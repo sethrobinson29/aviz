@@ -11,6 +11,8 @@ music-visualizer/
 ├── .gitignore
 ├── CMakeLists.txt
 ├── handoffs/
+│   ├── bootstrap-prompt.txt          # first-session prompt: scaffold CMakeLists.txt,
+│   │                                  # directory tree, README.md before any feature work
 │   ├── testing-prompt.txt         # standalone audit prompt for a fresh agent session
 │   │                                # to review test-suite integrity — see TESTING.md and
 │   │                                # DEFINITION_OF_DONE.md's "Who writes the tests"

@@ -1,0 +1,14 @@
+I'm starting a new C++ project — a real-time, layered audio-reactive music visualizer. The repo root already contains: CLAUDE.md, STRUCTURE.md, TESTING.md, DEFINITION_OF_DONE.md, visualizer-design-spec.md, .clang-format, .gitignore, and a handoffs/ folder (Claude Design UI export + notes, a separate test-suite audit prompt — not relevant to bootstrapping, ignore for now). This is already a git repository with those docs committed as the initial commit. Read all of the docs before doing anything else — they define the architecture, invariants, testing strategy, file layout, and completion criteria you're expected to follow for the rest of this project.
+
+Windows is the primary and only target right now (see CLAUDE.md's Target Platform section) — build and run natively, not through WSL2.
+
+Your first task is bootstrapping, not feature work. In order:
+
+1. Create CMakeLists.txt at the repo root per the dependency policy in STRUCTURE.md — FetchContent for miniaudio, raylib, and GoogleTest/GoogleMock, each pinned to a specific release tag or commit (not a tracking branch). Look up current stable tags for each rather than guessing. Configure builds to be out-of-source into build/ (already covered by .gitignore) using the Visual Studio generator (e.g. cmake -B build -G "Visual Studio 17 2022") — don't default to Ninja, since that requires a vcvars environment that doesn't set up cleanly from bash.
+2. Scaffold the full directory tree exactly as laid out in STRUCTURE.md — src/audio, src/compositor, src/visuals, src/ui_host, src/app, web/panel, tests/ mirroring src/ (including tests/ui_host and tests/fixtures), and assets/ (including assets/themes). Most of this will be empty to start; that's expected.
+3. Create a starter README.md — project description, build instructions, current feature list (will be minimal at this stage).
+4. Confirm the build actually configures and compiles with cmake -B build -G "Visual Studio 17 2022" && cmake --build build, and that ctest runs from the build directory (even with zero tests registered yet).
+5. If audio hardware or a display/GPU aren't available in this environment, follow the no-hardware fallback behavior in TESTING.md and say so explicitly rather than working around it silently.
+6. Commit the bootstrapped scaffold once confirmed working, per STRUCTURE.md's git conventions — this is a unit of work in its own right, separate from the initial docs-only commit.
+
+Once bootstrapping is confirmed working, stop and tell me what's in place before starting on actual feature work. Follow the milestones in visualizer-design-spec.md §8 / CLAUDE.md's Build Order from there (local file playback + feature extraction first, milestone 1).
