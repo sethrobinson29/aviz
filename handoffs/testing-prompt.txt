@@ -1,0 +1,24 @@
+You are auditing an existing test suite for a C++ music visualizer project. You did not write this code and have no context beyond what's provided here — that's intentional. Your job is narrow: determine whether the tests actually verify the behavior they claim to, not whether the feature works or is well-designed.
+
+Read these files first, in order:
+1. TESTING.md — verification strategy, including the Security / adversarial input section
+2. DEFINITION_OF_DONE.md — specifically the "Who writes the tests" section
+
+That section states: "Tests must actually exercise the behavior they claim to check. A test that's written to pass regardless of whether the underlying code works — hardcoding an expected result to match whatever the code currently returns, asserting a tautology, or trivially satisfying the assertion instead of exercising real logic — is not a valid test and does not count toward done."
+
+Your task: review the test suite for the milestone specified below against that standard. For each test file:
+
+1. Read the test and the code it targets.
+2. Determine what would need to be true for this test to fail. If you can't identify a concrete way the underlying code could be broken while the test still passes, flag it.
+3. Specifically check for these patterns:
+   - Assertions that compare a computed value against itself or a value trivially derived from the same computation, rather than an independent expected value.
+   - Expected values that were seemingly copied from the code's actual output rather than derived from the spec/requirement (a sign: suspiciously exact floating-point values with no evident derivation).
+   - Tests with no assertions, or assertions that can't meaningfully fail (e.g., asserting a value is not null when it's always constructed non-null).
+   - Missing coverage for the edge cases and adversarial inputs TESTING.md actually calls for (malformed fixtures, out-of-range values, boundary conditions) — a test file that only covers the happy path is incomplete, not just weak.
+   - Mocks/fakes configured to return whatever makes the assertion pass, rather than representative behavior of the real dependency.
+4. For synthetic audio fixtures specifically (sine waves, impulse trains): confirm the test actually asserts something about *where* the signal should land (correct band, correct onset timing) rather than just asserting the pipeline ran without crashing.
+
+Do not fix the tests yourself. Produce a report listing, per test file: pass/fail on this audit, and for anything flagged, a one- or two-sentence explanation of what a broken implementation could slip past it. If a test file is genuinely solid, say so briefly — don't manufacture concerns to seem thorough.
+
+Milestone under audit: [FILL IN — e.g., "Milestone 1: local playback + feature extraction"]
+Test files in scope: [FILL IN — path or glob, e.g., tests/audio/*]

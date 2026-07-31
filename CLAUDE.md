@@ -1,0 +1,66 @@
+# CLAUDE.md — Music Visualizer
+
+Project-specific guidance for Claude Code. See `visualizer-design-spec.md` in the repo root for full architecture rationale — this file is the condensed, actionable version for day-to-day work.
+
+## What this project is
+
+A real-time, layered audio-reactive visualizer. Audio comes from local files or system audio loopback (not direct YouTube/Bandcamp stream extraction — that's explicitly out of scope, see spec §3). Visuals are independent modules composited into a stack the user can reorder, blend, tint, and duplicate. The app is two separate native windows: a WebView2 control panel for managing the layer stack and theme, and a raylib window rendering the composited visuals, with a fullscreen mode for the latter. See spec §7 for the full UI architecture.
+
+## Stack
+
+- C++17 for the audio/visual core
+- miniaudio for audio I/O and loopback capture (WASAPI / Core Audio taps / PipeWire-PulseAudio monitor)
+- raylib for rendering
+- WebView2 (HTML/CSS/JS) for the control panel UI — a deliberate exception to "one language" for the core; see spec §7 for why and the `UIHost` interface that contains it
+
+Don't introduce other audio or rendering libraries without discussing it first, and don't let the WebView2/JS side grow beyond the control panel (e.g., don't move visual rendering or audio logic into it) — the audio/visual core stays single-language with no FFI boundaries within it.
+
+## Target Platform
+
+**Windows is the primary target — for both the audio core and the UI.** Develop, build, and run natively on Windows (MSVC + WebView2), not through WSL2. The spec's macOS/Linux loopback paths and any future non-Windows UI host (WebKitGTK, WKWebView) remain documented for future portability but are not implemented or tested until Windows is solid. Both platform-facing boundaries — the audio producer interface and the `UIHost` interface — are designed to be swappable later; neither is implemented for anything but Windows now.
+
+WSL2 is available and may be used for occasional diagnostic tooling (see `TESTING.md`'s concurrency section) but is not the dev/build/run environment.
+
+## Architecture invariants — do not violate these
+
+1. **Audio thread never blocks.** The miniaudio callback (file decode or loopback) only pushes PCM into a ring buffer. FFT/feature extraction happens on a separate worker thread. The render thread reads the latest computed `AudioFeatures` snapshot. If you're adding code to the audio callback path, stop and check which thread you're actually in.
+2. **Visual modules never touch raw PCM or FFT bins directly.** They consume the shared `AudioFeatures` struct (banded energies, onsets, RMS, peak freq, waveform snapshot) filtered to their assigned frequency range if applicable. This is the contract that keeps layers interchangeable.
+3. **Global beat is not a separate detector.** It's band index `kGlobalBandIndex`, computed with the same per-band spectral-flux onset logic as every other band, just scoped to full-spectrum energy. Don't add a second beat-detection algorithm.
+4. **Layers render to their own offscreen texture.** The compositor stacks textures; layers never share a canvas or render order-dependent state into each other directly.
+5. **Producers are interchangeable.** Local file playback and loopback capture both feed the same `push_frames(samples, count, channels, sample_rate)` interface. Don't special-case one producer downstream of that boundary.
+6. **The control panel and visualizer are separate windows with no shared-surface compositing.** Don't build anything that requires the WebView2 panel to render through/over a live view of the raylib output (or vice versa) — that would require DirectComposition/shared-surface interop we've deliberately avoided. Each window renders against its own background. See spec §7.
+7. **UI state crosses the C++/JS boundary through the defined state bridge only**, using the same JSON shape as layer preset persistence. Don't add ad hoc message formats or a second serialization scheme for UI state. Layer presets (saved layer-stack configurations) and themes (built-in UI skins) are distinct concepts with distinct storage — don't conflate them.
+8. **The control panel's security defaults are required, not optional hardening.** Restricted navigation, a CSP scoping resources to local content, DevTools disabled in release builds, and scoped local file access all ship as part of building the panel (milestone 8) — not added later as a follow-up. See spec §7 and `TESTING.md`'s Security / adversarial input section.
+
+## Build Order
+
+Follow the milestones in spec §8 unless directed otherwise: local playback + feature extraction → first visuals → compositor → duplication + freq mapping → loopback capture → remaining visual modules → tint/palette → control panel UI. Each is a checkpoint with its own completion bar — see `TESTING.md`'s milestone completion checklist before considering one finished.
+
+Don't jump ahead to later-stage visuals (fractals, flow fields, particles), loopback capture, or the control panel UI until the compositor and layer stack are working — retrofitting compositing onto a single-visual renderer, or building UI against a layer model that's still changing shape, is the mistake this order is designed to avoid.
+
+## Definition of Done
+
+See `DEFINITION_OF_DONE.md` for completion criteria by work type (visual module, pipeline change, bug fix) and the documentation update policy — README is updated immediately as part of done, architecture docs (`TESTING.md`, `STRUCTURE.md`, the design spec, this file) are flagged when stale, not auto-edited.
+
+## Structure
+
+See `STRUCTURE.md` for directory/file layout conventions (where modules, tests, and assets live, and how they relate to each other). Follow it when adding new files rather than improvising placement.
+
+## Verification
+
+See `TESTING.md` for the full verification strategy. Short version: pure-logic pieces (FFT banding, onset detection, envelope smoothing, serialization) get unit tests and synthetic fixtures. Visual, audio, and control-panel UI correctness are all verified by a human reviewing the actual running app — not by an agent claiming a rendered frame, clean buffer stats, or "it compiles" means it works. File parsing and the WebView2/JS boundary additionally get adversarial-input coverage (malformed fixtures, state-bridge validation) since those are real trust boundaries even in an offline app. Read `TESTING.md` before deciding how to verify a change.
+
+## Implementation Guidelines
+
+- Prioritize performance where there's a choice between approaches. If a performance-favoring approach costs functionality or scope, don't drop that functionality silently — surface the tradeoff and reason about it before proceeding.
+- Don't edit design documents (`visualizer-design-spec.md`, this file) as a side effect of implementation work. These are updated only when explicitly asked. If implementation reveals the docs are wrong or out of date, flag it instead of fixing it inline.
+- Check the relevant section of `visualizer-design-spec.md` (and this file) before making architectural or structural changes — implementation should follow the spec, not drift from it. If a task isn't covered by the spec, that's a design decision to surface, not one to improvise.
+- Favor idiomatic C++/miniaudio/raylib solutions over clever or unusual ones. Idiomatic here means: what a competent C++ developer familiar with these libraries would recognize immediately, not necessarily the most concise or performant possible construct.
+
+## Working style
+
+- Give clear reasoning for tradeoffs rather than just stating a conclusion.
+- Never make a design decision unilaterally. When there's a real choice — not just an implementation detail — surface the options and the tradeoffs and wait for a decision before proceeding.
+- Keep platform-specific code (WASAPI/Core Audio/PipeWire) isolated behind the shared capture interface — don't let platform branches leak into feature extraction, compositor, or visual module code.
+- No placeholder/stub visuals presented as done — if a visual module isn't fully wired to `AudioFeatures`, say so explicitly rather than leaving silent TODOs.
+- Same principle applies to environment failures: if audio hardware or a display/GPU can't be initialized, say so plainly rather than quietly stubbing out the affected system or fabricating success. See `TESTING.md` for the fallback behavior (synthetic signal producer, headless rendering) this should route to instead.

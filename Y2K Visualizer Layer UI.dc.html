@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Orbitron:wght@500;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050505; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#6a6d75,#25262b); border-radius: 6px; }
+  @keyframes beatPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  .y2k-slider { -webkit-appearance: none; appearance: none; background: transparent; }
+  .y2k-slider::-webkit-slider-runnable-track { height: 8px; background: linear-gradient(180deg,#0a0a0a,#26272b); border: 1px solid #000; box-shadow: inset 0 2px 3px rgba(0,0,0,0.8); }
+  .y2k-slider::-moz-range-track { height: 8px; background: linear-gradient(180deg,#0a0a0a,#26272b); border: 1px solid #000; box-shadow: inset 0 2px 3px rgba(0,0,0,0.8); }
+  .y2k-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 24px; margin-top: -9px; background: linear-gradient(180deg,color-mix(in srgb,var(--y2k-accent) 65%,white) 0%,var(--y2k-accent) 55%,color-mix(in srgb,var(--y2k-accent) 70%,black) 100%); border: 1px solid #000; box-shadow: 0 2px 0 #000, 0 0 8px var(--y2k-accent); clip-path: polygon(0 0, 100% 0, 100% 100%, 4px 100%, 0 calc(100% - 4px)); }
+  .y2k-slider::-moz-range-thumb { width: 16px; height: 24px; border-radius: 0; background: linear-gradient(180deg,color-mix(in srgb,var(--y2k-accent) 65%,white) 0%,var(--y2k-accent) 55%,color-mix(in srgb,var(--y2k-accent) 70%,black) 100%); border: 1px solid #000; box-shadow: 0 2px 0 #000, 0 0 8px var(--y2k-accent); }
+</style>
+</helmet>
+
+<div style="position:relative;width:100%;height:100vh;min-height:760px;display:flex;flex-direction:column;font-family:'Inter',sans-serif;background:radial-gradient(1200px 700px at 20% -10%, #1a1005 0%, #050505 55%), linear-gradient(160deg,#050505 0%,#0d0d10 45%,#050505 100%);color:#e8e9ee;overflow:hidden;">
+
+  <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0;">
+    <div style="position:absolute;top:-15%;left:-10%;width:55%;height:70%;border-radius:50%;background:radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%);filter:blur(30px);"></div>
+    <div style="position:absolute;bottom:-20%;right:-10%;width:60%;height:65%;border-radius:50%;background:radial-gradient(circle, {{ accentGlow }}, transparent 70%);filter:blur(50px);opacity:0.35;"></div>
+    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;">
+      <path d="M -100 680 C 250 520, 550 800, 950 560 S 1500 300 1750 420" fill="none" stroke="{{ accentColor }}" stroke-width="2.5" opacity="0.16"/>
+      <path d="M -80 200 C 260 40, 480 340, 860 140 S 1320 260 1720 60" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.08"/>
+      <path d="M -60 850 C 320 760, 460 950, 780 800 S 1200 640 1650 780" fill="none" stroke="#ffffff" stroke-width="5" opacity="0.05"/>
+      <path d="M 1180 900 C 1120 700 1300 660 1230 480 C 1360 590 1420 760 1360 900 Z" fill="{{ accentColor }}" opacity="0.06"/>
+      <path d="M 60 900 C 40 760 190 720 150 580 C 260 660 300 800 230 900 Z" fill="#ffffff" opacity="0.04"/>
+      <path d="M 200 -20 C 320 120 260 220 400 260 C 300 300 160 260 120 140 C 90 80 130 20 200 -20 Z" fill="none" stroke="{{ accentColor }}" stroke-width="1.5" opacity="0.12"/>
+      <path d="M 1500 -20 C 1400 60 1440 160 1350 220 C 1470 240 1560 180 1580 80 C 1590 40 1560 0 1500 -20 Z" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.07"/>
+    </svg>
+  </div>
+
+  <!-- TOP BAR -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 26px 16px 20px;background:repeating-linear-gradient(94deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 1px, rgba(0,0,0,0.06) 1px, rgba(0,0,0,0.06) 2px, transparent 2px, transparent 4px), linear-gradient(112deg, rgba(255,255,255,0.15) 0%, transparent 20%, transparent 55%, rgba(255,255,255,0.08) 70%, transparent 85%), linear-gradient(180deg,#2c2d31 0%, #0c0c0e 100%);border-bottom:2px solid {{ accentColor }};box-shadow:0 4px 20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);flex-shrink:0;position:relative;z-index:5;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:30px;height:30px;transform:rotate(45deg);background:radial-gradient(circle at 32% 28%, #fff 0%, {{ accentColor }} 40%, #000 130%);box-shadow:0 0 16px {{ accentGlow }}, inset 0 1px 2px rgba(255,255,255,0.5), 0 0 0 2px #000;"></div>
+      <div style="font-family:'Audiowide',cursive;font-size:22px;letter-spacing:1.5px;color:#d8dae0;text-shadow:0 0 12px {{ accentGlow }}, 0 1px 0 rgba(255,255,255,0.3), 0 2px 3px rgba(0,0,0,0.9);">VJ//STACK</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="position:relative;">
+        <button onClick="{{ togglePresetMenu }}" style="display:flex;align-items:center;gap:8px;padding:9px 18px 9px 22px;border:1px solid #000;background:linear-gradient(180deg,#6a6d75 0%,#3a3b40 50%,#1c1d20 100%);box-shadow:0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.4);color:#eceef2 !important;font-family:'Orbitron';font-weight:700;font-size:11.5px;letter-spacing:0.04em;cursor:pointer;clip-path:polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);" style-hover="filter:brightness(1.15);" style-active="transform:translateY(1px);box-shadow:0 1px 0 #000, inset 0 1px 3px rgba(0,0,0,0.5);">
+          PRESET: {{ presetName }} <span style="font-size:10px;transform:rotate({{ presetChevronDeg }});display:inline-block;transition:transform .15s;color:{{ accentColor }};">▾</span>
+        </button>
+        <sc-if value="{{ presetOpen }}">
+          <div style="position:absolute;top:calc(100% + 6px);right:0;min-width:180px;background:linear-gradient(180deg,#3a3b40,#1c1d20);box-shadow:0 10px 30px rgba(0,0,0,0.7);border:1px solid #000;border-left:2px solid {{ accentColor }};overflow:hidden;z-index:20;clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);">
+            <sc-for list="{{ presets }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.select }}" style="padding:10px 14px;font-size:12.5px;font-weight:600;color:#eceef2;cursor:pointer;font-family:'Inter';" style-hover="background:{{ accentColor }};color:#0a0a0a;">{{ p.label }}</div>
+            </sc-for>
+            <div style="padding:10px 14px;font-size:11.5px;font-weight:600;color:#8b8d95;border-top:1px solid rgba(255,255,255,0.08);cursor:pointer;" style-hover="color:#eceef2;">+ Save current as preset…</div>
+          </div>
+        </sc-if>
+      </div>
+      <button onClick="{{ addLayer }}" style="display:flex;align-items:center;gap:6px;padding:9px 22px 9px 18px;border:1px solid #000;background:linear-gradient(180deg,color-mix(in srgb,{{ accentColor }} 65%,white) 0%,{{ accentColor }} 45%,color-mix(in srgb,{{ accentColor }} 70%,black) 100%);box-shadow:0 3px 0 #000, 0 0 16px {{ accentGlow }}, inset 0 1px 0 rgba(255,255,255,0.6);color:#0a0a0a;font-family:'Orbitron';font-weight:800;font-size:12px;letter-spacing:0.04em;cursor:pointer;clip-path:polygon(0 0, calc(100% - 14px) 0, 100% 100%, 14px 100%);" style-hover="filter:brightness(1.15);" style-active="transform:translateY(2px);box-shadow:0 1px 0 #000, inset 0 1px 3px rgba(0,0,0,0.4);">
+        <span style="font-size:15px;line-height:1;">✚</span> ADD LAYER
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div style="position:relative;z-index:1;flex:1;display:grid;grid-template-columns:290px 1fr 340px;gap:16px;padding:16px;overflow:hidden;">
+
+    <!-- LEFT: LAYER STACK -->
+    <div style="position:relative;display:flex;flex-direction:column;background:repeating-linear-gradient(94deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(0,0,0,0.05) 1px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px), linear-gradient(112deg, rgba(255,255,255,0.14) 0%, transparent 20%, transparent 55%, rgba(255,255,255,0.07) 70%, transparent 85%), linear-gradient(180deg,#4a4c53 0%,#26272b 45%,#141517 100%);border:1px solid #000;box-shadow:0 8px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12);overflow:hidden;clip-path:polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 18px 100%, 0 calc(100% - 18px));">
+      <div style="position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:#000;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 0 0 1px #55575e;z-index:2;"></div>
+      <div style="position:absolute;bottom:8px;left:8px;width:6px;height:6px;border-radius:50%;background:#000;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 0 0 1px #55575e;z-index:2;"></div>
+      <div style="padding:12px 16px 10px;font-family:'Orbitron';font-weight:700;font-size:12px;letter-spacing:0.1em;color:#c8cad0;text-transform:uppercase;border-bottom:1px solid #000;box-shadow:0 1px 0 rgba(255,255,255,0.08);border-left:3px solid {{ accentColor }};">Layer Stack · {{ layerCount }}</div>
+      <div style="flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px;">
+        <sc-for list="{{ layers }}" as="layer" hint-placeholder-count="4">
+          <div draggable="true" onDragStart="{{ layer.onDragStart }}" onDragOver="{{ layer.onDragOver }}" onDrop="{{ layer.onDrop }}" onDragEnd="{{ onDragEnd }}" onClick="{{ layer.select }}" style="position:relative;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 10px;cursor:pointer;background:{{ layer.rowBg }};border:{{ layer.rowBorder }};box-shadow:{{ layer.rowShadow }};opacity:{{ layer.dragOpacity }};transition:box-shadow .12s, transform .12s;clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);">
+            <sc-if value="{{ layer.showDropLine }}"><div style="position:absolute;left:6px;right:6px;top:-5px;height:3px;background:{{ accentColor }};box-shadow:0 0 8px {{ accentGlow }};"></div></sc-if>
+            <div style="cursor:grab;display:grid;grid-template-columns:repeat(2,4px);grid-auto-rows:4px;gap:3px;padding:4px;" title="Drag to reorder">
+              <sc-for list="{{ dots }}" as="d" hint-placeholder-count="6"><div style="width:4px;height:4px;border-radius:50%;background:#9a9ca3;box-shadow:0 1px 0 rgba(0,0,0,0.6);"></div></sc-for>
+            </div>
+            <div style="width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px;filter:drop-shadow(0 0 6px {{ layer.tint }}88) drop-shadow(0 1px 1px rgba(0,0,0,0.6));">{{ layer.icon }}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-family:'Orbitron';font-weight:700;font-size:12.5px;letter-spacing:0.03em;color:#eceef2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ layer.name }}</div>
+              <div style="font-family:'IBM Plex Mono';font-size:10.5px;color:#9a9ca3;">{{ layer.summary }}</div>
+            </div>
+            <div style="width:9px;height:9px;border-radius:50%;background:{{ layer.tint }};box-shadow:0 0 6px {{ layer.tint }}, inset 0 1px 1px rgba(255,255,255,0.7);flex-shrink:0;"></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- CENTER: LIVE PREVIEW + TRANSPORT -->
+    <div style="display:flex;flex-direction:column;gap:14px;overflow:hidden;">
+      <div style="position:relative;flex:1;padding:16px 16px 18px 20px;background:repeating-linear-gradient(94deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(0,0,0,0.05) 1px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px), linear-gradient(112deg, rgba(255,255,255,0.14) 0%, transparent 20%, transparent 55%, rgba(255,255,255,0.07) 70%, transparent 85%), linear-gradient(180deg,#38393e,#101012);box-shadow:0 10px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);border:1px solid #000;display:flex;flex-direction:column;min-height:0;clip-path:polygon(34px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 34px);">
+        <div style="position:absolute;top:10px;left:10px;width:6px;height:6px;border-radius:50%;background:#000;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 0 0 1px #55575e;"></div>
+        <div style="position:absolute;bottom:10px;right:10px;width:6px;height:6px;border-radius:50%;background:#000;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 0 0 1px #55575e;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 6px 10px;">
+          <div style="font-family:'Orbitron';font-weight:700;font-size:12px;letter-spacing:0.1em;color:#c8cad0;text-transform:uppercase;border-left:3px solid {{ accentColor }};padding-left:8px;">Live Preview</div>
+          <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:11px;color:#9a9ca3;background:#0a0f0a;padding:3px 8px;border:1px solid #000;clip-path:polygon(6px 0, 100% 0, 100% 100%, 0 100%);"><span style="width:7px;height:7px;border-radius:50%;background:#ff3860;box-shadow:0 0 8px #ff3860;animation:beatPulse 0.6s ease-in-out infinite;"></span><span style="color:#ff3860;">REC</span> · 60fps</div>
+        </div>
+        <div style="flex:1;overflow:hidden;background:#000;border:8px solid #1c1d20;box-shadow:inset 0 0 40px rgba(0,0,0,0.9), 0 0 0 1px #000;position:relative;min-height:0;clip-path:polygon(0 0, 100% 0, 100% 100%, 22px 100%, 0 calc(100% - 22px));">
+          <canvas ref="{{ canvasRef }}" style="width:100%;height:100%;display:block;"></canvas>
+        </div>
+      </div>
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:16px;padding:12px 22px 12px 18px;background:repeating-linear-gradient(94deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(0,0,0,0.05) 1px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px), linear-gradient(112deg, rgba(255,255,255,0.14) 0%, transparent 20%, transparent 55%, rgba(255,255,255,0.07) 70%, transparent 85%), linear-gradient(180deg,#4a4c53,#26272b 45%,#141517);box-shadow:0 6px 18px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12);border:1px solid #000;clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);">
+        <button onClick="{{ togglePlaying }}" style="width:42px;height:42px;border-radius:50%;flex-shrink:0;background:radial-gradient(circle at 35% 30%, #fff, {{ accentColor }} 45%, #000 130%);box-shadow:0 3px 0 #000, 0 0 14px {{ accentGlow }}, inset 0 1px 1px rgba(255,255,255,0.4);border:1px solid #000;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#0a0a0a;font-size:15px;" style-hover="filter:brightness(1.15);" style-active="transform:translateY(2px);">{{ playIcon }}</button>
+        <div style="flex:1;">
+          <div style="font-family:'Orbitron';font-weight:700;font-size:10.5px;color:#9a9ca3;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Master Beat</div>
+          <div style="display:flex;gap:3px;align-items:flex-end;height:20px;background:#0a0f0a;padding:2px 4px;border:1px solid #000;">
+            <sc-for list="{{ beatBars }}" as="b" hint-placeholder-count="20"><div style="width:4px;background:{{ b.color }};height:{{ b.height }};transition:height .08s;"></div></sc-for>
+          </div>
+        </div>
+        <div style="font-family:'IBM Plex Mono';font-size:13px;color:#39ff6a;font-weight:600;background:#0a0f0a;padding:5px 10px;border:1px solid #000;text-shadow:0 0 6px #39ff6a99;clip-path:polygon(0 0, 100% 0, 100% 100%, 8px 100%);">128 BPM</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: INSPECTOR -->
+    <div style="position:relative;display:flex;flex-direction:column;background:repeating-linear-gradient(94deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, rgba(0,0,0,0.05) 1px, rgba(0,0,0,0.05) 2px, transparent 2px, transparent 4px), linear-gradient(112deg, rgba(255,255,255,0.14) 0%, transparent 20%, transparent 55%, rgba(255,255,255,0.07) 70%, transparent 85%), linear-gradient(180deg,#4a4c53 0%,#26272b 45%,#141517 100%);border:1px solid #000;box-shadow:0 8px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12);overflow-y:auto;clip-path:polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 26px) 100%, 0 100%);">
+      <div style="position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:#000;box-shadow:inset 0 1px 1px rgba(255,255,255,0.3), 0 0 0 1px #55575e;z-index:2;"></div>
+      <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:16px;display:flex;flex-direction:column;gap:18px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:28px;filter:drop-shadow(0 0 7px {{ selLayer.tint }}88) drop-shadow(0 1px 1px rgba(0,0,0,0.6));">{{ selLayer.icon }}</div>
+            <input value="{{ selLayer.name }}" onChange="{{ updateName }}" style="flex:1;font-family:'Orbitron';font-weight:700;font-size:14px;letter-spacing:0.02em;color:#eceef2;background:#0a0f0a;border:1px solid #000;padding:8px 10px;clip-path:polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));"/>
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;font-family:'Orbitron';font-weight:700;font-size:10.5px;color:#9a9ca3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;"><span>Opacity</span><span style="font-family:'IBM Plex Mono';color:#39ff6a;background:#0a0f0a;padding:2px 6px;border-radius:3px;border:1px solid #000;text-shadow:0 0 5px #39ff6a99;">{{ selLayer.opacityPct }}</span></div>
+            <input type="range" min="0" max="100" value="{{ selLayer.opacity }}" onChange="{{ updateOpacity }}" class="y2k-slider" style="width:100%;height:24px;--y2k-accent:{{ accentColor }};"/>
+          </div>
+
+          <div>
+            <div style="font-family:'Orbitron';font-weight:700;font-size:10.5px;color:#9a9ca3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Blend Mode</div>
+            <select value="{{ selLayer.blend }}" onChange="{{ updateBlend }}" style="width:100%;padding:10px 14px;border:1px solid #000;background:linear-gradient(180deg,#6a6d75,#26272b);box-shadow:0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.3);font-family:'Inter';font-weight:600;font-size:13px;color:#eceef2;cursor:pointer;clip-path:polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));">
+              <sc-for list="{{ blendOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}" selected="{{ o.selected }}" style="color:#1c1d20;background:#dfe1e6;">{{ o.v }}</option></sc-for>
+            </select>
+          </div>
+
+          <div>
+            <div style="font-family:'Orbitron';font-weight:700;font-size:10.5px;color:#9a9ca3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Tint Override</div>
+            <div style="position:relative;">
+              <button onClick="{{ toggleColorPopover }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 14px;border:1px solid #000;background:linear-gradient(180deg,#6a6d75,#26272b);box-shadow:0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.3);cursor:pointer;clip-path:polygon(10px 0, 100% 0, 100% 100%, 0 100%);">
+                <div style="width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff, {{ selLayer.tint }} 55%, #000 130%);box-shadow:inset 0 1px 1px rgba(255,255,255,0.5), 0 0 8px {{ selLayer.tint }}, 0 0 0 1px #000;"></div>
+                <span style="font-family:'IBM Plex Mono';font-size:12px;color:#eceef2;">{{ selLayer.tint }}</span>
+              </button>
+              <sc-if value="{{ colorPopoverOpen }}">
+                <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;padding:12px;background:linear-gradient(180deg,#3a3b40,#1c1d20);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.7);border:1px solid #000;z-index:20;display:flex;flex-wrap:wrap;gap:8px;">
+                  <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="8">
+                    <div onClick="{{ s.select }}" style="width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff,{{ s.color }} 55%,#000 130%);cursor:pointer;box-shadow:0 0 6px {{ s.color }}, inset 0 1px 1px rgba(255,255,255,0.5);border:{{ s.border }};"></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-family:'Orbitron';font-weight:700;font-size:10.5px;color:#9a9ca3;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Reactivity Source</div>
+            <select value="{{ selLayer.band }}" onChange="{{ updateBand }}" style="width:100%;padding:10px 14px;border:1px solid #000;background:linear-gradient(180deg,#6a6d75,#26272b);box-shadow:0 2px 0 #000, inset 0 1px 0 rgba(255,255,255,0.3);font-family:'Inter';font-weight:600;font-size:13px;color:#eceef2;cursor:pointer;clip-path:polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));">
+              <sc-for list="{{ bandOptions }}" as="o" hint-placeholder-count="7"><option value="{{ o.v }}" selected="{{ o.selected }}" style="color:#1c1d20;background:#dfe1e6;">{{ o.v }}</option></sc-for>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:6px;border-top:1px solid #000;padding-top:16px;">
+            <button onClick="{{ duplicateLayer }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid #000;background:linear-gradient(180deg,#6a6d75,#26272b);box-shadow:0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,0.3);color:#eceef2;font-family:'Orbitron';font-weight:700;font-size:11.5px;letter-spacing:0.02em;cursor:pointer;clip-path:polygon(10px 0, 100% 0, 100% 100%, 0 100%);" style-hover="filter:brightness(1.15);" style-active="transform:translateY(2px);box-shadow:inset 0 1px 3px rgba(0,0,0,0.5);">⧉ DUPLICATE</button>
+            <button onClick="{{ deleteLayer }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border:1px solid #000;background:linear-gradient(180deg,#ff8fa8 0%,#ff3860 45%,#8a0e2c 100%);box-shadow:0 3px 0 #000, 0 0 12px rgba(255,56,96,0.5), inset 0 1px 0 rgba(255,255,255,0.4);color:#fff;font-family:'Orbitron';font-weight:700;font-size:11.5px;letter-spacing:0.02em;cursor:pointer;clip-path:polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);" style-hover="filter:brightness(1.15);" style-active="transform:translateY(2px);box-shadow:0 1px 0 #000;">✕ DELETE</button>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ !hasSelection }}">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:30px;text-align:center;color:#6b6d75;font-family:'Orbitron';font-size:12px;font-weight:700;letter-spacing:0.04em;">Select a layer to edit its properties</div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:860},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#00e0ff&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#00e0ff&quot;,&quot;#ff2ec4&quot;,&quot;#baff29&quot;,&quot;#ff8a00&quot;]}}">
+
+const TYPE_META = {
+  waveform: { icon: '〰️', pattern: 'waveform' },
+  spectrum: { icon: '📊', pattern: 'spectrum' },
+  particles: { icon: '✦', pattern: 'particles' },
+  fractal: { icon: '🌀', pattern: 'fractal' },
+};
+const PALETTE = ['#ff2ec4', '#00e0ff', '#baff29', '#ff8a00', '#c86bff', '#ff5c5c', '#4dff9e', '#ffe066'];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.canvasRef = React.createRef();
+    this.rafId = null;
+    this.dragId = null;
+    this.state = {
+      selectedId: 2,
+      dragOverId: null,
+      presetOpen: false,
+      colorPopoverOpen: false,
+      playing: true,
+      t: 0,
+      layers: [
+        { id: 1, name: 'Background Fractal', type: 'fractal', opacity: 70, blend: 'Screen', tint: '#c86bff', band: 'Low Mid' },
+        { id: 2, name: 'Spectrum Bars', type: 'spectrum', opacity: 100, blend: 'Additive', tint: '#00e0ff', band: 'Global Beat' },
+        { id: 3, name: 'Waveform Glow', type: 'waveform', opacity: 55, blend: 'Screen', tint: '#ff2ec4', band: 'Bass' },
+        { id: 4, name: 'Particle Sparks', type: 'particles', opacity: 85, blend: 'Additive', tint: '#baff29', band: 'Treble' },
+      ],
+      nextId: 5,
+    };
+  }
+
+  componentDidMount() {
+    const loop = () => {
+      this.setState(s => ({ t: s.t + (s.playing ? 1 : 0) }));
+      this.draw();
+      this.rafId = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.rafId); }
+
+  draw() {
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (canvas.width !== rect.width || canvas.height !== rect.height) {
+      canvas.width = rect.width; canvas.height = rect.height;
+    }
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height, t = this.state.t * 0.05;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+    const compositeMap = { Normal: 'source-over', Additive: 'lighter', Multiply: 'multiply', Screen: 'screen' };
+
+    [...this.state.layers].reverse().forEach((layer, idx) => {
+      ctx.save();
+      ctx.globalAlpha = layer.opacity / 100;
+      ctx.globalCompositeOperation = compositeMap[layer.blend] || 'source-over';
+      ctx.strokeStyle = layer.tint; ctx.fillStyle = layer.tint;
+      ctx.lineWidth = 2.5;
+      const meta = TYPE_META[layer.type];
+      if (meta.pattern === 'waveform') {
+        ctx.beginPath();
+        for (let x = 0; x <= w; x += 4) {
+          const y = h / 2 + Math.sin(x * 0.02 + t * 3 + idx) * (h * 0.18) * Math.sin(t + x * 0.001);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      } else if (meta.pattern === 'spectrum') {
+        const bars = 32;
+        for (let i = 0; i < bars; i++) {
+          const bh = (Math.abs(Math.sin(i * 0.6 + t * 2)) * 0.6 + Math.abs(Math.sin(t * 4 + i)) * 0.4) * h * 0.5;
+          ctx.fillRect((i / bars) * w, h - bh, (w / bars) * 0.7, bh);
+        }
+      } else if (meta.pattern === 'particles') {
+        for (let i = 0; i < 40; i++) {
+          const a = i * 0.16 + t * 1.5;
+          const r = (Math.sin(t + i) * 0.5 + 0.5) * Math.min(w, h) * 0.42;
+          const x = w / 2 + Math.cos(a) * r, y = h / 2 + Math.sin(a * 1.3) * r * 0.6;
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (meta.pattern === 'fractal') {
+        ctx.beginPath();
+        const cx = w / 2, cy = h / 2;
+        for (let i = 0; i < 240; i++) {
+          const a = i * 0.25 + t;
+          const r = i * 0.9 * (0.5 + Math.sin(t * 0.5) * 0.2);
+          const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+
+  selectLayer(id) { this.setState({ selectedId: id, colorPopoverOpen: false }); }
+  addLayer() {
+    const types = Object.keys(TYPE_META);
+    const type = types[this.state.nextId % types.length];
+    const id = this.state.nextId;
+    this.setState(s => ({
+      nextId: id + 1, selectedId: id,
+      layers: [{ id, name: `New ${type[0].toUpperCase()}${type.slice(1)}`, type, opacity: 80, blend: 'Normal', tint: PALETTE[id % PALETTE.length], band: 'Global Beat' }, ...s.layers],
+    }));
+  }
+  duplicateLayer() {
+    const layer = this.state.layers.find(l => l.id === this.state.selectedId);
+    if (!layer) return;
+    const id = this.state.nextId;
+    this.setState(s => {
+      const idx = s.layers.findIndex(l => l.id === layer.id);
+      const copy = { ...layer, id, name: layer.name + ' Copy' };
+      const layers = [...s.layers]; layers.splice(idx, 0, copy);
+      return { layers, nextId: id + 1, selectedId: id };
+    });
+  }
+  deleteLayer() {
+    this.setState(s => {
+      const layers = s.layers.filter(l => l.id !== s.selectedId);
+      return { layers, selectedId: layers[0] ? layers[0].id : null };
+    });
+  }
+  updateOpacity(e) { const v = Number(e.target.value); this.updateSelected(l => ({ ...l, opacity: v })); }
+  updateBlend(e) { const v = e.target.value; this.updateSelected(l => ({ ...l, blend: v })); }
+  updateBand(e) { const v = e.target.value; this.updateSelected(l => ({ ...l, band: v })); }
+  updateName(e) { const v = e.target.value; this.updateSelected(l => ({ ...l, name: v })); }
+  updateSelected(fn) {
+    this.setState(s => ({ layers: s.layers.map(l => l.id === s.selectedId ? fn(l) : l) }));
+  }
+  setTint(color) { this.updateSelected(l => ({ ...l, tint: color })); this.setState({ colorPopoverOpen: false }); }
+
+  onDragStart(id) { this.dragId = id; }
+  onDragOver(id) { if (id !== this.state.dragOverId) this.setState({ dragOverId: id }); }
+  onDrop(targetId) {
+    const fromId = this.dragId;
+    if (fromId == null || fromId === targetId) { this.setState({ dragOverId: null }); return; }
+    this.setState(s => {
+      const layers = [...s.layers];
+      const fromIdx = layers.findIndex(l => l.id === fromId);
+      const toIdx = layers.findIndex(l => l.id === targetId);
+      const [moved] = layers.splice(fromIdx, 1);
+      layers.splice(toIdx, 0, moved);
+      return { layers, dragOverId: null };
+    });
+  }
+
+  renderVals() {
+    const accentColor = this.props.accentColor || '#00e0ff';
+    const accentGlow = accentColor + '99';
+    const selLayer = this.state.layers.find(l => l.id === this.state.selectedId);
+    const layers = this.state.layers.map(layer => {
+      const isSel = layer.id === this.state.selectedId;
+      const isDragOver = this.state.dragOverId === layer.id;
+      return {
+        ...layer,
+        icon: TYPE_META[layer.type].icon,
+        summary: `${layer.blend} · ${layer.opacity}% · ${layer.band}`,
+        iconBg: `linear-gradient(180deg, ${layer.tint}44, ${layer.tint}22)`,
+        rowBg: isSel ? `linear-gradient(180deg,#4a4c53,#1c1d20)` : 'linear-gradient(180deg,#3a3c42,#1c1d20)',
+        rowBorder: isSel ? `2px solid ${accentColor}` : '1px solid #000',
+        rowShadow: isSel ? `0 0 12px ${accentGlow}` : '0 1px 3px rgba(0,0,0,0.15)',
+        dragOpacity: this.dragId === layer.id ? 0.4 : 1,
+        showDropLine: isDragOver,
+        select: () => this.selectLayer(layer.id),
+        onDragStart: () => this.onDragStart(layer.id),
+        onDragOver: (e) => { e.preventDefault(); this.onDragOver(layer.id); },
+        onDrop: (e) => { e.preventDefault(); this.onDrop(layer.id); },
+      };
+    });
+    const beatBars = Array.from({ length: 20 }, (_, i) => {
+      const h = this.state.playing ? (Math.abs(Math.sin(this.state.t * 0.1 + i * 0.5)) * 16 + 3) : 3;
+      return { height: `${h}px`, color: i % 5 === 0 ? accentColor : '#8b91ab' };
+    });
+    return {
+      accentColor, accentGlow,
+      layers, dots: Array.from({ length: 6 }),
+      layerCount: layers.length,
+      hasSelection: !!selLayer,
+      selLayer: selLayer ? { ...selLayer, iconBg: `linear-gradient(180deg, ${selLayer.tint}44, ${selLayer.tint}22)`, icon: TYPE_META[selLayer.type].icon, opacityPct: `${selLayer.opacity}%` } : {},
+      blendOptions: ['Normal', 'Additive', 'Multiply', 'Screen'].map(v => ({ v, selected: selLayer && selLayer.blend === v })),
+      bandOptions: ['Global Beat', 'Sub Bass', 'Bass', 'Low Mid', 'Mid', 'High Mid', 'Treble'].map(v => ({ v, selected: selLayer && selLayer.band === v })),
+      swatches: PALETTE.map(c => ({ color: c, border: selLayer && selLayer.tint === c ? '2px solid #1c1b2e' : '2px solid transparent', select: () => this.setTint(c) })),
+      updateOpacity: (e) => this.updateOpacity(e),
+      updateBlend: (e) => this.updateBlend(e),
+      updateBand: (e) => this.updateBand(e),
+      updateName: (e) => this.updateName(e),
+      addLayer: () => this.addLayer(),
+      duplicateLayer: () => this.duplicateLayer(),
+      deleteLayer: () => this.deleteLayer(),
+      onDragEnd: () => { this.dragId = null; this.setState({ dragOverId: null }); },
+      toggleColorPopover: () => this.setState(s => ({ colorPopoverOpen: !s.colorPopoverOpen })),
+      colorPopoverOpen: this.state.colorPopoverOpen,
+      togglePresetMenu: () => this.setState(s => ({ presetOpen: !s.presetOpen })),
+      presetOpen: this.state.presetOpen,
+      presetChevronDeg: this.state.presetOpen ? '180deg' : '0deg',
+      presetName: 'Club Neon',
+      presets: ['Club Neon', 'Chill Ambient', 'Rave Strobe'].map(label => ({ label, select: () => this.setState({ presetOpen: false, presetName: label }) })),
+      canvasRef: this.canvasRef,
+      togglePlaying: () => this.setState(s => ({ playing: !s.playing })),
+      playIcon: this.state.playing ? '❚❚' : '▶',
+      beatBars,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
