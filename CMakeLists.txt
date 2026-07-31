@@ -49,7 +49,7 @@ enable_testing()
 include(GoogleTest)
 
 # --- app ---------------------------------------------------------------------
-add_executable(aviz src/main.cpp)
+add_executable(aviz src/main.cpp src/audio/miniaudio_backend.cpp)
 target_link_libraries(aviz PRIVATE miniaudio raylib)
 
 # --- tests ---------------------------------------------------------------------
