@@ -35,6 +35,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib)
 
+# --- pffft --------------------------------------------------------------------
+# Float-only; SIMD left on with pffft's own default arch level ("none" —
+# no explicit /arch: flag), which on MSVC x64 means the mandatory SSE2
+# baseline with no AVX opt-in. Tests/benchmarks/examples default OFF when
+# consumed as a subdirectory dependency, per pffft's own CMakeLists.txt.
+set(PFFFT_USE_TYPE_FLOAT ON CACHE BOOL "" FORCE)
+set(PFFFT_USE_TYPE_DOUBLE OFF CACHE BOOL "" FORCE)
+set(PFFFT_USE_SIMD ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+  pffft
+  GIT_REPOSITORY https://github.com/marton78/pffft.git
+  GIT_TAG v1.1.0
+)
+FetchContent_MakeAvailable(pffft)
+
 # --- GoogleTest / GoogleMock ---------------------------------------------------
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
@@ -49,8 +65,8 @@ enable_testing()
 include(GoogleTest)
 
 # --- app ---------------------------------------------------------------------
-add_executable(aviz src/main.cpp src/audio/miniaudio_backend.cpp)
-target_link_libraries(aviz PRIVATE miniaudio raylib)
+add_executable(aviz src/main.cpp src/audio/miniaudio_backend.cpp src/audio/ring_buffer.cpp)
+target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
 
 # --- tests ---------------------------------------------------------------------
 add_subdirectory(tests)
