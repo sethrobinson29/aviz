@@ -2,12 +2,6 @@
 
 #include <gtest/gtest.h>
 
-// FeatureWorker's poll loop drives a real thread against a real
-// AudioRingBuffer, but the mixdown/window-slide math it does each tick is
-// pure logic — pulled out as audio_worker_utils free functions specifically
-// so it's testable here without spinning up either (TESTING.md: pure-logic
-// pieces get direct unit tests).
-
 using audio_worker_utils::mixdown_to_mono;
 using audio_worker_utils::slide_window;
 

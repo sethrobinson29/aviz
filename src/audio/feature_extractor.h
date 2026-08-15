@@ -9,12 +9,9 @@
 
 struct PFFFT_Setup;
 
-// Turns one time-domain analysis window into one AudioFeatures snapshot:
-// windowed real FFT (pffft), log-band energy mapping, per-band spectral-flux
-// onset detection, and one-pole attack/release envelope smoothing (spec §4).
-// Pure logic, no threading/IO — unit-testable directly against synthetic
-// fixtures per TESTING.md. Not thread-safe: the feature worker owns one
-// instance and calls process() sequentially from a single thread.
+// Turns one time-domain analysis window into one AudioFeatures snapshot.
+// Not thread-safe: the feature worker owns one instance and calls process()
+// sequentially from a single thread.
 class FeatureExtractor {
 public:
     explicit FeatureExtractor(unsigned sample_rate);
@@ -24,10 +21,8 @@ public:
     FeatureExtractor& operator=(const FeatureExtractor&) = delete;
 
     // `mono_window` must have exactly audio_config::kFftWindowSize samples.
-    // `discontinuity` resets per-band onset history (flux comparisons across
-    // a ring-buffer overwrite gap would otherwise look like a spurious
-    // transient, spec §3) but leaves envelope state alone — the envelope has
-    // no notion of temporal contiguity to violate, it just tracks a value.
+    // `discontinuity` resets per-band onset history; envelope/AGC state is
+    // left alone.
     void process(const float* mono_window, bool discontinuity, AudioFeatures& out);
 
 private:
@@ -40,11 +35,10 @@ private:
     PFFFT_Setup* fft_setup_;
     std::vector<float> hann_window_;
 
-    // pffft requires 16-byte-aligned buffers; std::vector's alignment
-    // guarantee isn't sufficient by the library's own documented contract,
-    // so these are allocated via pffft_aligned_malloc/free instead.
-    float* windowed_input_;  // pffft input, size kFftWindowSize
-    float* fft_output_;      // pffft ordered output, size kFftWindowSize
+    // Allocated via pffft_aligned_malloc/free -- pffft requires 16-byte
+    // alignment, which std::vector doesn't guarantee.
+    float* windowed_input_;  // size kFftWindowSize
+    float* fft_output_;      // ordered output, size kFftWindowSize
 
     std::vector<float> magnitude_;  // bins [0, kFftWindowSize/2]
     std::array<BandRange, audio_config::kNumBands> band_ranges_{};
@@ -58,6 +52,14 @@ private:
 
     float attack_coeff_;
     float release_coeff_;
+
+    // Peak-hold-with-slow-release reference tracking smoothed_energy_: an
+    // exact snap on rise, a slow decay (audio_config::kAgcDecayTauMs)
+    // otherwise. Seeded on the first process() call; agc_seeded_ never
+    // resets, not even on `discontinuity`.
+    std::array<float, audio_config::kTotalBandSlots> agc_reference_{};
+    float agc_decay_coeff_;
+    bool agc_seeded_ = false;
 
     void reset_onset_history();
 };

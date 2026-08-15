@@ -20,5 +20,4 @@ Your task: review the test suite for the milestone specified below against that 
 
 Do not fix the tests yourself. Produce a report listing, per test file: pass/fail on this audit, and for anything flagged, a one- or two-sentence explanation of what a broken implementation could slip past it. If a test file is genuinely solid, say so briefly — don't manufacture concerns to seem thorough.
 
-Milestone under audit: [FILL IN — e.g., "Milestone 1: local playback + feature extraction"]
-Test files in scope: [FILL IN — path or glob, e.g., tests/audio/*]
+Milestone under audit: Milestone 2

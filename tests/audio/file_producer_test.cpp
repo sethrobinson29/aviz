@@ -8,11 +8,6 @@
 
 #include <gtest/gtest.h>
 
-// File decoding is a real trust boundary (TESTING.md's Security /
-// adversarial input section): a malformed or missing file must be rejected
-// cleanly (no crash, no silent misbehavior), not just handled for the happy
-// path. Fixture bytes are generated in-test rather than committed as binary
-// files, per tests/fixtures' "synthetic, code-generated" convention.
 namespace {
 
 std::filesystem::path temp_path(const char* name) {
@@ -84,11 +79,8 @@ TEST(FileProducerTest, ThrowsOnTruncatedWav) {
     auto path = temp_path("aviz_test_truncated.wav");
     write_bytes(path, truncated);
 
-    // miniaudio may either throw (rejects on open) or succeed with a
-    // decoder that simply yields fewer frames than declared — both are
-    // "fails safely." What must not happen is a crash, which EXPECT_NO_FATAL_FAILURE-
-    // style execution (falling through this test body without crashing)
-    // already demonstrates.
+    // Either throwing or opening with fewer frames than declared is fine;
+    // a crash is not.
     try {
         FileProducer producer(path.string());
     } catch (const std::runtime_error&) {

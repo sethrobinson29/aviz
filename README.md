@@ -9,18 +9,17 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Milestone 1 (local playback + feature extraction) is implemented and
-verified — see "Features" and "Running" below. Build order follows
-`visualizer-design-spec.md` §8. No compositor, visuals, or control panel UI
-yet.
+Local playback + feature extraction, and waveform/spectrum visuals
+rendering from live audio, are implemented and verified — see "Features"
+and "Running" below. Build order follows `visualizer-design-spec.md` §8.
 
 ## Stack
 
 - C++17 core
 - [miniaudio](https://github.com/mackron/miniaudio) — audio I/O, file decoding, and loopback capture
 - [pffft](https://github.com/marton78/pffft) — real-valued FFT for feature extraction
-- [raylib](https://github.com/raysan5/raylib) — rendering (not yet wired up to any output)
-- WebView2 (HTML/CSS/JS) — control panel UI (not yet built)
+- [raylib](https://github.com/raysan5/raylib) — rendering
+- WebView2 (HTML/CSS/JS) — control panel UI (planned)
 
 ## Platform
 
@@ -52,9 +51,11 @@ build/Release/aviz.exe <path-to-audio-file>
 
 Plays the file through the default output device (WAV, MP3, and FLAC —
 whatever miniaudio's built-in decoders cover; no OGG/Vorbis support wired up
-yet) while logging live feature-extraction output to the console every
-250ms: RMS, peak frequency, global-band energy, and whether an onset fired
-in the global band since the last print.
+yet) and opens a window rendering the audio-reactive visualization.
+
+- `1` — waveform
+- `2` — spectrum bars
+- close the window (or Alt+F4) to quit
 
 ## Testing
 
@@ -80,3 +81,9 @@ run directly from `tsan/`.
 - **Triple-buffered `AudioFeatures` handoff** from the worker thread to the
   render/consumer side — see `CLAUDE.md` invariant #1 for why a plain
   double-buffer isn't sufficient here.
+- **Waveform and spectrum bar visuals**, hotkey-switchable, each rendering
+  to its own offscreen texture. Spectrum bars normalize per band against a
+  peak-hold-with-slow-release reference (fast attack, slow release) rather
+  than a single shared scale, since band energy magnitude varies by orders
+  of magnitude bass-to-presence. Both settle to a flat/idle rest pose below
+  an RMS floor instead of rendering near-silence noise.

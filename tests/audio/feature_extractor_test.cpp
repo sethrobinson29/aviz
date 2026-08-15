@@ -10,19 +10,31 @@ namespace {
 
 constexpr unsigned kSampleRate = 48000;
 
-// Independent re-derivation of the log-band edge formula from spec §4 /
-// audio_config.h's public constants (kMinBandFrequencyHz, kNumBands) — not
-// a call into FeatureExtractor's private banding, so this actually checks
-// the extractor's output against the documented band layout rather than
-// against itself.
+// Independent re-derivation of the log-band-edge-to-FFT-bin formula, not a
+// call into FeatureExtractor's private banding. Bin-quantized rather than a
+// continuous threshold on `hz`, matching how a real tone's energy actually
+// lands in a single FFT bin.
 std::size_t band_for_frequency(float hz, unsigned sample_rate) {
+    constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;
     float low = audio_config::kMinBandFrequencyHz;
     float high = static_cast<float>(sample_rate) / 2.0f;
+
+    auto bin_for = [sample_rate, kNumFftBins](float f) -> std::size_t {
+        double bin = static_cast<double>(f) * audio_config::kFftWindowSize / sample_rate;
+        std::size_t rounded = static_cast<std::size_t>(std::lround(bin));
+        return std::min(rounded, kNumFftBins - 1);
+    };
+
+    std::size_t target_bin = bin_for(hz);
+    std::size_t bin_cursor = bin_for(low);
     for (std::size_t b = 0; b < audio_config::kNumBands; ++b) {
         float edge_hi = low * std::pow(high / low, static_cast<float>(b + 1) / audio_config::kNumBands);
-        if (hz < edge_hi) {
+        std::size_t bin_hi = std::max(bin_for(edge_hi), bin_cursor + 1);
+        bin_hi = std::min(bin_hi, kNumFftBins);
+        if (target_bin < bin_hi) {
             return b;
         }
+        bin_cursor = bin_hi;
     }
     return audio_config::kNumBands - 1;
 }
@@ -54,6 +66,38 @@ TEST(FeatureExtractorTest, KnownFrequencyLandsInExpectedBandAndPeak) {
     EXPECT_EQ(max_band, expected_band);
 }
 
+// Regression test for a duplicate-bin bug at the low end (two adjacent
+// bands both resolving to the same FFT bin). Uses two tones one FFT bin
+// apart, since KnownFrequencyLandsInExpectedBandAndPeak's 1kHz tone sits
+// well above the affected range.
+TEST(FeatureExtractorTest, LowFrequencyBandsDoNotOverlap) {
+    constexpr float kBin1Hz = 46.875f;  // 1 * sample_rate/kFftWindowSize -> FFT bin 1
+    constexpr float kBin2Hz = 93.75f;   // 2 * sample_rate/kFftWindowSize -> FFT bin 2
+
+    auto tone1 = fixtures::sine_wave(kBin1Hz, kSampleRate, audio_config::kFftWindowSize);
+    auto tone2 = fixtures::sine_wave(kBin2Hz, kSampleRate, audio_config::kFftWindowSize);
+
+    FeatureExtractor extractor1(kSampleRate);
+    FeatureExtractor extractor2(kSampleRate);
+    AudioFeatures out1;
+    AudioFeatures out2;
+    for (int i = 0; i < 50; ++i) {
+        extractor1.process(tone1.data(), false, out1);
+        extractor2.process(tone2.data(), false, out2);
+    }
+
+    std::size_t band1 = 0;
+    std::size_t band2 = 0;
+    for (std::size_t b = 1; b < audio_config::kNumBands; ++b) {
+        if (out1.band_energy[b] > out1.band_energy[band1]) band1 = b;
+        if (out2.band_energy[b] > out2.band_energy[band2]) band2 = b;
+    }
+
+    EXPECT_EQ(band1, band_for_frequency(kBin1Hz, kSampleRate));
+    EXPECT_EQ(band2, band_for_frequency(kBin2Hz, kSampleRate));
+    EXPECT_NE(band1, band2) << "adjacent low-frequency bins mapped to the same band";
+}
+
 // --- Onset differentiation ------------------------------------------------
 //
 // TESTING.md: "a synthetic kick-only impulse train and a synthetic hi-hat-
@@ -78,13 +122,9 @@ std::array<bool, audio_config::kTotalBandSlots> onsets_seen(const std::vector<fl
     return seen;
 }
 
-// A hard rectangular on/off gate is itself a broadband click (spectral
-// leakage into every band) independent of the carrier frequency, which
-// would swamp the per-band distinction this test is checking. Softening the
-// burst edges with a short raised-cosine ramp keeps it percussive (still
-// well within a single FFT hop) while avoiding that self-inflicted
-// broadband artifact — closer to a real drum hit's envelope than an
-// infinitely sharp digital edge.
+// Raised-cosine ramp on the gate edges -- a hard rectangular gate is itself
+// a broadband click regardless of carrier frequency, which would swamp the
+// per-band distinction this test checks.
 std::vector<float> gated_tone(float carrier_hz, std::size_t num_samples, std::size_t period,
                                std::size_t burst_len) {
     constexpr float kPi = 3.14159265358979323846f;
@@ -181,4 +221,94 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     // kEnvelopeReleaseMs (200ms) is 20x kEnvelopeAttackMs (10ms), so release
     // should take noticeably more calls to cover the same half-distance.
     EXPECT_GT(release_calls_to_half, attack_calls_to_half);
+}
+
+// --- AGC reference ----------------------------------------------------------
+
+// Seeded from the first hop's own value, not 0 ramping up -- the two read
+// exactly equal on the very first call.
+TEST(FeatureExtractorTest, AgcReferenceSeededFromFirstCallNotZero) {
+    constexpr float kToneHz = 1000.0f;
+    auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
+
+    FeatureExtractor extractor(kSampleRate);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+    AudioFeatures out;
+
+    extractor.process(tone.data(), false, out);
+
+    EXPECT_GT(out.band_agc_reference[band], 0.0f);
+    EXPECT_FLOAT_EQ(out.band_agc_reference[band], out.band_energy[band]);
+}
+
+// AGC reference rise is an exact snap, not a blend: on every hop where
+// smoothed_energy_ exceeds the current reference, the reference must equal
+// it exactly that same hop -- no catch-up lag to measure, by construction.
+TEST(FeatureExtractorTest, AgcReferenceSnapsExactlyToRisingEnergy) {
+    constexpr float kToneHz = 1000.0f;
+    auto silence = fixtures::silence(audio_config::kFftWindowSize);
+    auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(silence.data(), false, out);
+    }
+
+    // Every hop of the attack (energy still rising toward its steady state)
+    // must show the reference exactly matching the just-updated energy.
+    float prev_energy = out.band_energy[band];
+    for (int i = 0; i < 20; ++i) {
+        extractor.process(tone.data(), false, out);
+        if (out.band_energy[band] > prev_energy) {
+            EXPECT_FLOAT_EQ(out.band_agc_reference[band], out.band_energy[band]);
+        }
+        prev_energy = out.band_energy[band];
+    }
+}
+
+// AGC reference must decay much more slowly than it rises -- peak-hold-
+// with-slow-release, not a symmetric mean tracker.
+TEST(FeatureExtractorTest, AgcReferenceDecaysSlowerThanItRises) {
+    constexpr float kToneHz = 1000.0f;
+    auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
+    auto silence = fixtures::silence(audio_config::kFftWindowSize);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+
+    // Rise: settle on a loud tone so the reference reaches a real peak.
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(tone.data(), false, out);
+    }
+    float peak_reference = out.band_agc_reference[band];
+    ASSERT_GT(peak_reference, 0.0f);
+
+    // Decay: same number of hops (~2.13s) of silence.
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(silence.data(), false, out);
+    }
+
+    // Display envelope (release tau 200ms) has collapsed close to 0 well
+    // within this window.
+    EXPECT_LT(out.band_energy[band], peak_reference * 0.1f);
+    // AGC reference (decay tau 20s) has barely moved over the same window --
+    // this is the whole point of the asymmetry.
+    EXPECT_GT(out.band_agc_reference[band], peak_reference * 0.8f);
+}
+
+TEST(FeatureExtractorTest, AgcReferenceNeverBelowFloorEvenOnSilence) {
+    auto silence = fixtures::silence(audio_config::kFftWindowSize);
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+
+    for (int i = 0; i < 500; ++i) {
+        extractor.process(silence.data(), false, out);
+    }
+
+    for (std::size_t b = 0; b < audio_config::kTotalBandSlots; ++b) {
+        EXPECT_GE(out.band_agc_reference[b], audio_config::kAgcMinReference);
+    }
 }

@@ -43,24 +43,28 @@ FeatureExtractor::FeatureExtractor(unsigned sample_rate)
         hann_window_[i] = 0.5f - 0.5f * std::cos(2.0f * kPi * i / (audio_config::kFftWindowSize - 1));
     }
 
-    // Log-scaled band edges from kMinBandFrequencyHz to Nyquist.
+    // Log-scaled band edges from kMinBandFrequencyHz to Nyquist. Each band's
+    // bin_lo is the previous band's bin_hi (not independently re-rounded
+    // from its own edge_lo) so the bands tile the bin grid contiguously
+    // with no gaps or overlap.
     float low = audio_config::kMinBandFrequencyHz;
     float high = static_cast<float>(sample_rate) / 2.0f;
+    std::size_t bin_cursor = bin_for_frequency(low, sample_rate);
     for (std::size_t band = 0; band < audio_config::kNumBands; ++band) {
-        float edge_lo = low * std::pow(high / low, static_cast<float>(band) / audio_config::kNumBands);
         float edge_hi =
             low * std::pow(high / low, static_cast<float>(band + 1) / audio_config::kNumBands);
-        std::size_t bin_lo = bin_for_frequency(edge_lo, sample_rate);
-        std::size_t bin_hi = bin_for_frequency(edge_hi, sample_rate);
-        if (bin_hi <= bin_lo) {
-            bin_hi = std::min(bin_lo + 1, kNumFftBins);
-        }
-        band_ranges_[band] = {bin_lo, bin_hi};
+        std::size_t bin_hi = std::max(bin_for_frequency(edge_hi, sample_rate), bin_cursor + 1);
+        bin_hi = std::min(bin_hi, kNumFftBins);
+        assert(bin_hi > bin_cursor && "band collapsed to zero width");
+        assert(bin_hi <= kNumFftBins && "band exceeded available FFT bins");
+        band_ranges_[band] = {bin_cursor, bin_hi};
+        bin_cursor = bin_hi;
     }
 
     double dt_seconds = static_cast<double>(audio_config::kFftHopSize) / sample_rate_;
     attack_coeff_ = one_pole_coeff(audio_config::kEnvelopeAttackMs, dt_seconds);
     release_coeff_ = one_pole_coeff(audio_config::kEnvelopeReleaseMs, dt_seconds);
+    agc_decay_coeff_ = one_pole_coeff(audio_config::kAgcDecayTauMs, dt_seconds);
 }
 
 FeatureExtractor::~FeatureExtractor() {
@@ -76,6 +80,7 @@ void FeatureExtractor::reset_onset_history() {
     for (auto& history : flux_history_) {
         history.fill(0.0f);
     }
+    // Deliberately does NOT touch agc_reference_/agc_seeded_.
 }
 
 void FeatureExtractor::process(const float* mono_window, bool discontinuity, AudioFeatures& out) {
@@ -127,6 +132,9 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
     }
     raw_energy[audio_config::kGlobalBandIndex] = global_sum / static_cast<float>(kNumFftBins);
 
+    // Captured once so all bands seed together on the same call.
+    bool first_call = !agc_seeded_;
+
     for (std::size_t band = 0; band < audio_config::kTotalBandSlots; ++band) {
         float flux = std::max(0.0f, raw_energy[band] - prev_energy_[band]);
         prev_energy_[band] = raw_energy[band];
@@ -153,10 +161,8 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
                         audio_config::kOnsetFluxEpsilon;
         }
         // Require a full trailing history before trusting the adaptive
-        // threshold — with little or no history, `threshold` defaults
-        // toward 0 and would fire on the first nonzero flux regardless of
-        // whether it's a real transient, which is a cold-start artifact,
-        // not detection.
+        // threshold -- otherwise it defaults toward 0 and fires on the
+        // first nonzero flux regardless of size.
         bool has_baseline = count >= audio_config::kOnsetHistoryLength;
         out.band_onset[band] = has_baseline && flux > 0.0f && flux > threshold;
 
@@ -169,5 +175,19 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
         float coeff = raw_energy[band] > smoothed_energy_[band] ? attack_coeff_ : release_coeff_;
         smoothed_energy_[band] += (raw_energy[band] - smoothed_energy_[band]) * coeff;
         out.band_energy[band] = smoothed_energy_[band];
+
+        // Peak-hold-with-slow-release, tracking smoothed_energy_ (not
+        // raw_energy -- see audio_config.h). Rise is an exact snap, not a
+        // blend: any new peak is captured immediately, with no catch-up lag
+        // to tune away.
+        if (first_call || smoothed_energy_[band] > agc_reference_[band]) {
+            agc_reference_[band] = smoothed_energy_[band];
+        } else {
+            agc_reference_[band] += (smoothed_energy_[band] - agc_reference_[band]) * agc_decay_coeff_;
+        }
+        agc_reference_[band] = std::max(agc_reference_[band], audio_config::kAgcMinReference);
+        out.band_agc_reference[band] = agc_reference_[band];
     }
+
+    agc_seeded_ = true;
 }

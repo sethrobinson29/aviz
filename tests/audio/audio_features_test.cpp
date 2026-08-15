@@ -69,18 +69,9 @@ TEST(AudioFeaturesSnapshotTest, BandArraysCarryThroughPublish) {
 
 // --- Concurrent worker/render ------------------------------------------------
 //
-// Mirrors ring_buffer_test.cpp's concurrency tests: a real worker thread and
-// a real render thread against one AudioFeaturesSnapshot, not just sequential
-// back_buffer()/publish()/current() calls from one thread. This is the same
-// pattern that caught a genuine data race in the ring buffer, so it's applied
-// at full strength here rather than a lighter spot-check.
-//
 // Each published AudioFeatures carries the same sequence number written into
-// six different fields spread across the struct (rms, peak_frequency_hz,
-// band_energy[0], band_energy[kGlobalBandIndex], waveform.front(),
-// waveform.back()). A reader observing anything other than all six fields
-// agreeing would mean it read a torn mix of two different publishes —
-// exactly the failure mode the ring buffer test caught.
+// six fields spread across the struct; a reader seeing disagreement between
+// them read a torn mix of two different publishes.
 TEST(AudioFeaturesSnapshotConcurrencyTest, RenderNeverObservesTornOrOutOfOrderPublish) {
     constexpr int kIterations = 200000;
     AudioFeaturesSnapshot snap;

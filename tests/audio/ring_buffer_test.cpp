@@ -202,13 +202,6 @@ TEST(RingBufferTest, PushPopExactCapacityRepeatedCyclesNeverOverflow) {
 }
 
 // --- Concurrent producer/consumer ---------------------------------------------
-//
-// These run a real producer thread and a real consumer thread against one
-// AudioRingBuffer to exercise the actual SPSC concurrency property, not just
-// sequential push/pop calls from one thread. This is a sanity net, not a
-// substitute for the periodic Clang+TSan diagnostic build TESTING.md's
-// Concurrency section calls for at milestones that touch the thread handoff —
-// a plain build won't reliably surface subtle races.
 
 TEST(RingBufferConcurrencyTest, NoOverflowRegimePreservesExactOrder) {
     constexpr std::size_t kCapacity = 1 << 16;  // test-local, unrelated to audio_config
@@ -298,14 +291,8 @@ TEST(RingBufferConcurrencyTest, ForcedOverflowRegimeStaysMonotonicAndFlagsDiscon
     }
     producer.join();
 
-    // NOTE: strict ordering across the whole collected sequence is *not*
-    // asserted here. Under forced overflow the producer can lap the
-    // consumer mid pop_frames() more than once, so frames read during a
-    // discontinuity window can legitimately arrive out of order or repeat
-    // — see ring_buffer.h's class comment. What's guaranteed (and asserted
-    // below) is: no crash/hang, every value is one that was actually
-    // pushed (atomics rule out torn/garbage reads), and discontinuity()
-    // fired at least once so the consumer knows not to trust ordering.
+    // Strict ordering isn't asserted under forced overflow -- only that
+    // every value was actually pushed and discontinuity() fired.
     EXPECT_TRUE(saw_discontinuity.load(std::memory_order_relaxed));
     ASSERT_FALSE(collected.empty());
     for (float v : collected) {

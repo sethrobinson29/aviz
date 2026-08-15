@@ -6,12 +6,7 @@
 
 #include "audio_config.h"
 
-// Per-frame snapshot handed to every active layer. Visual modules consume
-// only this struct, filtered to their assigned band if applicable — never
-// raw PCM or FFT bins directly (CLAUDE.md invariant #2). Band index
-// audio_config::kGlobalBandIndex is the full-spectrum/global band, computed
-// with the same per-band spectral-flux onset logic as every other band
-// (CLAUDE.md invariant #3), not a separate detector.
+// Per-frame snapshot handed to every active layer (CLAUDE.md invariant #2).
 struct AudioFeatures {
     std::array<float, audio_config::kWaveformSnapshotSize> waveform{};
 
@@ -19,44 +14,19 @@ struct AudioFeatures {
     std::array<float, audio_config::kTotalBandSlots> band_energy{};
     // Whether a spectral-flux onset triggered this frame, per band.
     std::array<bool, audio_config::kTotalBandSlots> band_onset{};
+    // Peak-hold reference per band; always >= audio_config::kAgcMinReference.
+    // Visual modules normalize band_energy against this per-band rather
+    // than a shared scale.
+    std::array<float, audio_config::kTotalBandSlots> band_agc_reference{};
 
     float rms = 0.0f;
     float peak_frequency_hz = 0.0f;
 };
 
-// Triple-buffered AudioFeatures snapshot (CLAUDE.md invariant #1). A plain
-// 2-buffer ping-pong swapped via a single atomic index is NOT race-free
-// here: current() returns a reference render reads across several
-// statements, and nothing stops the worker from publishing repeatedly and
-// wrapping back into that exact buffer while render is still mid-read of
-// it — a genuine torn-read data race, caught by
-// AudioFeaturesSnapshotConcurrencyTest before this was switched to triple
-// buffering. (TESTING.md's Concurrency section says "double-buffering with
-// an atomic index/pointer"; that wording under-specifies what's actually
-// needed for an unsynchronized reader/writer pair and should be flagged
-// stale there.)
-//
-// Triple buffering fixes this structurally: the worker exclusively owns a
-// private back buffer, the render thread exclusively owns a private front
-// buffer, and a third "middle" buffer changes hands between them via a
-// shared atomic word that packs the middle buffer's index together with a
-// "new data" flag in one value (`shared_`). Packing them together matters:
-// an earlier version of this class stored the index and the flag as two
-// separate atomics, which left a window where the flag could be observed
-// out of sync with the index it was meant to describe — not a torn read,
-// but a genuine regression bug (render could receive an older buffer than
-// one it already had). The producer side (publish()) can unconditionally
-// exchange(), since it always wants to hand over its fresh buffer
-// regardless of prior state. The consumer side (current()) must only swap
-// when the flag is confirmed set, so it uses a compare_exchange retry loop
-// — a blind exchange there would occasionally swap in the same stale
-// buffer it just gave up. Neither side ever blocks; the consumer's CAS
-// loop is bounded by how many times the producer can publish concurrently,
-// not an indefinite spin.
-//
+// Triple-buffered AudioFeatures snapshot (CLAUDE.md invariant #1: packed
+// index+flag atomic, CAS retry on the consumer side, not a blind exchange).
 // Single-writer (worker calls back_buffer()/publish()), single-reader
-// (render calls current()). Three preallocated instances only — no
-// per-frame allocation.
+// (render calls current()).
 class AudioFeaturesSnapshot {
 public:
     AudioFeatures& back_buffer() { return buffers_[back_index_]; }

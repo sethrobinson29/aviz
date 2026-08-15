@@ -67,12 +67,16 @@ include(GoogleTest)
 # --- app ---------------------------------------------------------------------
 add_executable(aviz
   src/main.cpp
+  src/app/app.cpp
   src/audio/miniaudio_backend.cpp
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
   src/audio/feature_worker.cpp
   src/audio/file_producer.cpp
+  src/visuals/waveform/waveform_visual.cpp
+  src/visuals/spectrum/spectrum_visual.cpp
 )
+target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
 
 # --- tests ---------------------------------------------------------------------
