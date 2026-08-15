@@ -13,6 +13,8 @@ Deterministic, no listening or watching required. Cover these with real unit tes
 
 Use synthetic signal fixtures for anything frequency- or timing-dependent — e.g., a generated sine wave at a known frequency to validate banding, a synthetic kick-only impulse train and a synthetic hi-hat-only impulse train to validate that per-band onset detection actually behaves differently per band (this is the core claim behind having per-band detection at all, so it should be checkable in isolation, not just assumed to work).
 
+**Pure logic co-located with threading code is not exempt from unit tests.** The Concurrency section below carves out thread orchestration/handoff glue from routine unit-test coverage — that carve-out is about the orchestration itself (thread lifecycle, signaling, ownership handoff), not a blanket exemption for every function that happens to live in the same file. If a file mixing threading glue and pure computation exists (e.g., a worker's drain/processing step that also does windowing or mixdown math with no actual dependency on threads), extract the pure-logic part into a unit that can be called and tested directly, without spinning up a worker thread — don't let it fall through the gap between "not concurrency-only, so not covered by TSan/stress" and "not obviously a standalone module, so nobody wrote a unit test for it either."
+
 ## Visual correctness — human review via actual playback, not static output
 
 An agent cannot see the screen and should not claim a visual "looks right." Rendering/visual changes are reviewed by running the app and watching actual playback — that's the real check, not a substitute.
@@ -24,6 +26,13 @@ A single rendered frame or image dump is not sufficient evidence of correctness:
 Same principle as visual correctness: whether playback actually sounds right is checked by a human listening to it running, not inferred by the agent.
 
 Underrun/overrun counts from miniaudio should still be logged — they're cheap to capture and catch gross problems (dropped buffers, glitches) immediately. But they're a supplementary automated signal, not a substitute for listening. Don't report "audio pipeline works" based on clean underrun/overrun counts alone.
+
+**Verifying onset/feature detection by ear before there's a visual to watch (relevant to milestone 1 specifically):** listening to real playback and cross-checking against a live debug printout (RMS, band energies, onset flags) is a legitimate way to sanity-check detection before milestone 2 gives you an actual visual response to eyeball. Two things make a naive version of this misleading, worth building in from the start rather than rediscovering:
+
+- **Onset flags are single-hop-wide** (~10ms at hop 512/48kHz) and easy to sample-miss if debug output prints on a slower fixed interval — e.g. a 250ms print cycle has roughly a 1-in-23 chance of landing on any given onset's one true hop. This makes correct detection look sporadic/broken even when it isn't. Fix: latch the onset flag (sticky since the last print, cleared after each print) rather than sampling instantaneous state, so the debug output reflects "did an onset fire since last shown" instead of "is an onset true at this exact instant."
+- **A short warm-up period with no output is expected, not a bug.** Onset detection needs a full trailing window of history (~92 hops, ~1 sec) before its adaptive threshold is meaningful — nothing should fire in that window regardless of what's playing.
+- **A live debug flag is a rough indicator, not proof of correctness either way.** The actual correctness check is the synthetic-fixture test (`KickAndHiHatFireDistinctBands` or equivalent) — it records onsets across a whole clip with known ground truth, rather than a human's real-time impression of a real track. Don't skip the automated test on the theory that a listening session already confirmed it; they're checking different things (does detection generally seem sensible vs. does it fire at the exact expected positions).
+- Keep the automated onset test on **synthetic tones, not real files** — real material has no exact ground truth for expected onset positions, so switching the test to real audio would trade a precise, assertable check for a fuzzy one. If a tool for logging real-file onsets to a file for easier review would help a listening session, build it as a separate utility, not a modification to the existing correctness test.
 
 ## No-hardware fallback
 
@@ -72,12 +81,28 @@ A milestone that only adds a new visual module with no threading or audio change
 
 ## Concurrency
 
-The audio → worker → render thread handoff (`CLAUDE.md` invariant #1) is the part of this codebase most likely to have race-condition bugs rather than wrong-output bugs — and races don't reliably show up in a normal GoogleTest run.
+The audio → worker → render thread handoff (`CLAUDE.md` invariant #1) is the part of this codebase most likely to have race-condition bugs rather than wrong-output bugs — and races don't reliably show up in a normal GoogleTest run. This section covers the orchestration/handoff itself; pure logic that happens to live alongside it (e.g. windowing/mixdown math inside a worker's processing step) still needs direct unit test coverage per the note above, not a pass under this section's carve-out.
 
 - **Prevent structurally first.** Single-producer/single-consumer lock-free ring buffer for raw PCM; `AudioFeatures` snapshot published via triple buffering (worker's private back slot, render's private front slot, shared middle slot claimed via a packed index+flag atomic word and a compare-exchange retry loop on the consumer side — spec §4, `CLAUDE.md` invariant #1), not a bare 2-slot double-buffer swap and not a blind atomic exchange on the shared slot. No locks in the audio callback, ever. Getting this right by design matters more than catching races after the fact.
 
 **Track record (why this section isn't theoretical):** the ring buffer's overwrite-oldest handling, the `AudioFeatures` snapshot swap, and — within the snapshot fix itself — the first attempted repair all shipped with genuine data races, each found by exactly the process this section specifies (a stress test, 2000-iteration forced-overflow repeats, plus a fresh-context test-suite audit) rather than by inspection or by TSan alone. The ring buffer race was fixed with relaxed atomics on slot storage. The snapshot race took two structural iterations, not one: the original 2-slot double-buffer was replaced with triple buffering using a blind atomic exchange on the shared slot, which the same stress test then also caught as a regression — the fix was a packed index+new-data-flag atomic word claimed via a compare-exchange retry loop on the consumer side, not a blind exchange. Treat "the stress test didn't reproduce a failure this run" as weak evidence at best, per the reasoning above — it wasn't sufficient to rule out any of these three bugs and shouldn't be treated as sufficient on future threading changes either.
-- **Diagnostic builds, at relevant milestones only.** ThreadSanitizer doesn't work well with MSVC on native Windows (the primary target — see `CLAUDE.md`). When a milestone adds or changes threading code, build a Clang+TSan diagnostic build under WSL2 specifically to catch races, per the milestone completion checklist above. This is a separate, occasional build config — not part of the regular Windows dev loop.
+- **Diagnostic builds, at relevant milestones only.** ThreadSanitizer doesn't work well with MSVC on native Windows (the primary target — see `CLAUDE.md`). When a milestone adds or changes threading code, run the committed standalone build in `tsan/` under WSL2 to catch races, per the milestone completion checklist above. This is a separate, occasional build config — not part of the regular Windows dev loop, and not built with the main project's `CMakeLists.txt`.
+
+  **Recipe** (from WSL2, in `tsan/`):
+  ```bash
+  cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++
+  cmake --build build
+  ```
+  Compile flags: `-fsanitize=thread -g -O1` (`-O1` because TSan's runtime needs real, not heavily-optimized-away, memory accesses to instrument; `-g` for symbolized stack traces in any race report). Link flag: `-fsanitize=thread`. Both are baked unconditionally into `tsan/CMakeLists.txt` — there's no toggle, since this project exists only to be the TSan build.
+
+  Run the full suite once, then a targeted repeat pass on concurrency tests specifically:
+  ```bash
+  ./build/audio_tests_tsan
+  TSAN_OPTIONS='halt_on_error=1' ./build/audio_tests_tsan --gtest_filter='*Concurrency*' --gtest_repeat=2000 --gtest_brief=1
+  ```
+  Pipe output to a log and check for `WARNING: ThreadSanitizer` or nonzero `FAILED` counts — either means a real race, not a flake. This doesn't go through `ctest` (the standalone `tsan/CMakeLists.txt` never calls `enable_testing()`); the binary is run directly.
+
+  `tsan/CMakeLists.txt`'s source list must be kept in sync with the main project's audio test target by hand — it's a separate build, so it doesn't automatically track additions/removals from the real `tests/audio/` suite. If a file's been added there since the last TSan run, add it to `tsan/CMakeLists.txt` too before trusting the result.
 - **Stress testing, at relevant milestones only.** Races are often load-dependent and probabilistic — a single short test run may not reproduce one. When a milestone touches the thread handoff, run the pipeline continuously (feeding the synthetic signal generator) for an extended period and watch for crashes, hangs, or corrupted `AudioFeatures` output.
 
 ## Summary

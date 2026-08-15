@@ -25,6 +25,12 @@ music-visualizer/
 │                                           # above. Not deployable as-is (see the handoff doc)
 │                                           # — kept for extracting exact CSS values, gradients,
 │                                           # and layout dimensions while rebuilding web/panel/.
+├── tsan/
+│   └── CMakeLists.txt        # standalone Clang+TSan diagnostic build, committed for exact
+│                              # reproducibility (flags/toolchain matter for what TSan can catch).
+│                              # Not part of the main build — see TESTING.md's Concurrency
+│                              # section for the run recipe. Its own build/ output is git-ignored,
+│                              # same as the main build/ directory.
 ├── src/
 │   ├── audio/           # producers (file, loopback, synthetic), ring buffer,
 │   │                     # feature extraction (FFT, banding, onset/envelope)
@@ -51,7 +57,9 @@ music-visualizer/
 │   │                          # e.g. Y2K, Frutiger Aero) — consumed by web/panel. Not to be
 │   │                          # confused with layer presets, which are user-created and live
 │   │                          # outside the repo in the app's runtime data directory, not here.
-│   └── test-audio/           # pre-recorded fixture files, distinct from synthetic-generated ones
+│   └── test-audio/           # pre-recorded fixture files, distinct from synthetic-generated
+│                               # ones. Contents are git-ignored (unreleased personal material) —
+│                               # directory itself is kept via .gitkeep. See Conventions below.
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
 
@@ -71,7 +79,7 @@ music-visualizer/
 - **No top-level `include/`.** This is a single-binary app, not a library with external consumers, so headers live alongside their `.cpp` files in the same module directory rather than behind a separate public-include split.
 - **`assets/test-audio/` vs. `tests/fixtures/` are conceptually distinct**, even though both serve testing:
   - `tests/fixtures/` — synthetic, code-generated signals (exact frequencies, exact impulse timing) used in automated unit tests.
-  - `assets/test-audio/` — real recorded files for human "does this sound/look reasonable on real music" spot-checks per `TESTING.md`. Not asserted on programmatically.
+  - `assets/test-audio/` — real recorded files for human "does this sound/look reasonable on real music" spot-checks per `TESTING.md`. Not asserted on programmatically. **Contents are git-ignored**, not committed — the files in use are unreleased personal material, so they stay local rather than entering git history. The directory itself is kept present (via `.gitkeep` or equivalent) so `STRUCTURE.md`'s layout still holds even with no tracked files inside.
 - **`web/panel/` (the WebView2 UI) is not covered by GoogleTest/CTest.** `tests/ui_host/` covers only the C++ side of the state bridge (message format, serialization). No JS test framework has been chosen yet — until one is, panel behavior (theme switching, drag-reorder, layout) is human-review territory, same as visual/audio correctness in `TESTING.md`. Flag this rather than silently picking a JS framework.
 - **`handoffs/` is reference material, not part of the load-bearing doc set.** Unlike `CLAUDE.md`/`TESTING.md`/`STRUCTURE.md`/the design spec/`DEFINITION_OF_DONE.md`, files here aren't kept in sync automatically and don't get the "flag if stale" treatment — they're point-in-time notes (a design export's quirks, an audit prompt) meant to be read once at the relevant point in the project, not treated as ongoing architecture truth. If something in a handoff conflicts with the core docs, the core docs win.
 

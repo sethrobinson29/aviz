@@ -51,6 +51,10 @@ All visuals consume the same computed feature set — never raw samples directly
 
   **Concrete layout: 16 log-scaled bands + 1 global band = 17 total, fixed-size (`std::array`, no per-frame allocation).** 16 was chosen as a middle of the spec's 8–32 range, divides evenly into 4-band preset groupings (bass/low-mid/high-mid/treble) with no remainder, and is enough granularity for band-mapped layers to feel distinct without carrying 32 bands' worth of onset-detection history state for marginal benefit. The global band sits at the **last index** (`kGlobalBandIndex = kNumBands = 16`), not prepended or interleaved — this keeps the log-scaled bands at indices `0..15` contiguous and trivially iterable (`for (i = 0; i < kNumBands; i++)`) for anything sweeping "all real frequency bands" (spectrum visual, preset grouping, UI band list), since global is an aggregate, not a point on the log-frequency sweep, and gets its own named constant instead. `kTotalBands = kNumBands + 1 = 17`.
 - **Per-band onset/beat detection**: spectral-flux-style (frame-to-frame energy increase, peak-picked above a rolling threshold), computed independently per band. A kick-drum transient in the sub-bass band and a hi-hat/snare transient in the 2–5kHz band trigger differently, which is what makes band-mapped layers feel distinct rather than just synced pulses.
+
+  **Concrete threshold: `threshold[n] = max(mean(flux, trailing window) + k·stddev(flux, trailing window), absolute_floor)`.** Trailing window ~92 frames (~1 sec at hop 512/48kHz), `k` ~1.5–2.0, refractory period ~50–100ms minimum inter-onset time to prevent a single transient's decay from double-firing — all tunable constants per the requirement below. Maintained incrementally (running sum/sum-of-squares over a circular buffer, O(1) per update) rather than via a true rolling median, since this runs per-band (17 bands) every hop and the performance-priority guideline (`CLAUDE.md`) favors it; median's extra robustness to outliers isn't needed here.
+
+  **`absolute_floor = 0.1f`, tunable — added to fix a real robustness bug, not a hypothetical.** With an all-zero flux history (true silence, no noise floor), the adaptive term alone (`mean + k·stddev`) collapses to exactly 0, so the *first* nonzero flux value in that band — however tiny — fired an onset regardless of whether it was a real transient. This caused every band to fire simultaneously right at a track's true first onset, since the same collapse happened everywhere at once. A relative-only threshold can't self-correct for this: the floor has to be an absolute value independent of the trailing window's own statistics. Found by real listening + live debug output, not by an existing test — worth remembering this class of bug (threshold math degenerate at a boundary condition) isn't something the original synthetic fixtures happened to cover.
 - **Global beat detection**: implemented as a degenerate case of the same per-band computation, with the band scoped to full-spectrum energy — not a separate detection system. Gives layers a consistent "master clock" to lock onto without requiring a second algorithm.
 - **RMS/volume** and **peak frequency** as simple scalar features.
 
@@ -61,6 +65,8 @@ Struct shape (conceptual): a per-frame snapshot containing raw recent waveform s
 **FFT window/hop size: 1024/512.** At a typical 48kHz sample rate this gives ~21.3ms windows, ~46.9 Hz/bin frequency resolution, and an update rate (~93/sec) comfortably above display refresh (60fps) — no visible stepping in feature values across render frames. Chosen as a middle ground between 512/256 (finer timing, coarser frequency resolution) and 2048/1024 (finer frequency resolution, more added latency, update rate close enough to 60fps to risk visible stepping).
 
 **Window size, hop size, band boundaries, and envelope attack/release constants must all be tunable** — named constants or a small config struct in the audio/feature-extraction code, not literals scattered through the FFT/banding logic. This project is expected to need by-ear/by-eye tuning once it's actually running, independent of any future shipping ambitions; hardcoding these values would mean a recompile for every experiment.
+
+**Envelope smoothing (resolves the §9 gap): asymmetric one-pole IIR, separate attack/release coefficients.** `env[n] = coeff·env[n-1] + (1-coeff)·value`, where `coeff` switches between an attack coefficient when the input is rising and a release coefficient when falling, each derived from a target time constant via `coeff = exp(-hop_time / tau)`. Starting values: attack `tau` ~10–20ms (responsive to a transient), release `tau` ~150–300ms (avoids flicker, gives a felt decay rather than a hard cutoff). Applied to `band_energy` before it's ever handed to a visual layer. Both time constants are tunable per the requirement above.
 
 ## 5. Layer & Compositor System
 
@@ -154,7 +160,7 @@ Each gap resolves at the milestone that actually needs it, not before — decidi
 
 | Gap | Resolves by | Why |
 |---|---|---|
-| Smoothing/envelope shaping | Milestone 1 | Milestone 1 already includes envelope computation — this is "decide the specific attack/release approach" as part of building it. |
+| Per-layer sensitivity/gain control | Milestone 4 | Distinct from the shared band envelope shape (resolved, §4) — this is a per-layer knob on top of it, and milestone 4 is where per-layer params (freq_range, reactivity_source) get built out. |
 | No-signal handling | Milestone 2 | First visuals need a defined idle state before they render anything meaningful off silence. |
 | Layer count performance ceiling | Milestone 3–4 | Becomes real once the compositor exists (3), sharper once duplication makes stacking many layers trivial (4). |
 | Sample rate mismatch | Milestone 5 | Local playback alone (1) has one known rate — only matters once loopback introduces a second, different producer. |
@@ -165,7 +171,7 @@ Each gap resolves at the milestone that actually needs it, not before — decidi
 
 ### Gap details
 
-- **Smoothing/envelope shaping** — raw per-band FFT values jitter frame to frame; feeding them directly into visuals will look twitchy rather than musical. Needs an attack/release envelope per band (fast rise, slower decay) applied before handoff to layers, plus a per-layer sensitivity/gain control.
+- **Per-layer sensitivity/gain control** — the shared band envelope shape (attack/release) is resolved (§4), but a per-layer sensitivity/gain multiplier on top of it — letting a user make one specific layer more or less responsive than the raw band envelope, independent of every other layer reading the same band — is not yet designed. Natural fit alongside the other per-layer params (`freq_range`, `reactivity_source`) built in milestone 4.
 - **No-signal handling** — undefined idle state when RMS is near zero (paused track, silent loopback source). Layers should have a defined idle/rest appearance rather than rendering FFT floor noise as visual noise.
 - **Layer count performance ceiling** — each layer is a full offscreen texture render; nothing currently bounds stack size. Needs a documented default cap or explicit acknowledgment of perf degradation as layer count grows.
 - **Sample rate mismatch between producers** — local files and loopback devices can report different native rates, and a user may switch source mid-session. Band Hz ranges can't assume a fixed rate; needs a resample-to-common-rate step rather than relying on windowing alone to tolerate variability.
