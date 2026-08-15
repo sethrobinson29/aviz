@@ -1,1 +1,7 @@
 build/
+tsan/build/
+
+# Real test-audio files are local-only (large/binary, often copyrighted) —
+# keep the directory tracked via .gitkeep without committing contents.
+assets/test-audio/*
+!assets/test-audio/.gitkeep

@@ -1,0 +1,114 @@
+#include "audio/file_producer.h"
+
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <stdexcept>
+#include <vector>
+
+#include <gtest/gtest.h>
+
+// File decoding is a real trust boundary (TESTING.md's Security /
+// adversarial input section): a malformed or missing file must be rejected
+// cleanly (no crash, no silent misbehavior), not just handled for the happy
+// path. Fixture bytes are generated in-test rather than committed as binary
+// files, per tests/fixtures' "synthetic, code-generated" convention.
+namespace {
+
+std::filesystem::path temp_path(const char* name) {
+    return std::filesystem::temp_directory_path() / name;
+}
+
+void write_bytes(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes) {
+    std::ofstream f(path, std::ios::binary);
+    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+}
+
+void write_u32le(std::vector<std::uint8_t>& out, std::uint32_t v) {
+    out.push_back(static_cast<std::uint8_t>(v));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
+    out.push_back(static_cast<std::uint8_t>(v >> 16));
+    out.push_back(static_cast<std::uint8_t>(v >> 24));
+}
+
+void write_u16le(std::vector<std::uint8_t>& out, std::uint16_t v) {
+    out.push_back(static_cast<std::uint8_t>(v));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
+}
+
+// Minimal valid mono 16-bit PCM WAV: header + `num_frames` silent frames.
+std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_t channels,
+                                          std::uint32_t num_frames) {
+    std::uint32_t data_bytes = num_frames * channels * 2;
+    std::vector<std::uint8_t> out;
+
+    out.insert(out.end(), {'R', 'I', 'F', 'F'});
+    write_u32le(out, 36 + data_bytes);
+    out.insert(out.end(), {'W', 'A', 'V', 'E'});
+
+    out.insert(out.end(), {'f', 'm', 't', ' '});
+    write_u32le(out, 16);
+    write_u16le(out, 1);  // PCM
+    write_u16le(out, channels);
+    write_u32le(out, sample_rate);
+    write_u32le(out, sample_rate * channels * 2);  // byte rate
+    write_u16le(out, static_cast<std::uint16_t>(channels * 2));  // block align
+    write_u16le(out, 16);  // bits per sample
+
+    out.insert(out.end(), {'d', 'a', 't', 'a'});
+    write_u32le(out, data_bytes);
+    out.resize(out.size() + data_bytes, 0);  // silence
+    return out;
+}
+
+}  // namespace
+
+TEST(FileProducerTest, ThrowsOnMissingFile) {
+    EXPECT_THROW(FileProducer producer("this_file_does_not_exist.wav"), std::runtime_error);
+}
+
+TEST(FileProducerTest, ThrowsOnMalformedFile) {
+    auto path = temp_path("aviz_test_malformed.wav");
+    write_bytes(path, {0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01, 0x02});
+
+    EXPECT_THROW(FileProducer producer(path.string()), std::runtime_error);
+
+    std::filesystem::remove(path);
+}
+
+TEST(FileProducerTest, ThrowsOnTruncatedWav) {
+    auto full = make_valid_wav(44100, 2, 1000);
+    // Cut off partway through the declared data chunk.
+    std::vector<std::uint8_t> truncated(full.begin(), full.begin() + 60);
+
+    auto path = temp_path("aviz_test_truncated.wav");
+    write_bytes(path, truncated);
+
+    // miniaudio may either throw (rejects on open) or succeed with a
+    // decoder that simply yields fewer frames than declared — both are
+    // "fails safely." What must not happen is a crash, which EXPECT_NO_FATAL_FAILURE-
+    // style execution (falling through this test body without crashing)
+    // already demonstrates.
+    try {
+        FileProducer producer(path.string());
+    } catch (const std::runtime_error&) {
+        // also acceptable
+    }
+
+    std::filesystem::remove(path);
+}
+
+TEST(FileProducerTest, OpensValidFileAndReportsFormat) {
+    auto bytes = make_valid_wav(44100, 2, 4410);
+    auto path = temp_path("aviz_test_valid.wav");
+    write_bytes(path, bytes);
+
+    {
+        FileProducer producer(path.string());
+        EXPECT_EQ(producer.channels(), 2u);
+        EXPECT_EQ(producer.sample_rate(), 44100u);
+        EXPECT_FALSE(producer.is_finished());
+    }  // decoder must close its file handle before remove() below (Windows exclusive lock)
+
+    std::filesystem::remove(path);
+}

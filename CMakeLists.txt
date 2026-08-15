@@ -65,7 +65,14 @@ enable_testing()
 include(GoogleTest)
 
 # --- app ---------------------------------------------------------------------
-add_executable(aviz src/main.cpp src/audio/miniaudio_backend.cpp src/audio/ring_buffer.cpp)
+add_executable(aviz
+  src/main.cpp
+  src/audio/miniaudio_backend.cpp
+  src/audio/ring_buffer.cpp
+  src/audio/feature_extractor.cpp
+  src/audio/feature_worker.cpp
+  src/audio/file_producer.cpp
+)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
 
 # --- tests ---------------------------------------------------------------------
