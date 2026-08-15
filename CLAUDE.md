@@ -53,9 +53,10 @@ See `TESTING.md` for the full verification strategy. Short version: pure-logic p
 ## Implementation Guidelines
 
 - Prioritize performance where there's a choice between approaches. If a performance-favoring approach costs functionality or scope, don't drop that functionality silently — surface the tradeoff and reason about it before proceeding.
-- Don't edit design documents (`visualizer-design-spec.md`, this file) as a side effect of implementation work. These are updated only when explicitly asked. If implementation reveals the docs are wrong or out of date, flag it instead of fixing it inline.
+- Don't edit design documents (`visualizer-design-spec.md`, this file) as a side effect of implementation work. These are updated only when explicitly asked. If implementation reveals the docs are wrong or out of date, flag it instead of fixing it inline. **This restriction is about who authors changes to these docs, not about version control.** Once a doc has been updated (whether by explicit request or delivered as ready-to-use content), commit it like any other tracked file — these docs are committed source of truth per `STRUCTURE.md`'s tree, not local-only or excluded from git. Don't withhold `CLAUDE.md` or any other core doc from a commit on the theory that "can't edit it" means "can't commit it" — they're different things.
 - Check the relevant section of `visualizer-design-spec.md` (and this file) before making architectural or structural changes — implementation should follow the spec, not drift from it. If a task isn't covered by the spec, that's a design decision to surface, not one to improvise.
 - Favor idiomatic C++/miniaudio/raylib solutions over clever or unusual ones. Idiomatic here means: what a competent C++ developer familiar with these libraries would recognize immediately, not necessarily the most concise or performant possible construct.
+- **Code comments describe non-obvious functionality, not decision narration.** A comment should explain something a reader couldn't get from the code itself — a non-obvious invariant, why a value is what it is, a gotcha a future edit could easily break. It should not narrate the process that led here ("we tried X, decided Y instead," "per discussion with the user," "changed this from Z") — that history belongs in `visualizer-design-spec.md` (which already documents this project's real decisions and bug fixes at length) or in the commit message, not baked into the source as prose. If a comment is describing what was decided rather than what the code does or why a non-obvious value/behavior is correct, it doesn't belong in the file.
 
 ## Working style
 
@@ -64,3 +65,15 @@ See `TESTING.md` for the full verification strategy. Short version: pure-logic p
 - Keep platform-specific code (WASAPI/Core Audio/PipeWire) isolated behind the shared capture interface — don't let platform branches leak into feature extraction, compositor, or visual module code.
 - No placeholder/stub visuals presented as done — if a visual module isn't fully wired to `AudioFeatures`, say so explicitly rather than leaving silent TODOs.
 - Same principle applies to environment failures: if audio hardware or a display/GPU can't be initialized, say so plainly rather than quietly stubbing out the affected system or fabricating success. See `TESTING.md` for the fallback behavior (synthetic signal producer, headless rendering) this should route to instead.
+
+## Compact Instructions
+
+If context compaction happens mid-session, prioritize preserving, in this order:
+
+1. **The specific unresolved question or bug currently being investigated** — what's been ruled in/out so far, what the next diagnostic step was going to be, and any concrete data already gathered (specific values, specific file/timestamp references, specific test results) that led to the current hypothesis. This is the state most likely to be expensive to reconstruct and least likely to already be written down anywhere else.
+2. **Any decision that's been reasoned through and settled in this session but not yet written into `visualizer-design-spec.md`, `CLAUDE.md`, `STRUCTURE.md`, or `TESTING.md`.** Settled facts already committed to those docs don't need to be preserved in the summary — they're safely persisted and will be re-read at the start of the next session. It's the gap between "decided" and "documented" that's actually at risk.
+3. **Rejected approaches and why**, specifically for whatever's currently being worked on — not a general log of every alternative ever considered, but enough to avoid re-proposing something that was already tried and found wanting in this session.
+
+Lower priority, safe to compress heavily or drop: verbose tool output, full file contents already reflected in the current state of the repo, and narration of process/steps taken to arrive at something now already settled and documented.
+
+If a natural stopping point is reached before compaction is forced, prefer writing settled decisions into the actual docs over relying on compaction to carry them forward — see `STRUCTURE.md`'s note that these files are the durable record, not conversation history.
