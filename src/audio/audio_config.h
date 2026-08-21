@@ -23,12 +23,12 @@ inline constexpr std::size_t kTotalBandSlots = kNumBands + 1;
 // High edge is always the runtime Nyquist frequency (sample_rate / 2).
 inline constexpr float kMinBandFrequencyHz = 20.0f;
 
-// Onset fires when spectral flux exceeds mean + kOnsetThresholdMultiplier *
-// stddev + kOnsetFluxEpsilon, over the trailing kOnsetHistoryLength flux
-// values for that band.
+// Onset fires when spectral flux exceeds
+// max(mean + kOnsetThresholdMultiplier * stddev, kOnsetAbsoluteFluxFloor),
+// over the trailing kOnsetHistoryLength flux values for that band.
 inline constexpr std::size_t kOnsetHistoryLength = 43;
 inline constexpr float kOnsetThresholdMultiplier = 1.5f;
-inline constexpr float kOnsetFluxEpsilon = 0.01f;
+inline constexpr float kOnsetAbsoluteFluxFloor = 0.1f;
 
 inline constexpr float kEnvelopeAttackMs = 10.0f;
 inline constexpr float kEnvelopeReleaseMs = 200.0f;

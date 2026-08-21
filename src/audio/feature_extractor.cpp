@@ -151,8 +151,8 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
             }
             variance /= static_cast<float>(count);
             float stddev = std::sqrt(variance);
-            threshold = mean + audio_config::kOnsetThresholdMultiplier * stddev +
-                        audio_config::kOnsetFluxEpsilon;
+            threshold = std::max(mean + audio_config::kOnsetThresholdMultiplier * stddev,
+                                  audio_config::kOnsetAbsoluteFluxFloor);
         }
         bool has_baseline = count >= audio_config::kOnsetHistoryLength;
         out.band_onset[band] = has_baseline && flux > 0.0f && flux > threshold;

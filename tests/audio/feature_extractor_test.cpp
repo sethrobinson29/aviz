@@ -280,3 +280,25 @@ TEST(FeatureExtractorTest, AgcReferenceNeverBelowFloorEvenOnSilence) {
         EXPECT_GE(out.band_agc_reference[b], audio_config::kAgcMinReference);
     }
 }
+
+// --- Onset absolute floor ---------------------------------------------------
+
+// After a long silence, mean and stddev of the flux history are exactly 0.
+// The spike amplitude below is calibrated so the resulting flux is ~0.044:
+// above 0.01, below kOnsetAbsoluteFluxFloor (0.1).
+TEST(FeatureExtractorTest, OnsetThresholdEnforcesAbsoluteFloorAfterQuietWarmup) {
+    constexpr float kToneHz = 1000.0f;
+    auto silence = fixtures::silence(audio_config::kFftWindowSize);
+    auto spike = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize, 0.0007f);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+    for (std::size_t i = 0; i < audio_config::kOnsetHistoryLength + 10; ++i) {
+        extractor.process(silence.data(), false, out);
+    }
+
+    extractor.process(spike.data(), false, out);
+
+    EXPECT_FALSE(out.band_onset[band]);
+}
