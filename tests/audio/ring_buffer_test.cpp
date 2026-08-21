@@ -11,8 +11,7 @@
 
 namespace {
 
-// Builds `count` mono frames with values [start, start+1, ...) so pushed and
-// popped data can be identified by value.
+// Builds `count` mono frames with values [start, start+1, ...).
 std::vector<float> MakeMonoFrames(float start, std::size_t count) {
     std::vector<float> frames(count);
     for (std::size_t i = 0; i < count; ++i) {
@@ -50,15 +49,12 @@ TEST(RingBufferTest, PopReturnsFewerThanRequestedWhenStarved) {
     EXPECT_EQ(out[0], 0.0f);
     EXPECT_EQ(out[1], 1.0f);
     EXPECT_EQ(out[2], 2.0f);
-    // Untouched tail of the caller's buffer is left alone.
     EXPECT_EQ(out[3], -1.0f);
 }
 
 TEST(RingBufferTest, WraparoundAcrossCapacityBoundaryPreservesOrder) {
     AudioRingBuffer rb(8, 1);
 
-    // Straddle the modulo boundary repeatedly: push 5, pop 5, several times
-    // over a capacity-8 buffer, so the internal indices wrap multiple times.
     for (int cycle = 0; cycle < 4; ++cycle) {
         auto in = MakeMonoFrames(static_cast<float>(cycle * 100), 5);
         rb.push_frames(in.data(), in.size());
@@ -84,8 +80,6 @@ TEST(RingBufferTest, NoDiscontinuityUnderNormalLoad) {
 
 TEST(RingBufferTest, OverflowOverwritesOldestAndSetsDiscontinuity) {
     AudioRingBuffer rb(4, 1);
-    // Push 6 frames (values 0..5) into a capacity-4 buffer in one call —
-    // the oldest 2 (0, 1) must be overwritten before ever being read.
     auto in = MakeMonoFrames(0.0f, 6);
     rb.push_frames(in.data(), in.size());
 
@@ -113,8 +107,6 @@ TEST(RingBufferTest, OverflowAcrossMultiplePushCallsAlsoDetected) {
     std::vector<float> out(4);
     std::size_t copied = rb.pop_frames(out.data(), out.size());
     EXPECT_EQ(copied, 4u);
-    // Oldest surviving frame is the 3rd frame of the first push (value 2),
-    // followed by all of the second push.
     std::vector<float> expected = {2.0f, 10.0f, 11.0f, 12.0f};
     EXPECT_EQ(out, expected);
 }
@@ -162,8 +154,6 @@ TEST(RingBufferTest, EmptyBufferPopReturnsZeroAndLeavesOutputUntouched) {
 
 TEST(RingBufferTest, ExactlyFullBufferDoesNotTriggerDiscontinuity) {
     AudioRingBuffer rb(4, 1);
-    // Exactly capacity_frames pushed in one call: new_write - read == capacity,
-    // not > capacity, so this must NOT count as overflow.
     auto in = MakeMonoFrames(0.0f, 4);
     rb.push_frames(in.data(), in.size());
 
@@ -177,7 +167,7 @@ TEST(RingBufferTest, ExactlyFullBufferDoesNotTriggerDiscontinuity) {
 
 TEST(RingBufferTest, OneFrameBeyondExactlyFullTriggersDiscontinuity) {
     AudioRingBuffer rb(4, 1);
-    auto in = MakeMonoFrames(0.0f, 5);  // capacity + 1
+    auto in = MakeMonoFrames(0.0f, 5);
     rb.push_frames(in.data(), in.size());
 
     EXPECT_TRUE(rb.discontinuity());
@@ -187,9 +177,6 @@ TEST(RingBufferTest, OneFrameBeyondExactlyFullTriggersDiscontinuity) {
 TEST(RingBufferTest, PushPopExactCapacityRepeatedCyclesNeverOverflow) {
     AudioRingBuffer rb(4, 1);
 
-    // Repeatedly hug the exact capacity boundary: push exactly capacity_frames,
-    // pop exactly capacity_frames, many times over — exercises wraparound of
-    // the physical storage at the exact power-of-two edge on every cycle.
     for (int cycle = 0; cycle < 50; ++cycle) {
         auto in = MakeMonoFrames(static_cast<float>(cycle * 4), 4);
         rb.push_frames(in.data(), in.size());
@@ -205,10 +192,7 @@ TEST(RingBufferTest, PushPopExactCapacityRepeatedCyclesNeverOverflow) {
 
 TEST(RingBufferConcurrencyTest, NoOverflowRegimePreservesExactOrder) {
     constexpr std::size_t kCapacity = 1 << 16;  // test-local, unrelated to audio_config
-    constexpr std::size_t kTotalFrames = 20000;  // well under capacity: overflow
-                                                  // cannot happen regardless of
-                                                  // scheduling, since write-read
-                                                  // is bounded by kTotalFrames.
+    constexpr std::size_t kTotalFrames = 20000;
     AudioRingBuffer rb(kCapacity, 1);
 
     std::thread producer([&] {
@@ -247,10 +231,8 @@ TEST(RingBufferConcurrencyTest, NoOverflowRegimePreservesExactOrder) {
 }
 
 TEST(RingBufferConcurrencyTest, ForcedOverflowRegimeStaysMonotonicAndFlagsDiscontinuity) {
-    constexpr std::size_t kCapacity = 16;       // deliberately small
-    constexpr std::size_t kTotalFrames = 5000;  // >> capacity, producer runs
-                                                 // unthrottled: overflow is
-                                                 // essentially guaranteed.
+    constexpr std::size_t kCapacity = 16;
+    constexpr std::size_t kTotalFrames = 5000;
     AudioRingBuffer rb(kCapacity, 1);
     std::atomic<bool> saw_discontinuity{false};
     std::atomic<bool> producer_finished{false};
@@ -283,8 +265,6 @@ TEST(RingBufferConcurrencyTest, ForcedOverflowRegimeStaysMonotonicAndFlagsDiscon
             if (producer_finished.load(std::memory_order_acquire)) {
                 break;
             }
-            // Deliberately slower than the producer so it reliably falls
-            // behind at least once, forcing overwrite-oldest to engage.
             std::this_thread::sleep_for(std::chrono::microseconds(200));
         }
         ASSERT_LT(std::chrono::steady_clock::now(), deadline) << "consumer stalled";

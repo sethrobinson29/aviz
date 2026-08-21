@@ -11,9 +11,7 @@ namespace {
 constexpr unsigned kSampleRate = 48000;
 
 // Independent re-derivation of the log-band-edge-to-FFT-bin formula, not a
-// call into FeatureExtractor's private banding. Bin-quantized rather than a
-// continuous threshold on `hz`, matching how a real tone's energy actually
-// lands in a single FFT bin.
+// call into FeatureExtractor's private banding.
 std::size_t band_for_frequency(float hz, unsigned sample_rate) {
     constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;
     float low = audio_config::kMinBandFrequencyHz;
@@ -49,7 +47,6 @@ TEST(FeatureExtractorTest, KnownFrequencyLandsInExpectedBandAndPeak) {
 
     FeatureExtractor extractor(kSampleRate);
     AudioFeatures out;
-    // Let the envelope settle toward the tone's steady-state energy.
     for (int i = 0; i < 50; ++i) {
         extractor.process(tone.data(), false, out);
     }
@@ -66,10 +63,6 @@ TEST(FeatureExtractorTest, KnownFrequencyLandsInExpectedBandAndPeak) {
     EXPECT_EQ(max_band, expected_band);
 }
 
-// Regression test for a duplicate-bin bug at the low end (two adjacent
-// bands both resolving to the same FFT bin). Uses two tones one FFT bin
-// apart, since KnownFrequencyLandsInExpectedBandAndPeak's 1kHz tone sits
-// well above the affected range.
 TEST(FeatureExtractorTest, LowFrequencyBandsDoNotOverlap) {
     constexpr float kBin1Hz = 46.875f;  // 1 * sample_rate/kFftWindowSize -> FFT bin 1
     constexpr float kBin2Hz = 93.75f;   // 2 * sample_rate/kFftWindowSize -> FFT bin 2
@@ -99,10 +92,6 @@ TEST(FeatureExtractorTest, LowFrequencyBandsDoNotOverlap) {
 }
 
 // --- Onset differentiation ------------------------------------------------
-//
-// TESTING.md: "a synthetic kick-only impulse train and a synthetic hi-hat-
-// only impulse train to validate that per-band onset detection actually
-// behaves differently per band."
 
 namespace {
 
@@ -122,9 +111,6 @@ std::array<bool, audio_config::kTotalBandSlots> onsets_seen(const std::vector<fl
     return seen;
 }
 
-// Raised-cosine ramp on the gate edges -- a hard rectangular gate is itself
-// a broadband click regardless of carrier frequency, which would swamp the
-// per-band distinction this test checks.
 std::vector<float> gated_tone(float carrier_hz, std::size_t num_samples, std::size_t period,
                                std::size_t burst_len) {
     constexpr float kPi = 3.14159265358979323846f;
@@ -186,14 +172,12 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     std::size_t band = band_for_frequency(kToneHz, kSampleRate);
     AudioFeatures out;
 
-    // Let the envelope fully settle at the tone's steady-state energy.
     for (int i = 0; i < 200; ++i) {
         extractor.process(tone.data(), false, out);
     }
     float steady_state = out.band_energy[band];
     ASSERT_GT(steady_state, 0.0f);
 
-    // Attack: from a fresh (zeroed) extractor, count calls to cross halfway.
     FeatureExtractor rising(kSampleRate);
     AudioFeatures rising_out;
     int attack_calls_to_half = -1;
@@ -206,8 +190,6 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     }
     ASSERT_GT(attack_calls_to_half, 0) << "energy never reached halfway during attack";
 
-    // Release: starting from the settled `extractor` above, count calls to
-    // fall back below halfway once the tone stops.
     int release_calls_to_half = -1;
     for (int i = 1; i <= 400; ++i) {
         extractor.process(quiet.data(), false, out);
@@ -218,15 +200,11 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     }
     ASSERT_GT(release_calls_to_half, 0) << "energy never fell back below halfway during release";
 
-    // kEnvelopeReleaseMs (200ms) is 20x kEnvelopeAttackMs (10ms), so release
-    // should take noticeably more calls to cover the same half-distance.
     EXPECT_GT(release_calls_to_half, attack_calls_to_half);
 }
 
 // --- AGC reference ----------------------------------------------------------
 
-// Seeded from the first hop's own value, not 0 ramping up -- the two read
-// exactly equal on the very first call.
 TEST(FeatureExtractorTest, AgcReferenceSeededFromFirstCallNotZero) {
     constexpr float kToneHz = 1000.0f;
     auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
@@ -241,9 +219,6 @@ TEST(FeatureExtractorTest, AgcReferenceSeededFromFirstCallNotZero) {
     EXPECT_FLOAT_EQ(out.band_agc_reference[band], out.band_energy[band]);
 }
 
-// AGC reference rise is an exact snap, not a blend: on every hop where
-// smoothed_energy_ exceeds the current reference, the reference must equal
-// it exactly that same hop -- no catch-up lag to measure, by construction.
 TEST(FeatureExtractorTest, AgcReferenceSnapsExactlyToRisingEnergy) {
     constexpr float kToneHz = 1000.0f;
     auto silence = fixtures::silence(audio_config::kFftWindowSize);
@@ -268,8 +243,6 @@ TEST(FeatureExtractorTest, AgcReferenceSnapsExactlyToRisingEnergy) {
     }
 }
 
-// AGC reference must decay much more slowly than it rises -- peak-hold-
-// with-slow-release, not a symmetric mean tracker.
 TEST(FeatureExtractorTest, AgcReferenceDecaysSlowerThanItRises) {
     constexpr float kToneHz = 1000.0f;
     auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
@@ -279,23 +252,18 @@ TEST(FeatureExtractorTest, AgcReferenceDecaysSlowerThanItRises) {
     FeatureExtractor extractor(kSampleRate);
     AudioFeatures out;
 
-    // Rise: settle on a loud tone so the reference reaches a real peak.
     for (int i = 0; i < 200; ++i) {
         extractor.process(tone.data(), false, out);
     }
     float peak_reference = out.band_agc_reference[band];
     ASSERT_GT(peak_reference, 0.0f);
 
-    // Decay: same number of hops (~2.13s) of silence.
+    // ~2.13s of silence at this hop rate.
     for (int i = 0; i < 200; ++i) {
         extractor.process(silence.data(), false, out);
     }
 
-    // Display envelope (release tau 200ms) has collapsed close to 0 well
-    // within this window.
     EXPECT_LT(out.band_energy[band], peak_reference * 0.1f);
-    // AGC reference (decay tau 20s) has barely moved over the same window --
-    // this is the whole point of the asymmetry.
     EXPECT_GT(out.band_agc_reference[band], peak_reference * 0.8f);
 }
 

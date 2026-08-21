@@ -23,7 +23,7 @@ std::vector<Rectangle> to_bars(const float* band_energy, const float* band_refer
 struct SpectrumParams {
     Color bar_color = SKYBLUE;
     float gap_ratio = 0.2f;            // gap width as a fraction of bar width
-    float max_height_fraction = 0.8f;  // headroom: a maxed-out bar stops at 80% of the window
+    float max_height_fraction = 0.8f;
 };
 
 class SpectrumVisual : public VisualModule {

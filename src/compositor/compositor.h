@@ -6,12 +6,10 @@
 #include "compositor/layer.h"
 #include "raylib.h"
 
-// Stacks layers into a single composited output texture (spec §5). Each
-// layer renders to its own offscreen texture (VisualModule owns that); the
+// Stacks layers into a single composited output texture. Each layer
+// renders to its own offscreen texture (VisualModule owns that); the
 // compositor only draws those textures on top of each other into
-// `output_`, applying per-layer opacity and blend mode. Layers never share
-// a canvas or render order-dependent state into each other directly
-// (CLAUDE.md invariant #4).
+// `output_`, applying per-layer opacity and blend mode.
 class Compositor {
 public:
     ~Compositor();
@@ -25,7 +23,7 @@ public:
     // any layer is to render at nonzero size.
     std::size_t add_layer(VisualType type);
     void remove_layer(std::size_t index);
-    // Moves the layer at `from` to `to`, shifting layers between them.
+    // Shifts layers between `from` and `to`, rather than swapping them.
     void move_layer(std::size_t from, std::size_t to);
 
     // Renders every layer, then composites them into the output texture in

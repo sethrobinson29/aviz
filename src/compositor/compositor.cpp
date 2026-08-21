@@ -43,13 +43,6 @@ void Compositor::move_layer(std::size_t from, std::size_t to) {
 }
 
 void Compositor::render(const AudioFeatures& features) {
-    // Each VisualModule::render() opens and closes its own texture mode.
-    // raylib's render-target state isn't a stack -- a nested
-    // BeginTextureMode() while output_'s texture mode is already active
-    // would have its EndTextureMode() reset to the screen framebuffer
-    // instead of restoring output_. So every layer renders first, fully
-    // outside output_'s texture mode, and only the already-rendered
-    // textures get composited below.
     for (Layer& layer : layers_) {
         layer.visual->render(features);
     }

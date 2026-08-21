@@ -6,27 +6,19 @@
 
 #include "audio_config.h"
 
-// Per-frame snapshot handed to every active layer (CLAUDE.md invariant #2).
 struct AudioFeatures {
     std::array<float, audio_config::kWaveformSnapshotSize> waveform{};
 
     // Post-envelope (attack/release smoothed) energy per band.
     std::array<float, audio_config::kTotalBandSlots> band_energy{};
-    // Whether a spectral-flux onset triggered this frame, per band.
     std::array<bool, audio_config::kTotalBandSlots> band_onset{};
     // Peak-hold reference per band; always >= audio_config::kAgcMinReference.
-    // Visual modules normalize band_energy against this per-band rather
-    // than a shared scale.
     std::array<float, audio_config::kTotalBandSlots> band_agc_reference{};
 
     float rms = 0.0f;
     float peak_frequency_hz = 0.0f;
 };
 
-// Triple-buffered AudioFeatures snapshot (CLAUDE.md invariant #1: packed
-// index+flag atomic, CAS retry on the consumer side, not a blind exchange).
-// Single-writer (worker calls back_buffer()/publish()), single-reader
-// (render calls current()).
 class AudioFeaturesSnapshot {
 public:
     AudioFeatures& back_buffer() { return buffers_[back_index_]; }
@@ -46,8 +38,6 @@ public:
                 front_index_ = observed & kIndexMask;
                 break;
             }
-            // compare_exchange_weak refreshed `observed` with the latest value on
-            // failure (the producer published concurrently); loop re-checks it.
         }
         return buffers_[front_index_];
     }

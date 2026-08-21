@@ -31,7 +31,7 @@ void write_u16le(std::vector<std::uint8_t>& out, std::uint16_t v) {
     out.push_back(static_cast<std::uint8_t>(v >> 8));
 }
 
-// Minimal valid mono 16-bit PCM WAV: header + `num_frames` silent frames.
+// Minimal valid 16-bit PCM WAV: header + `num_frames` silent frames.
 std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_t channels,
                                           std::uint32_t num_frames) {
     std::uint32_t data_bytes = num_frames * channels * 2;
@@ -84,7 +84,6 @@ TEST(FileProducerTest, ThrowsOnTruncatedWav) {
     try {
         FileProducer producer(path.string());
     } catch (const std::runtime_error&) {
-        // also acceptable
     }
 
     std::filesystem::remove(path);
@@ -100,7 +99,7 @@ TEST(FileProducerTest, OpensValidFileAndReportsFormat) {
         EXPECT_EQ(producer.channels(), 2u);
         EXPECT_EQ(producer.sample_rate(), 44100u);
         EXPECT_FALSE(producer.is_finished());
-    }  // decoder must close its file handle before remove() below (Windows exclusive lock)
+    }
 
     std::filesystem::remove(path);
 }

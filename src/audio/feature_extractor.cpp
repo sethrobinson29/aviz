@@ -17,7 +17,7 @@ constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;  // [0
 float one_pole_coeff(float time_constant_ms, double dt_seconds) {
     double tau = static_cast<double>(time_constant_ms) / 1000.0;
     if (tau <= 0.0) {
-        return 1.0f;  // instantaneous
+        return 1.0f;
     }
     return static_cast<float>(1.0 - std::exp(-dt_seconds / tau));
 }
@@ -43,10 +43,6 @@ FeatureExtractor::FeatureExtractor(unsigned sample_rate)
         hann_window_[i] = 0.5f - 0.5f * std::cos(2.0f * kPi * i / (audio_config::kFftWindowSize - 1));
     }
 
-    // Log-scaled band edges from kMinBandFrequencyHz to Nyquist. Each band's
-    // bin_lo is the previous band's bin_hi (not independently re-rounded
-    // from its own edge_lo) so the bands tile the bin grid contiguously
-    // with no gaps or overlap.
     float low = audio_config::kMinBandFrequencyHz;
     float high = static_cast<float>(sample_rate) / 2.0f;
     std::size_t bin_cursor = bin_for_frequency(low, sample_rate);
@@ -80,7 +76,6 @@ void FeatureExtractor::reset_onset_history() {
     for (auto& history : flux_history_) {
         history.fill(0.0f);
     }
-    // Deliberately does NOT touch agc_reference_/agc_seeded_.
 }
 
 void FeatureExtractor::process(const float* mono_window, bool discontinuity, AudioFeatures& out) {
@@ -132,7 +127,6 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
     }
     raw_energy[audio_config::kGlobalBandIndex] = global_sum / static_cast<float>(kNumFftBins);
 
-    // Captured once so all bands seed together on the same call.
     bool first_call = !agc_seeded_;
 
     for (std::size_t band = 0; band < audio_config::kTotalBandSlots; ++band) {
@@ -160,9 +154,6 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
             threshold = mean + audio_config::kOnsetThresholdMultiplier * stddev +
                         audio_config::kOnsetFluxEpsilon;
         }
-        // Require a full trailing history before trusting the adaptive
-        // threshold -- otherwise it defaults toward 0 and fires on the
-        // first nonzero flux regardless of size.
         bool has_baseline = count >= audio_config::kOnsetHistoryLength;
         out.band_onset[band] = has_baseline && flux > 0.0f && flux > threshold;
 
@@ -176,10 +167,6 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
         smoothed_energy_[band] += (raw_energy[band] - smoothed_energy_[band]) * coeff;
         out.band_energy[band] = smoothed_energy_[band];
 
-        // Peak-hold-with-slow-release, tracking smoothed_energy_ (not
-        // raw_energy -- see audio_config.h). Rise is an exact snap, not a
-        // blend: any new peak is captured immediately, with no catch-up lag
-        // to tune away.
         if (first_call || smoothed_energy_[band] > agc_reference_[band]) {
             agc_reference_[band] = smoothed_energy_[band];
         } else {

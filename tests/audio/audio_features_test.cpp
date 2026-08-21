@@ -37,7 +37,6 @@ TEST(AudioFeaturesSnapshotTest, AlternatesBuffersAcrossPublishCyclesWithoutClobb
     snap.publish();
     EXPECT_EQ(snap.current().rms, 1.0f);
 
-    // Writing into the new back buffer must not disturb what's published.
     snap.back_buffer().rms = 2.0f;
     EXPECT_EQ(snap.current().rms, 1.0f);
 

@@ -8,7 +8,7 @@
 
 namespace compositor_math {
 
-// Clamps opacity into the valid [0, 1] compositing range.
+// Range: [0, 1].
 float clamp_opacity(float opacity);
 
 // GL blend factors for a compositor-stage LayerBlendMode. `raylib_mode` is
@@ -26,9 +26,7 @@ struct BlendFactors {
 };
 BlendFactors to_blend_factors(LayerBlendMode mode);
 
-// Moves the element at `from` to sit at `to`, shifting elements between
-// them (same semantics as drag-to-reorder — spec §5). Indices are clamped
-// into [0, v.size()); no-op on an empty vector.
+// Indices are clamped into [0, v.size()); no-op on an empty vector.
 template <typename T>
 void move_element(std::vector<T>& v, std::size_t from, std::size_t to) {
     if (v.empty()) {

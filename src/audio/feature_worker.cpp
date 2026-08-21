@@ -48,14 +48,14 @@ FeatureWorker::~FeatureWorker() { stop(); }
 
 void FeatureWorker::start() {
     if (running_.exchange(true)) {
-        return;  // already running
+        return;
     }
     thread_ = std::thread(&FeatureWorker::run, this);
 }
 
 void FeatureWorker::stop() {
     if (!running_.exchange(false)) {
-        return;  // already stopped
+        return;
     }
     if (thread_.joinable()) {
         thread_.join();
@@ -77,7 +77,7 @@ std::size_t FeatureWorker::drain_ring_buffer() {
         total += popped;
 
         if (popped < kScratchChunkFrames) {
-            break;  // ring buffer drained
+            break;
         }
     }
     return total;

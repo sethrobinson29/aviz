@@ -3,9 +3,6 @@
 #include "audio/audio_features.h"
 #include "raylib.h"
 
-// Common interface for visual modules (spec §6). Each module owns its
-// offscreen texture and renders into it every frame from the current
-// AudioFeatures snapshot.
 class VisualModule {
 public:
     virtual ~VisualModule() = default;

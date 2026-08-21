@@ -90,15 +90,10 @@ int run_app(const char* audio_path) {
             "  O         move top layer to bottom of stack\n");
 
         {
-            // Scoped so textures unload before CloseWindow() tears down the
-            // GL context.
             Compositor compositor;
             compositor.resize(kWindowWidth, kWindowHeight);
             compositor.add_layer(VisualType::Waveform);
 
-            // Loop runs on window lifetime, not producer.is_finished() --
-            // a finished track keeps playing silence, so visuals settle
-            // into their idle pose instead of the window closing.
             while (!WindowShouldClose()) {
                 if (IsKeyPressed(KEY_ONE)) {
                     compositor.add_layer(VisualType::Waveform);

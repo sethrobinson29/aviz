@@ -29,8 +29,6 @@ TEST(SpectrumToBarsTest, NormalizesEachBandAgainstItsOwnReferenceAndClamps) {
     EXPECT_NEAR(bars[1].height, 100.0f, 1e-4f);  // 200/100 -> clamped to full height
 }
 
-// This is the exact bug the per-band reference replaced: equal raw energy
-// but different "typical" scale per band must not read as equal loudness.
 TEST(SpectrumToBarsTest, DifferentReferencesGiveDifferentNormalizationForEqualEnergy) {
     float energy[2] = {10.0f, 10.0f};
     float reference[2] = {10.0f, 100.0f};
@@ -74,7 +72,7 @@ TEST(SpectrumToBarsTest, ZeroReferenceYieldsZeroHeightInsteadOfDividingByIt) {
 
 TEST(SpectrumToBarsTest, MaxHeightFractionCapsAFullyNormalizedBar) {
     float energy[1] = {100.0f};
-    float reference[1] = {100.0f};  // ratio == 1.0, would be full height uncapped
+    float reference[1] = {100.0f};
     auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 0.8f,
                                         /*idle=*/false);
 

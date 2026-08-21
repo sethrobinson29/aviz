@@ -9,9 +9,6 @@
 
 struct PFFFT_Setup;
 
-// Turns one time-domain analysis window into one AudioFeatures snapshot.
-// Not thread-safe: the feature worker owns one instance and calls process()
-// sequentially from a single thread.
 class FeatureExtractor {
 public:
     explicit FeatureExtractor(unsigned sample_rate);
@@ -35,12 +32,10 @@ private:
     PFFFT_Setup* fft_setup_;
     std::vector<float> hann_window_;
 
-    // Allocated via pffft_aligned_malloc/free -- pffft requires 16-byte
-    // alignment, which std::vector doesn't guarantee.
     float* windowed_input_;  // size kFftWindowSize
     float* fft_output_;      // ordered output, size kFftWindowSize
 
-    std::vector<float> magnitude_;  // bins [0, kFftWindowSize/2]
+    std::vector<float> magnitude_;
     std::array<BandRange, audio_config::kNumBands> band_ranges_{};
 
     std::array<float, audio_config::kTotalBandSlots> prev_energy_{};
@@ -53,10 +48,6 @@ private:
     float attack_coeff_;
     float release_coeff_;
 
-    // Peak-hold-with-slow-release reference tracking smoothed_energy_: an
-    // exact snap on rise, a slow decay (audio_config::kAgcDecayTauMs)
-    // otherwise. Seeded on the first process() call; agc_seeded_ never
-    // resets, not even on `discontinuity`.
     std::array<float, audio_config::kTotalBandSlots> agc_reference_{};
     float agc_decay_coeff_;
     bool agc_seeded_ = false;

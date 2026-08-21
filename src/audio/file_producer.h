@@ -6,11 +6,6 @@
 
 #include "ring_buffer.h"
 
-// Local file playback producer (CLAUDE.md invariant #5).
-//
-// Pimpl'd so this header never includes miniaudio.h: miniaudio.h pulls in
-// <windows.h>, which collides with raylib.h's symbols in the same
-// translation unit.
 class FileProducer {
 public:
     // Throws std::runtime_error if the file can't be opened or decoded.

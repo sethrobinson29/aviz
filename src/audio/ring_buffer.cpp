@@ -42,8 +42,7 @@ std::size_t AudioRingBuffer::pop_frames(float* out, std::size_t frame_count) {
     std::size_t write = write_index_.load(std::memory_order_acquire);
     std::size_t read = read_index_.load(std::memory_order_relaxed);
 
-    // Producer has lapped us: snap forward to the oldest frame still valid.
-    // discontinuity_ was already raised by the producer when this happened.
+    // Producer has lapped us: snap forward to the oldest still-valid frame.
     if (write - read > capacity_frames_) {
         read = write - capacity_frames_;
     }

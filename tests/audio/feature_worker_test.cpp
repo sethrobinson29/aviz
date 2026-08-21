@@ -29,7 +29,7 @@ TEST(MixdownToMonoTest, MonoInputPassesThroughUnchanged) {
 }
 
 TEST(MixdownToMonoTest, AveragesFourChannels) {
-    float interleaved[] = {1.0f, 2.0f, 3.0f, 4.0f};  // one frame, 4 channels
+    float interleaved[] = {1.0f, 2.0f, 3.0f, 4.0f};
     float mono[1] = {};
 
     mixdown_to_mono(interleaved, 1, 4, mono);
@@ -65,13 +65,11 @@ TEST(SlideWindowTest, CountEqualToWindowSizeReplacesEntireWindow) {
 }
 
 TEST(SlideWindowTest, CountExceedingWindowSizeKeepsOnlyMostRecentTail) {
-    std::vector<float> window = {1.0f, 2.0f, 3.0f};  // size 3
-    float new_samples[] = {10.0f, 11.0f, 12.0f, 13.0f, 14.0f};  // 5 new samples
+    std::vector<float> window = {1.0f, 2.0f, 3.0f};
+    float new_samples[] = {10.0f, 11.0f, 12.0f, 13.0f, 14.0f};
 
     slide_window(window, new_samples, 5);
 
-    // Worker fell behind by more than a window's worth — window becomes
-    // just the most recent 3 of the 5 new samples, oldest 2 discarded.
     EXPECT_EQ(window, (std::vector<float>{12.0f, 13.0f, 14.0f}));
 }
 

@@ -8,7 +8,6 @@
 #include "feature_extractor.h"
 #include "ring_buffer.h"
 
-// Pure logic pulled out of FeatureWorker's poll loop for unit testing.
 namespace audio_worker_utils {
 
 // Downmixes `frame_count` interleaved frames (each `channels` wide) to mono
@@ -25,13 +24,12 @@ void slide_window(std::vector<float>& window, const float* new_samples, std::siz
 
 }  // namespace audio_worker_utils
 
-// Feature-extraction worker thread (CLAUDE.md invariant #1). Polls the ring
-// buffer, slides the analysis window, and publishes one extraction pass per
-// tick that has new audio.
+// Polls the ring buffer, slides the analysis window, and publishes one
+// extraction pass per tick that has new audio.
 class FeatureWorker {
 public:
     // `ring` and `snapshot` must outlive this worker. `sample_rate` is the
-    // producer's actual rate (fixed for local file playback per spec §3).
+    // producer's actual rate.
     FeatureWorker(AudioRingBuffer& ring, AudioFeaturesSnapshot& snapshot, unsigned sample_rate);
     ~FeatureWorker();
 
