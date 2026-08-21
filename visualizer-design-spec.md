@@ -93,7 +93,7 @@ Struct shape (conceptual): a per-frame snapshot containing raw recent waveform s
 
 ## 5. Layer & Compositor System
 
-**Rendering model:** each active layer renders to its own offscreen texture (framebuffer). The compositor then stacks textures in order — this is what makes arbitrary mixing possible, since layers never fight over one shared canvas.
+**Rendering model:** each active layer renders to its own offscreen texture (framebuffer). The compositor then stacks textures in order — this is what makes arbitrary mixing possible, since layers never fight over one shared canvas. **Every offscreen texture must be cleared to fully transparent (alpha 0), not opaque black, before a visual module draws into it.** An opaque-black background composites incorrectly under every blend mode except normal — additive, multiply, and screen all treat background transparency as meaningful, and an opaque background silently produces wrong output rather than an obvious failure. This is a requirement for every visual module (§6), not something to fix per-module after the fact — found as a real bug during milestone 3 when milestone 2's waveform/spectrum modules (built before the compositor existed to expose the problem) needed correcting.
 
 **Layer data model (conceptual):**
 
@@ -130,7 +130,7 @@ Starting set, roughly in build order:
 7. **Fractals** — zoom/rotation/color cycling driven by audio
 8. **Geometric/abstract** — rotating polygons, tunnels
 
-Each module implements a common interface: given `AudioFeatures` (filtered to its assigned band, if applicable) and its own `visual_params`, render into its offscreen texture.
+Each module implements a common interface: given `AudioFeatures` (filtered to its assigned band, if applicable) and its own `visual_params`, render into its offscreen texture. Per §5's rendering model, that texture must be cleared to transparent before drawing — not opaque black — so the compositor's blend modes work correctly regardless of what's stacked above or below.
 
 ## 7. UI Architecture
 

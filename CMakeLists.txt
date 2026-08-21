@@ -75,6 +75,9 @@ add_executable(aviz
   src/audio/file_producer.cpp
   src/visuals/waveform/waveform_visual.cpp
   src/visuals/spectrum/spectrum_visual.cpp
+  src/compositor/layer.cpp
+  src/compositor/compositor.cpp
+  src/compositor/compositor_math.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)

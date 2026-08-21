@@ -16,7 +16,8 @@ std::vector<Vector2> to_points(const float* samples, std::size_t count, int widt
 }  // namespace waveform_math
 
 struct WaveformParams {
-    Color line_color = RAYWHITE;
+    Color line_color = ORANGE;
+    float line_thickness = 3.0f;
 };
 
 class WaveformVisual : public VisualModule {

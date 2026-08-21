@@ -32,3 +32,24 @@ add_executable(visuals_tests
 target_include_directories(visuals_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(visuals_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
 gtest_discover_tests(visuals_tests)
+
+# Compositor's GL-free logic: blend-mode-to-GL-factor mapping, opacity
+# clamping, layer reorder index math (compositor_math), plus
+# Compositor::add_layer/remove_layer/move_layer and make_visual, none of
+# which touch RenderTexture2D/BeginTextureMode as long as resize() is never
+# called. render()/resize() themselves stay human-review territory per
+# TESTING.md. Links raylib for its plain constants/types only, never
+# initializes a window/GL context.
+add_executable(compositor_tests
+  compositor/compositor_math_test.cpp
+  compositor/compositor_test.cpp
+  compositor/layer_test.cpp
+  ../src/compositor/compositor_math.cpp
+  ../src/compositor/compositor.cpp
+  ../src/compositor/layer.cpp
+  ../src/visuals/waveform/waveform_visual.cpp
+  ../src/visuals/spectrum/spectrum_visual.cpp
+)
+target_include_directories(compositor_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
+gtest_discover_tests(compositor_tests)

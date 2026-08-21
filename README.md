@@ -9,9 +9,12 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Local playback + feature extraction, and waveform/spectrum visuals
-rendering from live audio, are implemented and verified — see "Features"
-and "Running" below. Build order follows `visualizer-design-spec.md` §8.
+Local playback + feature extraction, waveform/spectrum visuals, and the
+layer compositor (stacking, opacity, blend modes, reordering) are
+implemented and verified — see "Features" and "Running" below. The control
+panel UI doesn't exist yet, so the layer stack is driven by a temporary
+keyboard rig instead of real controls. Build order follows
+`visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -51,11 +54,21 @@ build/Release/aviz.exe <path-to-audio-file>
 
 Plays the file through the default output device (WAV, MP3, and FLAC —
 whatever miniaudio's built-in decoders cover; no OGG/Vorbis support wired up
-yet) and opens a window rendering the audio-reactive visualization.
+yet) and opens a window rendering the composited layer stack.
 
-- `1` — waveform
-- `2` — spectrum bars
+No control panel UI exists yet (milestone 8), so the layer stack is driven
+by a temporary keyboard rig printed to the console at startup:
+
+- `1` / `2` — add a waveform / spectrum layer to the top of the stack
+- `X` — remove the top layer
+- `B` — cycle the top layer's blend mode (normal → additive → multiply →
+  screen → normal)
+- `up` / `down` — increase / decrease the top layer's opacity
+- `O` — move the top layer to the bottom of the stack
 - close the window (or Alt+F4) to quit
+
+The stack starts with a single waveform layer. Every add/remove/reorder
+prints the resulting stack order to the console.
 
 ## Testing
 
@@ -81,9 +94,13 @@ run directly from `tsan/`.
 - **Triple-buffered `AudioFeatures` handoff** from the worker thread to the
   render/consumer side — see `CLAUDE.md` invariant #1 for why a plain
   double-buffer isn't sufficient here.
-- **Waveform and spectrum bar visuals**, hotkey-switchable, each rendering
-  to its own offscreen texture. Spectrum bars normalize per band against a
-  peak-hold-with-slow-release reference (fast attack, slow release) rather
-  than a single shared scale, since band energy magnitude varies by orders
-  of magnitude bass-to-presence. Both settle to a flat/idle rest pose below
-  an RMS floor instead of rendering near-silence noise.
+- **Waveform and spectrum bar visuals**, each rendering to its own
+  offscreen texture, cleared to transparent so the compositor can stack
+  them. Spectrum bars normalize per band against a peak-hold-with-slow-release
+  reference (fast attack, slow release) rather than a single shared scale,
+  since band energy magnitude varies by orders of magnitude bass-to-presence.
+  Both settle to a flat/idle rest pose below an RMS floor instead of
+  rendering near-silence noise.
+- **Layer compositor**: add/remove/reorder layers, each with independent
+  opacity and blend mode (normal, additive, multiply, screen). Layers
+  composite in stack order, bottom to top, into a single output texture.

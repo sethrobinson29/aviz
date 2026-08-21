@@ -60,7 +60,7 @@ void SpectrumVisual::render(const AudioFeatures& features) {
         width_, height_, params_.gap_ratio, params_.max_height_fraction, idle);
 
     BeginTextureMode(texture_);
-    ClearBackground(BLACK);
+    ClearBackground(BLANK);
     for (const Rectangle& bar : bars) {
         DrawRectangleRec(bar, params_.bar_color);
     }

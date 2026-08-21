@@ -49,7 +49,9 @@ void WaveformVisual::render(const AudioFeatures& features) {
         features.waveform.data(), features.waveform.size(), width_, height_, idle);
 
     BeginTextureMode(texture_);
-    ClearBackground(BLACK);
-    DrawLineStrip(points.data(), static_cast<int>(points.size()), params_.line_color);
+    ClearBackground(BLANK);
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        DrawLineEx(points[i - 1], points[i], params_.line_thickness, params_.line_color);
+    }
     EndTextureMode();
 }
