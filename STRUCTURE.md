@@ -32,7 +32,7 @@ music-visualizer/
 │                              # section for the run recipe. Its own build/ output is git-ignored,
 │                              # same as the main build/ directory.
 ├── src/
-│   ├── audio/           # producers (file, loopback, synthetic), ring buffer,
+│   ├── audio/           # producers (file, loopback), ring buffer,
 │   │                     # feature extraction (FFT, banding, onset/envelope)
 │   ├── compositor/       # layer stack, blend modes, offscreen texture management
 │   ├── visuals/           # one subdirectory per visual module
@@ -48,6 +48,8 @@ music-visualizer/
 ├── tests/
 │   ├── audio/             # mirrors src/audio — FFT banding, onset, envelope tests
 │   ├── compositor/         # layer stack serialization, blend logic tests
+│   ├── visuals/             # mirrors src/visuals — per-module logic tests (e.g.
+│   │                         # spectrum_visual_test.cpp, waveform_visual_test.cpp)
 │   ├── ui_host/             # state bridge serialization/message-format tests
 │   └── fixtures/            # synthetic signal generators, known test tones/impulses
 ├── assets/

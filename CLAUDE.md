@@ -66,7 +66,7 @@ See `TESTING.md` for the full verification strategy. Short version: pure-logic p
 - Never make a design decision unilaterally. When there's a real choice — not just an implementation detail — surface the options and the tradeoffs and wait for a decision before proceeding.
 - Keep platform-specific code (WASAPI/Core Audio/PipeWire) isolated behind the shared capture interface — don't let platform branches leak into feature extraction, compositor, or visual module code.
 - No placeholder/stub visuals presented as done — if a visual module isn't fully wired to `AudioFeatures`, say so explicitly rather than leaving silent TODOs.
-- Same principle applies to environment failures: if audio hardware or a display/GPU can't be initialized, say so plainly rather than quietly stubbing out the affected system or fabricating success. See `TESTING.md` for the fallback behavior (synthetic signal producer, headless rendering) this should route to instead.
+- Same principle applies to environment failures: if something can't be initialized, say so plainly rather than quietly stubbing out the affected system or fabricating success. (No-hardware fallback behavior no longer applies to this project — see `TESTING.md`.)
 
 ## Compact Instructions
 

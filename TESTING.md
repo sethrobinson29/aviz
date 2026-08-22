@@ -38,11 +38,9 @@ Underrun/overrun counts from miniaudio should still be logged — they're cheap 
 
 ## No-hardware fallback
 
-Claude Code sandboxes will often have no real audio devices and no display/GPU. The pipeline needs to be exercisable without either.
+Not applicable to this project. Dev and test agents both run on the same real Windows machine with real audio hardware and a real display always present — there's no sandboxed/hardware-less environment in this workflow, no CI, and no plan to distribute an executable.
 
-- **Detect, don't assume.** Both the audio capture layer and raylib's windowing/GPU context must explicitly detect init failure (no audio devices found, no display/GPU available) rather than crashing or hanging.
-- **Synthetic signal generator as a third producer.** Alongside local file playback and loopback capture, add a synthetic generator implementing the same `push_frames` interface — sine waves at known frequencies, impulse trains, silence, white noise. This is what makes the unit tests and fixtures above actually runnable end-to-end (feature extraction, banding, onset detection, compositor) with zero real audio hardware. It's a real producer, not a test-only branch — keep it strictly limited to generating signal via the standard interface; don't let it grow app-specific test hooks elsewhere in the pipeline (compositor, UI).
-- **Headless rendering fallback.** If display/GPU init fails, fall back to an offscreen framebuffer and write frames out (this is also what feeds the short reference video clips mentioned above) rather than failing outright.
+`tests/fixtures/synthetic_signal.h` remains in use as a unit-test fixture (known-frequency sine waves, known-timing impulse trains, for asserting exact expected behavior) — that's unrelated to hardware availability and stays as-is.
 
 ## Test cadence
 
@@ -105,7 +103,7 @@ The audio → worker → render thread handoff (`CLAUDE.md` invariant #1) is the
   Pipe output to a log and check for `WARNING: ThreadSanitizer` or nonzero `FAILED` counts — either means a real race, not a flake. This doesn't go through `ctest` (the standalone `tsan/CMakeLists.txt` never calls `enable_testing()`); the binary is run directly.
 
   `tsan/CMakeLists.txt`'s source list must be kept in sync with the main project's audio test target by hand — it's a separate build, so it doesn't automatically track additions/removals from the real `tests/audio/` suite. If a file's been added there since the last TSan run, add it to `tsan/CMakeLists.txt` too before trusting the result.
-- **Stress testing, at relevant milestones only.** Races are often load-dependent and probabilistic — a single short test run may not reproduce one. When a milestone touches the thread handoff, run the pipeline continuously (feeding the synthetic signal generator) for an extended period and watch for crashes, hangs, or corrupted `AudioFeatures` output.
+- **Stress testing, at relevant milestones only.** Races are often load-dependent and probabilistic — a single short test run may not reproduce one. When a milestone touches the thread handoff, run the pipeline continuously (real file playback, looped for an extended duration — there's no app-level synthetic producer; see the No-hardware fallback section) and watch for crashes, hangs, or corrupted `AudioFeatures` output.
 
 ## Summary
 
@@ -115,7 +113,6 @@ The audio → worker → render thread handoff (`CLAUDE.md` invariant #1) is the
 | Visual/rendering changes | Human review of actual running playback |
 | Audio playback correctness | Human review of actual running playback |
 | Buffer underrun/overrun | Logged automatically, supplementary only |
-| No audio/display hardware available | Synthetic signal producer + headless render fallback, detected explicitly at init |
 | Thread handoff races | Structural prevention (lock-free ring buffer, atomic snapshot swap) + periodic Clang/TSan diagnostic build + periodic stress test, not routine per-change checks |
 | Control panel UI (`web/panel/`) behavior | Human review of actual running panel; no JS test framework chosen yet. C++-side state bridge (`ui_host/`) still gets unit tests. |
 | Malformed audio files / layer preset JSON | Malformed fixture files at both boundaries; reject cleanly, no crash/OOB read, no unclamped ranges into FFT math |
