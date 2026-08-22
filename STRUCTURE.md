@@ -65,6 +65,16 @@ music-visualizer/
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
 
+## Build options
+
+- **`AVIZ_VERBOSE_RAYLIB_LOG`** (CMake option, default `OFF`) — controls raylib's own trace log verbosity, not application logging. raylib's default `INFO` level prints a line for every texture/FBO load and unload, which is noisy during normal development (especially with the debug control tools reprinting a layer list after every action). Default build suppresses raylib's log to `WARNING` and above via `SetTraceLogLevel`; pass `-DAVIZ_VERBOSE_RAYLIB_LOG=ON` on the configure line to restore full `INFO`-level output when actually debugging a texture/FBO/GPU issue specifically.
+
+  ```
+  cmake -B build -G "Visual Studio 17 2022" -DAVIZ_VERBOSE_RAYLIB_LOG=ON
+  ```
+
+  This is not a general application logging framework — there's no leveled TRACE/DEBUG/INFO/WARN/ERROR system for the project's own diagnostics, and none is needed right now. The debug control tools' layer-list printouts are deliberate feature output, not logging, and aren't affected by this flag. Don't build out a broader logging framework speculatively; this flag exists to solve the one specific noise source (raylib's own trace log) that's actually come up.
+
 ## Dependency policy
 
 - **Out-of-source builds.** Build into a `build/` directory (`cmake -B build`), never in-tree. `build/` is git-ignored.

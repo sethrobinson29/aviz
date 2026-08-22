@@ -53,16 +53,27 @@ void SpectrumVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void SpectrumVisual::render(const AudioFeatures& features) {
+void SpectrumVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
     const bool idle = features.rms < visual_config::kIdleRmsFloor;
+
+    // Always laid out across the full kNumBands-wide slot grid, even when
+    // only one bar will be drawn, so a band-scoped layer's bar sits at the
+    // same position/size it would occupy in the Global view.
     const std::vector<Rectangle> bars = spectrum_math::to_bars(
         features.band_energy.data(), features.band_agc_reference.data(), audio_config::kNumBands,
         width_, height_, params_.gap_ratio, params_.max_height_fraction, idle);
 
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
-    for (const Rectangle& bar : bars) {
-        DrawRectangleRec(bar, params_.bar_color);
+    if (reactivity.freq_band.has_value()) {
+        std::size_t band = *reactivity.freq_band;
+        if (band < bars.size()) {
+            DrawRectangleRec(bars[band], params_.bar_color);
+        }
+    } else {
+        for (const Rectangle& bar : bars) {
+            DrawRectangleRec(bar, params_.bar_color);
+        }
     }
     EndTextureMode();
 }

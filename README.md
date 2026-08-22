@@ -9,12 +9,12 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Local playback + feature extraction, waveform/spectrum visuals, and the
-layer compositor (stacking, opacity, blend modes, reordering) are
-implemented and verified — see "Features" and "Running" below. The control
-panel UI doesn't exist yet, so the layer stack is driven by a temporary
-keyboard rig instead of real controls. Build order follows
-`visualizer-design-spec.md` §8.
+Local playback + feature extraction, waveform/spectrum visuals, the layer
+compositor (stacking, opacity, blend modes, tint), and layer duplication +
+frequency mapping (`freq_band`, `reactivity_source`, `enabled`) are
+implemented — see "Features" below. The control panel UI doesn't exist yet,
+so the layer stack is driven by a temporary keyboard-controlled debug tool.
+Build order follows `visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -45,30 +45,6 @@ different.)
 Dependencies (miniaudio, pffft, raylib, GoogleTest/GoogleMock) are fetched
 and pinned to specific release tags via CMake FetchContent — no manual
 installation needed.
-
-## Running
-
-```
-build/Release/aviz.exe <path-to-audio-file>
-```
-
-Plays the file through the default output device (WAV, MP3, and FLAC —
-whatever miniaudio's built-in decoders cover; no OGG/Vorbis support wired up
-yet) and opens a window rendering the composited layer stack.
-
-No control panel UI exists yet (milestone 8), so the layer stack is driven
-by a temporary keyboard rig printed to the console at startup:
-
-- `1` / `2` — add a waveform / spectrum layer to the top of the stack
-- `X` — remove the top layer
-- `B` — cycle the top layer's blend mode (normal → additive → multiply →
-  screen → normal)
-- `up` / `down` — increase / decrease the top layer's opacity
-- `O` — move the top layer to the bottom of the stack
-- close the window (or Alt+F4) to quit
-
-The stack starts with a single waveform layer. Every add/remove/reorder
-prints the resulting stack order to the console.
 
 ## Testing
 
@@ -102,5 +78,21 @@ run directly from `tsan/`.
   Both settle to a flat/idle rest pose below an RMS floor instead of
   rendering near-silence noise.
 - **Layer compositor**: add/remove/reorder layers, each with independent
-  opacity and blend mode (normal, additive, multiply, screen). Layers
-  composite in stack order, bottom to top, into a single output texture.
+  opacity, blend mode (normal, additive, multiply, screen), and tint color.
+  Layers composite in stack order, bottom to top, into a single output
+  texture. Waveform/spectrum both draw in white by default so the
+  compositor's multiply-based tint isn't fighting a pre-colored base.
+  Duplicating a layer clones its visual and copies all of its other fields
+  (opacity, blend mode, tint, `freq_band`, `reactivity_source`, `enabled`).
+  Disabled layers are skipped entirely — no offscreen render, no
+  compositing pass.
+- **Per-layer `freq_band` and `reactivity_source`**: every layer can be
+  scoped to a specific band (0–15) or Global, and tagged with what
+  audio-derived value it's meant to react to (`GlobalBeat`, `BandOnset`,
+  `BandAmplitude`, `PeakFreq`). Spectrum draws a single bar for a
+  band-scoped layer, positioned/sized as it would sit in the full 16-band
+  layout. Waveform still draws the full-mix signal (there's no per-band
+  time-domain data) but modulates it: `BandAmplitude`/scoped-band energy
+  scales its amplitude, `BandOnset`/`GlobalBeat` trigger a decaying
+  line-thickness pulse on that band's onset. `PeakFreq` isn't wired to
+  either visual yet.

@@ -16,3 +16,33 @@ TEST(MakeVisualTest, SpectrumTypeConstructsSpectrumVisual) {
     EXPECT_NE(dynamic_cast<SpectrumVisual*>(visual.get()), nullptr);
     EXPECT_EQ(dynamic_cast<WaveformVisual*>(visual.get()), nullptr);
 }
+
+TEST(VisualCloneTest, WaveformCloneIsIndependentInstanceOfSameType) {
+    auto original = make_visual(VisualType::Waveform);
+    auto clone = original->clone();
+
+    EXPECT_NE(clone.get(), original.get());
+    EXPECT_NE(dynamic_cast<WaveformVisual*>(clone.get()), nullptr);
+}
+
+TEST(VisualCloneTest, SpectrumCloneIsIndependentInstanceOfSameType) {
+    auto original = make_visual(VisualType::Spectrum);
+    auto clone = original->clone();
+
+    EXPECT_NE(clone.get(), original.get());
+    EXPECT_NE(dynamic_cast<SpectrumVisual*>(clone.get()), nullptr);
+}
+
+TEST(VisualCloneTest, SpectrumClonePreservesParams) {
+    SpectrumVisual original(SpectrumParams{RED, 0.5f, 0.9f});
+    auto clone = original.clone();
+
+    auto* spectrum_clone = dynamic_cast<SpectrumVisual*>(clone.get());
+    ASSERT_NE(spectrum_clone, nullptr);
+    const SpectrumParams& params = spectrum_clone->params();
+    EXPECT_EQ(params.bar_color.r, RED.r);
+    EXPECT_EQ(params.bar_color.g, RED.g);
+    EXPECT_EQ(params.bar_color.b, RED.b);
+    EXPECT_FLOAT_EQ(params.gap_ratio, 0.5f);
+    EXPECT_FLOAT_EQ(params.max_height_fraction, 0.9f);
+}

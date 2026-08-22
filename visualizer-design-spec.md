@@ -103,6 +103,8 @@ Struct shape (conceptual): a per-frame snapshot containing raw recent waveform s
 
 **raylib's render-target state is not a stack.** Every layer must fully finish rendering to its own offscreen texture — `BeginTextureMode()`/`EndTextureMode()` fully paired and closed — before the compositor's own texture mode (for `output_`) is opened. A nested `BeginTextureMode()` call while `output_`'s texture mode is already active has its matching `EndTextureMode()` reset to the screen framebuffer instead of restoring `output_`, silently breaking the composite target. This is why the render loop's structure is "render every layer to completion first, then composite the already-rendered textures below" rather than any interleaved or nested ordering — found as a real implementation constraint during milestone 3, not a hypothetical.
 
+**Disabled layers (`enabled=false`) are skipped entirely, not rendered-then-hidden.** The compositor doesn't call a disabled layer's `render()` at all — no offscreen texture work, no compositing pass for it. This is cheap by construction, not an optimization to add later.
+
 **Layer data model (conceptual):**
 
 ```
@@ -115,6 +117,7 @@ Layer {
   palette_override: optional
   reactivity_source: enum (global_beat, band_onset, band_amplitude, peak_freq)
   freq_range: optional { min_hz, max_hz }   // used only for band_* sources
+  enabled: bool                  // default true; compositor skips render() entirely when false
 }
 ```
 

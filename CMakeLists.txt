@@ -5,6 +5,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(AVIZ_VERBOSE_RAYLIB_LOG
+  "Show raylib's own INFO-level trace log (every texture/FBO load and unload) instead of suppressing it to WARNING and above. See STRUCTURE.md's Build options."
+  OFF)
+
 include(FetchContent)
 
 # --- miniaudio (header-only) ------------------------------------------------
@@ -81,6 +85,9 @@ add_executable(aviz
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
+if(AVIZ_VERBOSE_RAYLIB_LOG)
+  target_compile_definitions(aviz PRIVATE AVIZ_VERBOSE_RAYLIB_LOG)
+endif()
 
 # --- tests ---------------------------------------------------------------------
 add_subdirectory(tests)

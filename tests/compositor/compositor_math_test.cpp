@@ -58,3 +58,47 @@ TEST(MoveElementTest, ClampsOutOfRangeIndicesToLastElement) {
     compositor_math::move_element(v, 99, 0);
     EXPECT_EQ(v, (std::vector<int>{3, 1, 2}));
 }
+
+TEST(NextFreqBandTest, RingOrderIsGlobalThenZeroThroughLastBand) {
+    constexpr std::size_t kNumBands = 16;
+    EXPECT_EQ(compositor_math::next_freq_band(std::nullopt, kNumBands), std::optional<std::size_t>(0));
+    EXPECT_EQ(compositor_math::next_freq_band(0, kNumBands), std::optional<std::size_t>(1));
+    EXPECT_EQ(compositor_math::next_freq_band(14, kNumBands), std::optional<std::size_t>(15));
+    EXPECT_EQ(compositor_math::next_freq_band(15, kNumBands), std::nullopt);
+}
+
+TEST(PrevFreqBandTest, RingOrderReversesNextFreqBand) {
+    constexpr std::size_t kNumBands = 16;
+    EXPECT_EQ(compositor_math::prev_freq_band(std::nullopt, kNumBands),
+              std::optional<std::size_t>(15));
+    EXPECT_EQ(compositor_math::prev_freq_band(15, kNumBands), std::optional<std::size_t>(14));
+    EXPECT_EQ(compositor_math::prev_freq_band(1, kNumBands), std::optional<std::size_t>(0));
+    EXPECT_EQ(compositor_math::prev_freq_band(0, kNumBands), std::nullopt);
+}
+
+TEST(DefaultReactivitySourceTest, GlobalBeatForGlobalBandOnsetForBand) {
+    EXPECT_EQ(compositor_math::default_reactivity_source(std::nullopt), ReactivitySource::GlobalBeat);
+    EXPECT_EQ(compositor_math::default_reactivity_source(3), ReactivitySource::BandOnset);
+}
+
+TEST(NextReactivitySourceTest, TogglesWithinValidPairForBandMode) {
+    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::BandOnset, 3),
+              ReactivitySource::BandAmplitude);
+    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::BandAmplitude, 3),
+              ReactivitySource::BandOnset);
+}
+
+TEST(NextReactivitySourceTest, TogglesWithinValidPairForGlobalMode) {
+    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
+              ReactivitySource::PeakFreq);
+    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::PeakFreq, std::nullopt),
+              ReactivitySource::GlobalBeat);
+}
+
+TEST(NextReactivitySourceTest, StaleValueFromOtherModeFallsBackToDefault) {
+    // GlobalBeat is not a valid option while a specific band is selected;
+    // this happens transiently right after freq_band changes mode, before
+    // the caller applies default_reactivity_source.
+    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, 3),
+              ReactivitySource::BandOnset);
+}

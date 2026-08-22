@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 #include "compositor/layer.h"
@@ -10,6 +11,28 @@ namespace compositor_math {
 
 // Range: [0, 1].
 float clamp_opacity(float opacity);
+
+// Cycles a layer's freq_band through band indices [0, num_bands) and
+// Global (nullopt): Global -> 0 -> 1 -> ... -> num_bands-1 -> Global for
+// next_freq_band, the reverse for prev_freq_band.
+std::optional<std::size_t> next_freq_band(std::optional<std::size_t> current,
+                                           std::size_t num_bands);
+std::optional<std::size_t> prev_freq_band(std::optional<std::size_t> current,
+                                           std::size_t num_bands);
+
+// The reactivity_source a layer should fall back to when freq_band changes
+// mode (Global <-> a specific band), since band_onset/band_amplitude only
+// apply to a band and global_beat/peak_freq only apply to Global.
+ReactivitySource default_reactivity_source(std::optional<std::size_t> freq_band);
+
+// Cycles reactivity_source within the 2-option pair valid for the given
+// freq_band mode: {BandOnset, BandAmplitude} for a band, {GlobalBeat,
+// PeakFreq} for Global. If `current` isn't one of those two (stale from a
+// prior mode), returns default_reactivity_source(freq_band).
+ReactivitySource next_reactivity_source(ReactivitySource current,
+                                         std::optional<std::size_t> freq_band);
+ReactivitySource prev_reactivity_source(ReactivitySource current,
+                                         std::optional<std::size_t> freq_band);
 
 // GL blend factors for a compositor-stage LayerBlendMode. `raylib_mode` is
 // the value to pass to BeginBlendMode(). For LayerBlendMode::Screen this is

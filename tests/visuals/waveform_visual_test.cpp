@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "visuals/visual_config.h"
+
 TEST(WaveformToPointsTest, IdleReturnsFlatMidLine) {
     auto pts = waveform_math::to_points(nullptr, 0, 200, 100, /*idle=*/true);
 
@@ -54,4 +56,48 @@ TEST(WaveformToPointsTest, IdleIgnoresSamplesEvenIfProvided) {
     ASSERT_EQ(pts.size(), 2u);
     EXPECT_FLOAT_EQ(pts[0].y, 50.0f);
     EXPECT_FLOAT_EQ(pts[1].y, 50.0f);
+}
+
+TEST(WaveformToPointsTest, AmplitudeScaleShrinksOffsetFromMidline) {
+    float samples[1] = {1.0f};
+    auto pts = waveform_math::to_points(samples, 1, 100, 200, /*idle=*/false,
+                                         /*amplitude_scale=*/0.5f);
+
+    ASSERT_EQ(pts.size(), 1u);
+    EXPECT_FLOAT_EQ(pts[0].y, 50.0f);  // mid(100) - 1.0*0.5*100 = 50
+}
+
+TEST(WaveformToPointsTest, DefaultAmplitudeScaleIsUnity) {
+    float samples[1] = {1.0f};
+    auto pts = waveform_math::to_points(samples, 1, 100, 200, /*idle=*/false);
+
+    ASSERT_EQ(pts.size(), 1u);
+    EXPECT_FLOAT_EQ(pts[0].y, 0.0f);  // same as MapsAmplitudeToYOffset's +1.0 case
+}
+
+TEST(BandAmplitudeScaleTest, NormalizesAndClamps) {
+    EXPECT_FLOAT_EQ(waveform_math::band_amplitude_scale(50.0f, 100.0f), 0.5f);
+    EXPECT_FLOAT_EQ(waveform_math::band_amplitude_scale(200.0f, 100.0f), 1.0f);
+    EXPECT_FLOAT_EQ(waveform_math::band_amplitude_scale(-5.0f, 100.0f), 0.0f);
+}
+
+TEST(BandAmplitudeScaleTest, NonPositiveReferenceYieldsZero) {
+    EXPECT_FLOAT_EQ(waveform_math::band_amplitude_scale(5.0f, 0.0f), 0.0f);
+    EXPECT_FLOAT_EQ(waveform_math::band_amplitude_scale(5.0f, -1.0f), 0.0f);
+}
+
+TEST(PulseThicknessTest, ZeroPulseReturnsBaseThicknessUnchanged) {
+    EXPECT_FLOAT_EQ(waveform_math::pulse_thickness(3.0f, 0.0f), 3.0f);
+}
+
+TEST(PulseThicknessTest, FullPulseAppliesBoostFactor) {
+    EXPECT_FLOAT_EQ(waveform_math::pulse_thickness(2.0f, 1.0f),
+                    2.0f * visual_config::kOnsetPulseThicknessBoost);
+}
+
+TEST(PulseThicknessTest, ClampsOutOfRangePulse) {
+    EXPECT_FLOAT_EQ(waveform_math::pulse_thickness(2.0f, 5.0f),
+                    waveform_math::pulse_thickness(2.0f, 1.0f));
+    EXPECT_FLOAT_EQ(waveform_math::pulse_thickness(2.0f, -5.0f),
+                    waveform_math::pulse_thickness(2.0f, 0.0f));
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 #include "raylib.h"
@@ -21,7 +22,7 @@ std::vector<Rectangle> to_bars(const float* band_energy, const float* band_refer
 }  // namespace spectrum_math
 
 struct SpectrumParams {
-    Color bar_color = SKYBLUE;
+    Color bar_color = WHITE;
     float gap_ratio = 0.2f;            // gap width as a fraction of bar width
     float max_height_fraction = 0.8f;
 };
@@ -32,8 +33,12 @@ public:
     ~SpectrumVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
     RenderTexture2D& render_texture() override { return texture_; }
+    std::unique_ptr<VisualModule> clone() const override {
+        return std::make_unique<SpectrumVisual>(params_);
+    }
+    const SpectrumParams& params() const { return params_; }
 
 private:
     SpectrumParams params_;
