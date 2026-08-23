@@ -12,6 +12,12 @@ namespace compositor_math {
 // Range: [0, 1].
 float clamp_opacity(float opacity);
 
+// Multiplier applied to a layer's reactivity strength (amplitude scaling,
+// onset pulse magnitude). 1.0 = unmodified.
+inline constexpr float kSensitivityMin = 0.0f;
+inline constexpr float kSensitivityMax = 4.0f;
+float clamp_sensitivity(float sensitivity);
+
 // Cycles a layer's freq_band through band indices [0, num_bands) and
 // Global (nullopt): Global -> 0 -> 1 -> ... -> num_bands-1 -> Global for
 // next_freq_band, the reverse for prev_freq_band.

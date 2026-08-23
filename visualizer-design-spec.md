@@ -115,11 +115,25 @@ Layer {
   blend_mode: enum (normal, additive, multiply, screen, ...)
   tint_color: optional
   palette_override: optional
-  reactivity_source: enum (global_beat, band_onset, band_amplitude, peak_freq)
-  freq_range: optional { min_hz, max_hz }   // used only for band_* sources
+  reactivity: LayerReactivity    // see struct below — freq_band, source, sensitivity
   enabled: bool                  // default true; compositor skips render() entirely when false
 }
 ```
+
+**`LayerReactivity` (real struct, `src/visuals/visual_module.h`):**
+
+```
+struct LayerReactivity {
+    std::optional<std::size_t> freq_band;   // nullopt = Global; else [0, kNumBands)
+    ReactivitySource source = ReactivitySource::GlobalBeat;
+    float sensitivity = 1.0f;
+};
+```
+
+**`sensitivity` (real field: `Layer.sensitivity`, `src/compositor/layer.h`) — per-layer multiplier on top of the shared band envelope (§4).** Clamped to `[kSensitivityMin, kSensitivityMax] = [0.0f, 4.0f]` via `compositor_math::clamp_sensitivity` — tunable constants, not hardcoded literals, tested against real material. Default `1.0f` (identity, matches unscaled prior behavior). Applied differently depending on the reactivity channel:
+- **Amplitude channels** (`BandAmplitude`, and any other continuous-value channel): direct multiply on the value, uncapped past 1.0 by design — a layer can genuinely be made more responsive than the raw envelope, not just attenuated.
+- **Onset/pulse channels** (`BandOnset`, `GlobalBeat`): multiplies the pulse's snap-up magnitude *before* that pulse's own `[0,1]` clamp — sensitivity affects how easily a pulse reaches full intensity, but never produces an out-of-range value regardless of how high sensitivity is set. Multiplying after the clamp would make sensitivity above 1.0 a no-op, which is why pre-clamp is the correct order.
+
 
 **Stack position is implicit (vector index), not a separate field.** No `order_index` on `Layer` — position in the stack is just where it sits in the underlying `std::vector<Layer>`, and `move_layer` operates directly on that. This avoids a redundant piece of state that could drift out of sync with actual position, and it's what the compositor already does. Layer identity (a stable reference that survives a reorder — needed for UI selection surviving drag-to-reorder, and for layer preset persistence) is a separate, currently-unsolved concern — see §9.
 
@@ -130,6 +144,8 @@ Layer {
 **Color customization**, two layers of control:
 - **Palette override** — each visual type has its own internal color logic (e.g., spectrum bars colored by frequency); accepts a custom palette/gradient input.
 - **Post-tint** — a universal, cheaper compositor-stage pass (hue shift / multiply by tint color) applied after rendering, giving "recolor anything" without touching each visual module's internals. Ship this first; palette overrides per visual type are a deeper v2 layer on top.
+
+**Tint is a multiply ceiling, not a floor — non-obvious, cost real implementation rework once already.** Because post-tint is applied once, after a visual module's `render()`, as a straight multiply, and a visual module's pre-tint output can never exceed 1.0 per channel, the mathematical result can never be brighter than `tint_color` itself — `pre_tint_value × tint_color ≤ tint_color`, always. There is no pixel a visual module can draw, however bright, that composites out brighter than the layer's own tint. A "brighten on hit" pulse effect must therefore dim toward that ceiling and decay back up to it, not attempt to exceed it (see §6's Spectrum onset-pulse mechanism for the resolved version of exactly this problem). This is also why palette override (above) exists as the escape hatch for a visual module that genuinely needs internal color control beyond what a post-tint multiply can express — reach for that, don't add a one-off exception that lets a single visual module peek at `tint_color` directly.
 
 ## 6. Visual Modules
 
@@ -145,6 +161,18 @@ Starting set, roughly in build order:
 8. **Geometric/abstract** — rotating polygons, tunnels
 
 Each module implements a common interface: given `AudioFeatures` (filtered to its assigned band, if applicable) and its own `visual_params`, render into its offscreen texture. Per §5's rendering model, that texture must be cleared to transparent before drawing — not opaque black — so the compositor's blend modes work correctly regardless of what's stacked above or below.
+
+**Spectrum's `reactivity_source` consumption (resolves a real milestone 4 gap — Spectrum previously ignored `reactivity_source` entirely).** Bar height always tracks the continuous energy/reference ratio (§4's AGC mechanism) regardless of mode — `BandAmplitude` and `BandOnset`/`GlobalBeat` modes show identical height behavior, so a band's current loudness is always visible no matter which reactivity mode is selected. What differs by mode is a per-band RGB brightness pulse layered on top of that same bar, driven independently of height:
+
+- **`BandAmplitude` mode:** no pulse; bar renders at its normal `bar_color` (`WHITE`, the multiply-identity for post-tint) at all times.
+- **`BandOnset`/`GlobalBeat` mode:** bar color interpolates between a dimmed rest fraction and full `bar_color`, snapping to full brightness on an onset event and decaying back to the dimmed rest state afterward — same snap-and-decay shape as elsewhere, applied to color instead of height. This resolves the multiply-tint-ceiling constraint (§5): since full `bar_color` is already the brightest a bar can render pre-tint, the pulse dims *below* that and rises back *up to* it, rather than attempting to exceed it.
+  - Rest brightness: `kSpectrumOnsetPulseRestBrightnessFraction = 0.55f` (`src/visuals/visual_config.h`), tunable, tested against real material.
+  - Decay: `kSpectrumOnsetPulseDecayPerFrame = 0.92f` (`src/visuals/visual_config.h`) — a flat per-frame multiplicative decay, not a time-constant-derived (`tau`-based) coefficient like most other decay mechanisms in this project (§4's envelope, AGC reference). This means its perceived decay speed is implicitly tied to the render loop's frame rate rather than being frame-rate-independent; a minor known inconsistency, not corrected here, worth knowing if the render loop's timing model ever changes.
+- Each `SpectrumVisual` instance maintains its own independent per-band pulse state (one decaying value per band + global, `kTotalBands` values) — this is per-visual-module state, not shared audio-pipeline state, and doesn't touch raw flux or violate invariant #2.
+- In `GlobalBeat` mode, each bar currently pulses off its own band's individual onset, not a single shared aggregate pulse — the dedicated global pulse slot (index `kGlobalBandIndex`) is computed every frame but not currently drawn. Worth knowing this is the actual behavior if "GlobalBeat" as a name suggests a single synchronized flash across all bars; that's not what it currently does.
+- `SpectrumVisual` remains fully tint-blind, per §5's tint/visual-module separation — it has no access to `tint_color`, only to `LayerReactivity` (`freq_band`/`source`/`sensitivity`). This mechanism was deliberately built to hold that separation rather than crossing it, after an earlier design attempt would have required threading `tint_color` into the visual module directly.
+
+**Known asymmetry, not yet fixed:** `WaveformVisual`'s onset pulse is a single scalar that doesn't reset when a layer's `freq_band` changes at runtime, so it can briefly show a stale decaying pulse carried over from the previously-selected band. `SpectrumVisual` doesn't have this problem, since its pulse state is already independent per band. Flagged, not fixed — out of scope for the work that produced Spectrum's mechanism above.
 
 ## 7. UI Architecture
 
@@ -197,7 +225,6 @@ Each gap resolves at the milestone that actually needs it, not before — decidi
 
 | Gap | Resolves by | Why |
 |---|---|---|
-| Per-layer sensitivity/gain control | Milestone 4 | Distinct from the shared band envelope shape (resolved, §4) — this is a per-layer knob on top of it, and milestone 4 is where per-layer params (freq_range, reactivity_source) get built out. |
 | Layer count performance ceiling | Milestone 3–4 | Becomes real once the compositor exists (3), sharper once duplication makes stacking many layers trivial (4). |
 | Sample rate mismatch | Milestone 5 | Local playback alone (1) has one known rate — only matters once loopback introduces a second, different producer. |
 | Layer preset persistence | Before/alongside Milestone 8 | The state bridge reuses this schema, so it can't be designed twice. |
@@ -205,10 +232,11 @@ Each gap resolves at the milestone that actually needs it, not before — decidi
 | WebView2 Runtime distribution | Before Milestone 8 ships | A packaging decision, not a coding one, but blocks calling milestone 8 done. |
 | CRT linking (static vs. dynamic) | Before Milestone 8 ships | Tied to the WebView2 Runtime distribution decision above — resolving them together avoids redundant packaging work. |
 | Output/export | Unscheduled | Not required by any current milestone. Resolve only if this becomes an actual desired feature. |
+| Spectrum `GlobalBeat` mode pulses per-band, not as one shared flash | Unscheduled | Found during milestone 4's Spectrum onset-pulse work. Not broken, just possibly not matching what the name implies — revisit only if a single synchronized global flash becomes a desired look. |
+| `WaveformVisual` onset pulse doesn't reset on `freq_band` change | Unscheduled | Can briefly show a stale decaying pulse from the previously-selected band after a runtime band change. `SpectrumVisual` doesn't have this problem (independent per-band state). Minor, flagged during milestone 4, not fixed. |
 
 ### Gap details
 
-- **Per-layer sensitivity/gain control** — the shared band envelope shape (attack/release) is resolved (§4), but a per-layer sensitivity/gain multiplier on top of it — letting a user make one specific layer more or less responsive than the raw band envelope, independent of every other layer reading the same band — is not yet designed. Natural fit alongside the other per-layer params (`freq_range`, `reactivity_source`) built in milestone 4.
 - **Layer count performance ceiling** — each layer is a full offscreen texture render; nothing currently bounds stack size. Needs a documented default cap or explicit acknowledgment of perf degradation as layer count grows.
 - **Sample rate mismatch between producers** — local files and loopback devices can report different native rates, and a user may switch source mid-session. Band Hz ranges can't assume a fixed rate; needs a resample-to-common-rate step rather than relying on windowing alone to tolerate variability.
 - **Layer preset persistence** — no mechanism yet to save/reload a layer stack (types, params, blend modes, freq mappings) to disk. Without this, every session starts from scratch. Straightforward fix: JSON serialization of the `Layer` struct list. Note: §7's state bridge is specified to reuse this same JSON shape, so the schema needs to be defined once and shared, not designed twice — resolve this gap before or alongside building the state bridge (milestone 8), not independently. This is distinct from theme selection (§7) — a layer preset is a saved layer-stack configuration; a theme is a built-in UI skin. Don't conflate the two when designing the storage format.
@@ -216,6 +244,8 @@ Each gap resolves at the milestone that actually needs it, not before — decidi
 - **WebView2 Runtime distribution** — WebView2 Runtime ships preinstalled on most current Windows machines but isn't guaranteed present. Not yet decided whether to rely on it being present (simplest, but can fail on an unpatched/older machine) or bundle the Evergreen Bootstrapper/fixed-version runtime as part of packaging. Needs a decision before milestone 8 is considered shippable, not just built.
 - **CRT linking (static vs. dynamic)** — the C++ core links against the MSVC runtime either statically (`/MT`, baked into the exe, no install step, larger binary) or dynamically (`/MD`, smaller binary, requires the matching VC++ Redistributable present on the target machine). Static linking alone doesn't remove the need for an installer if WebView2 Runtime distribution (above) ends up requiring a bundled bootstrapper — in that case dynamic linking plus bundling the redist through the same installer is the lower-total-work option, since the installer is being built anyway. Decide alongside WebView2 Runtime distribution at milestone 8, not independently.
 - **Output/export** — not yet decided whether this stays a live on-screen visualizer only, or needs a "render to video file" path. Affects whether rendering must be decoupled from real-time playback rate.
+- **Spectrum `GlobalBeat` mode pulses per-band, not as one shared flash** — see §6 for the full description; not broken, just worth knowing if a single synchronized flash is ever wanted instead.
+- **`WaveformVisual` onset pulse doesn't reset on `freq_band` change** — see §6 for the full description; minor, `SpectrumVisual` doesn't share this problem.
 
 ### Cross-platform (future, deferred until that push begins)
 

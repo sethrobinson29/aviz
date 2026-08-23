@@ -7,6 +7,10 @@ namespace compositor_math {
 
 float clamp_opacity(float opacity) { return std::clamp(opacity, 0.0f, 1.0f); }
 
+float clamp_sensitivity(float sensitivity) {
+    return std::clamp(sensitivity, kSensitivityMin, kSensitivityMax);
+}
+
 std::optional<std::size_t> next_freq_band(std::optional<std::size_t> current,
                                            std::size_t num_bands) {
     if (!current.has_value()) {

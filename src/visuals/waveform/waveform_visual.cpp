@@ -39,6 +39,26 @@ float pulse_thickness(float base_thickness, float pulse) {
     return base_thickness * (1.0f + (visual_config::kOnsetPulseThicknessBoost - 1.0f) * pulse);
 }
 
+ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity) {
+    ReactivityResult result;
+    if (reactivity.freq_band.has_value()) {
+        std::size_t band = *reactivity.freq_band;
+        if (reactivity.source == ReactivitySource::BandAmplitude) {
+            result.amplitude_scale =
+                band_amplitude_scale(features.band_energy[band], features.band_agc_reference[band]) *
+                reactivity.sensitivity;
+        } else if (reactivity.source == ReactivitySource::BandOnset) {
+            result.onset_active = features.band_onset[band];
+        }
+    } else if (reactivity.source == ReactivitySource::GlobalBeat) {
+        result.onset_active = features.band_onset[audio_config::kGlobalBandIndex];
+    }
+    if (result.onset_active) {
+        result.onset_pulse_target = reactivity.sensitivity;
+    }
+    return result;
+}
+
 }  // namespace waveform_math
 
 WaveformVisual::WaveformVisual(WaveformParams params) : params_(params) {}
@@ -61,23 +81,15 @@ void WaveformVisual::resize(int width, int height) {
 void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
     const bool idle = features.rms < visual_config::kIdleRmsFloor;
 
-    float amplitude_scale = 1.0f;
-    bool onset_active = false;
-    if (reactivity.freq_band.has_value()) {
-        std::size_t band = *reactivity.freq_band;
-        if (reactivity.source == ReactivitySource::BandAmplitude) {
-            amplitude_scale = waveform_math::band_amplitude_scale(features.band_energy[band],
-                                                                    features.band_agc_reference[band]);
-        } else if (reactivity.source == ReactivitySource::BandOnset) {
-            onset_active = features.band_onset[band];
-        }
-    } else if (reactivity.source == ReactivitySource::GlobalBeat) {
-        onset_active = features.band_onset[audio_config::kGlobalBandIndex];
-    }
-    onset_pulse_ = onset_active ? 1.0f : onset_pulse_ * visual_config::kOnsetPulseDecayPerFrame;
+    const waveform_math::ReactivityResult reactivity_result =
+        waveform_math::resolve_reactivity(features, reactivity);
+    onset_pulse_ = reactivity_result.onset_active
+                       ? reactivity_result.onset_pulse_target
+                       : onset_pulse_ * visual_config::kOnsetPulseDecayPerFrame;
 
-    const std::vector<Vector2> points = waveform_math::to_points(
-        features.waveform.data(), features.waveform.size(), width_, height_, idle, amplitude_scale);
+    const std::vector<Vector2> points =
+        waveform_math::to_points(features.waveform.data(), features.waveform.size(), width_,
+                                  height_, idle, reactivity_result.amplitude_scale);
     const float draw_thickness =
         waveform_math::pulse_thickness(params_.line_thickness, onset_pulse_);
 

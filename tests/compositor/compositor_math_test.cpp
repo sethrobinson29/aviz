@@ -13,6 +13,16 @@ TEST(ClampOpacityTest, ClampsIntoZeroOneRange) {
     EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(1.5f), 1.0f);
 }
 
+TEST(ClampSensitivityTest, ClampsIntoValidRange) {
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(-1.0f), compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(0.0f), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(1.0f), 1.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(compositor_math::kSensitivityMax),
+                     compositor_math::kSensitivityMax);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(compositor_math::kSensitivityMax + 1.0f),
+                     compositor_math::kSensitivityMax);
+}
+
 TEST(ToBlendFactorsTest, BuiltInModesMapToRaylibConstants) {
     EXPECT_EQ(compositor_math::to_blend_factors(LayerBlendMode::Normal).raylib_mode, BLEND_ALPHA);
     EXPECT_EQ(compositor_math::to_blend_factors(LayerBlendMode::Additive).raylib_mode, BLEND_ADDITIVE);
@@ -101,4 +111,30 @@ TEST(NextReactivitySourceTest, StaleValueFromOtherModeFallsBackToDefault) {
     // the caller applies default_reactivity_source.
     EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, 3),
               ReactivitySource::BandOnset);
+}
+
+TEST(PrevReactivitySourceTest, TogglesWithinValidPairForBandMode) {
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::BandOnset, 3),
+              ReactivitySource::BandAmplitude);
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::BandAmplitude, 3),
+              ReactivitySource::BandOnset);
+}
+
+TEST(PrevReactivitySourceTest, TogglesWithinValidPairForGlobalMode) {
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
+              ReactivitySource::PeakFreq);
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::PeakFreq, std::nullopt),
+              ReactivitySource::GlobalBeat);
+}
+
+TEST(PrevReactivitySourceTest, StaleValueFromOtherModeFallsBackToDefault) {
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, 3),
+              ReactivitySource::BandOnset);
+}
+
+TEST(PrevReactivitySourceTest, IsInverseOfNextReactivitySourceWithinAValidPair) {
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::BandOnset, 3),
+              compositor_math::next_reactivity_source(ReactivitySource::BandOnset, 3));
+    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
+              compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt));
 }

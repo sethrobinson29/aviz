@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "visuals/spectrum/spectrum_visual.h"
+#include "visuals/waveform/waveform_visual.h"
 
 TEST(CompositorAddLayerTest, ReturnsSequentialIndicesAndGrowsStack) {
     Compositor compositor;
@@ -87,6 +88,7 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     source.tint_color = Color{10, 20, 30, 255};
     source.freq_band = 3;
     source.reactivity_source = ReactivitySource::BandAmplitude;
+    source.sensitivity = 2.5f;
     source.enabled = false;
 
     std::optional<std::size_t> new_index = compositor.duplicate_layer(source_index);
@@ -101,7 +103,23 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     EXPECT_EQ(copy.tint_color.r, 10);
     EXPECT_EQ(copy.freq_band, std::optional<std::size_t>(3));
     EXPECT_EQ(copy.reactivity_source, ReactivitySource::BandAmplitude);
+    EXPECT_FLOAT_EQ(copy.sensitivity, 2.5f);
     EXPECT_FALSE(copy.enabled);
+}
+
+TEST(CompositorDuplicateLayerTest, WaveformParamsSurviveDuplication) {
+    Compositor compositor;
+    std::size_t source_index = compositor.add_layer(VisualType::Waveform).value();
+    compositor.layers()[source_index].visual =
+        std::make_unique<WaveformVisual>(WaveformParams{BLUE, 5.0f});
+
+    std::optional<std::size_t> new_index = compositor.duplicate_layer(source_index);
+
+    ASSERT_TRUE(new_index.has_value());
+    auto* copy = dynamic_cast<WaveformVisual*>(compositor.layers()[*new_index].visual.get());
+    ASSERT_NE(copy, nullptr);
+    EXPECT_EQ(copy->params().line_color.r, BLUE.r);
+    EXPECT_FLOAT_EQ(copy->params().line_thickness, 5.0f);
 }
 
 TEST(CompositorDuplicateLayerTest, OutOfRangeIndexIsNoOp) {

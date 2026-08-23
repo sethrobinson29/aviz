@@ -19,6 +19,8 @@ struct LayerReactivity {
     // nullopt = Global; otherwise a band index in [0, audio_config::kNumBands).
     std::optional<std::size_t> freq_band;
     ReactivitySource source = ReactivitySource::GlobalBeat;
+    // Mirrors Layer::sensitivity; see compositor_math::clamp_sensitivity.
+    float sensitivity = 1.0f;
 };
 
 class VisualModule {

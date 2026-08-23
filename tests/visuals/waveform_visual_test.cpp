@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "audio/audio_config.h"
 #include "visuals/visual_config.h"
 
 TEST(WaveformToPointsTest, IdleReturnsFlatMidLine) {
@@ -100,4 +101,94 @@ TEST(PulseThicknessTest, ClampsOutOfRangePulse) {
                     waveform_math::pulse_thickness(2.0f, 1.0f));
     EXPECT_FLOAT_EQ(waveform_math::pulse_thickness(2.0f, -5.0f),
                     waveform_math::pulse_thickness(2.0f, 0.0f));
+}
+
+TEST(ResolveReactivityTest, BandAmplitudeScalesFromItsOwnBandNotOthers) {
+    AudioFeatures features;
+    features.band_energy[3] = 50.0f;
+    features.band_agc_reference[3] = 100.0f;
+    features.band_energy[4] = 999.0f;  // different band -- must not be read
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandAmplitude};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FLOAT_EQ(result.amplitude_scale, 0.5f);
+    EXPECT_FALSE(result.onset_active);
+}
+
+TEST(ResolveReactivityTest, BandOnsetReadsItsOwnBandNotOthers) {
+    AudioFeatures features;
+    features.band_onset[3] = true;
+    features.band_onset[4] = false;
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandOnset};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_TRUE(result.onset_active);
+    EXPECT_FLOAT_EQ(result.amplitude_scale, 1.0f);
+}
+
+TEST(ResolveReactivityTest, BandOnsetFalseWhenThatBandHasNoOnset) {
+    AudioFeatures features;
+    features.band_onset[3] = false;
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandOnset};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FALSE(result.onset_active);
+}
+
+TEST(ResolveReactivityTest, GlobalBeatReadsTheGlobalBandNotABand) {
+    AudioFeatures features;
+    features.band_onset[audio_config::kGlobalBandIndex] = true;
+    features.band_onset[0] = false;
+
+    LayerReactivity reactivity{/*freq_band=*/std::nullopt, ReactivitySource::GlobalBeat};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_TRUE(result.onset_active);
+}
+
+TEST(ResolveReactivityTest, PeakFreqInGlobalModeLeavesDefaultsUntouched) {
+    AudioFeatures features;
+    features.band_onset[audio_config::kGlobalBandIndex] = true;
+
+    LayerReactivity reactivity{/*freq_band=*/std::nullopt, ReactivitySource::PeakFreq};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FALSE(result.onset_active);
+    EXPECT_FLOAT_EQ(result.amplitude_scale, 1.0f);
+}
+
+TEST(ResolveReactivityTest, BandAmplitudeIsDirectMultipliedBySensitivity) {
+    AudioFeatures features;
+    features.band_energy[3] = 50.0f;
+    features.band_agc_reference[3] = 100.0f;  // ratio -> 0.5
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandAmplitude, /*sensitivity=*/3.0f};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FLOAT_EQ(result.amplitude_scale, 1.5f);  // 0.5 * 3.0, exceeds 1.0 -- would fail if reclamped
+}
+
+TEST(ResolveReactivityTest, BandOnsetSetsPulseTargetToSensitivity) {
+    AudioFeatures features;
+    features.band_onset[3] = true;
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandOnset, /*sensitivity=*/2.5f};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_TRUE(result.onset_active);
+    EXPECT_FLOAT_EQ(result.onset_pulse_target, 2.5f);
+}
+
+TEST(ResolveReactivityTest, PulseTargetIsUnusedDefaultWhenOnsetInactive) {
+    AudioFeatures features;
+    features.band_onset[3] = false;
+
+    LayerReactivity reactivity{/*freq_band=*/3, ReactivitySource::BandOnset, /*sensitivity=*/2.5f};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FALSE(result.onset_active);
+    EXPECT_FLOAT_EQ(result.onset_pulse_target, 0.0f);
 }

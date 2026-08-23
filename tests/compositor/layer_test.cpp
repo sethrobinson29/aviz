@@ -25,6 +25,19 @@ TEST(VisualCloneTest, WaveformCloneIsIndependentInstanceOfSameType) {
     EXPECT_NE(dynamic_cast<WaveformVisual*>(clone.get()), nullptr);
 }
 
+TEST(VisualCloneTest, WaveformClonePreservesParams) {
+    WaveformVisual original(WaveformParams{BLUE, 5.0f});
+    auto clone = original.clone();
+
+    auto* waveform_clone = dynamic_cast<WaveformVisual*>(clone.get());
+    ASSERT_NE(waveform_clone, nullptr);
+    const WaveformParams& params = waveform_clone->params();
+    EXPECT_EQ(params.line_color.r, BLUE.r);
+    EXPECT_EQ(params.line_color.g, BLUE.g);
+    EXPECT_EQ(params.line_color.b, BLUE.b);
+    EXPECT_FLOAT_EQ(params.line_thickness, 5.0f);
+}
+
 TEST(VisualCloneTest, SpectrumCloneIsIndependentInstanceOfSameType) {
     auto original = make_visual(VisualType::Spectrum);
     auto clone = original->clone();

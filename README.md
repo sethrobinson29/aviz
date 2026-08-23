@@ -94,5 +94,17 @@ run directly from `tsan/`.
   layout. Waveform still draws the full-mix signal (there's no per-band
   time-domain data) but modulates it: `BandAmplitude`/scoped-band energy
   scales its amplitude, `BandOnset`/`GlobalBeat` trigger a decaying
-  line-thickness pulse on that band's onset. `PeakFreq` isn't wired to
-  either visual yet.
+  line-thickness pulse on that band's onset. Spectrum's bar height always
+  tracks its band's continuous energy/reference ratio regardless of mode
+  (opacity/tint alpha stays fixed at the layer's normal value throughout);
+  `BandOnset`/`GlobalBeat` additionally pulse that bar's RGB toward white on
+  a hit, decaying back to its normal tint color afterward (17 independent
+  per-band values so switching a layer's `freq_band` never shows another
+  band's stale pulse). `PeakFreq` isn't wired to either visual yet.
+- **Per-layer `sensitivity`**: a `[0, 4]`-clamped multiplier (default `1.0`)
+  on a layer's reactivity strength, independent of every other layer
+  reading the same band. Direct-multiplies the amplitude channel
+  (Waveform's amplitude scale, Spectrum's bar-height ratio — both
+  uncapped past 1.0, by design) and, pre-clamp, sets the snap-up magnitude
+  of an onset-driven pulse (Waveform's line-thickness pulse, Spectrum's
+  per-band white-flash pulse).

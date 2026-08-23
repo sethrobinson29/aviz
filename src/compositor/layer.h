@@ -26,6 +26,9 @@ struct Layer {
     // nullopt = Global; otherwise a band index in [0, audio_config::kNumBands).
     std::optional<std::size_t> freq_band;
     ReactivitySource reactivity_source = ReactivitySource::GlobalBeat;
+    // Multiplier on this layer's reactivity strength; see
+    // compositor_math::clamp_sensitivity for valid range.
+    float sensitivity = 1.0f;
     bool enabled = true;
 };
 

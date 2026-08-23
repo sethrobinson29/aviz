@@ -25,6 +25,24 @@ float band_amplitude_scale(float energy, float reference);
 // unchanged.
 float pulse_thickness(float base_thickness, float pulse);
 
+struct ReactivityResult {
+    float amplitude_scale = 1.0f;
+    bool onset_active = false;
+    // Value onset_pulse_ should snap to when onset_active is true (equals
+    // reactivity.sensitivity, pre-clamp -- pulse_thickness clamps it to
+    // [0, 1] before applying its own boost). Meaningless when onset_active
+    // is false.
+    float onset_pulse_target = 0.0f;
+};
+
+// Selects amplitude_scale/onset_active from `reactivity`'s freq_band/source:
+// BandAmplitude scales by that band's energy/reference, direct-multiplied
+// by reactivity.sensitivity; BandOnset or GlobalBeat (Global-scoped) set
+// onset_active from that band's onset flag and onset_pulse_target from
+// reactivity.sensitivity. Any other combination leaves the defaults (unity
+// scale, no onset).
+ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity);
+
 }  // namespace waveform_math
 
 struct WaveformParams {

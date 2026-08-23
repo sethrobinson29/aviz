@@ -113,8 +113,8 @@ void print_layers(const Compositor& compositor, std::size_t selected) {
         } else {
             std::printf("  band=%-6s", "Global");
         }
-        std::printf("  reactivity=%-13s  opacity=%.1f  blend=%-8s%s\n",
-                    reactivity_source_name(layer.reactivity_source), layer.opacity,
+        std::printf("  reactivity=%-13s  sensitivity=%.1f  opacity=%.1f  blend=%-8s%s\n",
+                    reactivity_source_name(layer.reactivity_source), layer.sensitivity, layer.opacity,
                     blend_mode_name(layer.blend_mode), layer.enabled ? "" : "  [hidden]");
     }
     std::printf("--------------------------------------------------------------\n");
@@ -154,6 +154,7 @@ int run_app(const char* audio_path) {
             "  B         cycle selected layer's blend mode\n"
             "  ,/.       cycle selected layer's freq_band (bands 0-15, Global)\n"
             "  [/]       cycle selected layer's reactivity_source\n"
+            "  -/=       adjust selected layer's sensitivity\n"
             "  m         toggle selected layer's enabled state\n");
 
         {
@@ -231,6 +232,14 @@ int run_app(const char* audio_path) {
                     Layer& layer = layers[selected];
                     layer.reactivity_source =
                         compositor_math::next_reactivity_source(layer.reactivity_source, layer.freq_band);
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_MINUS) && !layers.empty()) {
+                    Layer& layer = layers[selected];
+                    layer.sensitivity = compositor_math::clamp_sensitivity(layer.sensitivity - 0.1f);
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_EQUAL) && !layers.empty()) {
+                    Layer& layer = layers[selected];
+                    layer.sensitivity = compositor_math::clamp_sensitivity(layer.sensitivity + 0.1f);
                     print_layers(compositor, selected);
                 } else if (IsKeyPressed(KEY_M) && !layers.empty()) {
                     Layer& layer = layers[selected];
