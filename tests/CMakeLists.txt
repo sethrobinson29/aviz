@@ -8,9 +8,14 @@ add_executable(audio_tests
   audio/feature_extractor_test.cpp
   audio/file_producer_test.cpp
   audio/feature_worker_test.cpp
+  audio/loopback_producer_test.cpp
+  audio/producer_host_test.cpp
+  audio/pipeline_format_test.cpp
   ../src/audio/ring_buffer.cpp
   ../src/audio/feature_extractor.cpp
   ../src/audio/file_producer.cpp
+  ../src/audio/loopback_producer.cpp
+  ../src/audio/pipeline_format_converter.cpp
   ../src/audio/feature_worker.cpp
   ../src/audio/miniaudio_backend.cpp
 )

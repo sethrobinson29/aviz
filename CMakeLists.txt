@@ -77,6 +77,8 @@ add_executable(aviz
   src/audio/feature_extractor.cpp
   src/audio/feature_worker.cpp
   src/audio/file_producer.cpp
+  src/audio/loopback_producer.cpp
+  src/audio/pipeline_format_converter.cpp
   src/visuals/waveform/waveform_visual.cpp
   src/visuals/spectrum/spectrum_visual.cpp
   src/compositor/layer.cpp

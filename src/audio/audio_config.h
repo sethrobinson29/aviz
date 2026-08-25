@@ -4,6 +4,13 @@
 
 namespace audio_config {
 
+// Canonical pipeline format. Every producer converts its native output to
+// this format before push_frames(); the ring buffer, worker, and extractor
+// are constructed once against these constants and never rebuilt on a
+// producer switch.
+inline constexpr unsigned kPipelineSampleRate = 48000;
+inline constexpr unsigned kPipelineChannels = 2;
+
 inline constexpr std::size_t kFftWindowSize = 1024;
 inline constexpr std::size_t kFftHopSize = 512;
 

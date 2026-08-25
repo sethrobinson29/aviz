@@ -10,11 +10,12 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 ## Status
 
 Local playback + feature extraction, waveform/spectrum visuals, the layer
-compositor (stacking, opacity, blend modes, tint), and layer duplication +
-frequency mapping (`freq_band`, `reactivity_source`, `enabled`) are
-implemented — see "Features" below. The control panel UI doesn't exist yet,
-so the layer stack is driven by a temporary keyboard-controlled debug tool.
-Build order follows `visualizer-design-spec.md` §8.
+compositor (stacking, opacity, blend modes, tint), layer duplication +
+frequency mapping (`freq_band`, `reactivity_source`, `enabled`), and WASAPI
+loopback capture with mid-session source switching are implemented — see
+"Features" below. The control panel UI doesn't exist yet, so the layer stack
+is driven by a temporary keyboard-controlled debug tool. Build order follows
+`visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -60,9 +61,18 @@ run directly from `tsan/`.
 
 ## Features
 
-- **Local file playback** (WAV/MP3/FLAC via miniaudio) feeding a
+- **Local file playback** (WAV/MP3/FLAC via miniaudio) and **WASAPI loopback
+  capture** (taps the default output device's mix) both feed the same
   lock-free SPSC ring buffer (overwrite-oldest on overflow, with a
-  discontinuity flag for the worker to resync on).
+  discontinuity flag for the worker to resync on). Both producers convert
+  their native format to a canonical 48kHz/stereo/f32 pipeline format before
+  pushing frames, so the ring buffer, worker, and feature extractor are
+  built once, against fixed constants, and never rebuilt when the source
+  changes. `ProducerHost` is the sole owner of the active producer and the
+  only code path that can switch it — always stopping the old producer to
+  completion before starting the next, so a source switch can't race the
+  next producer's first frames onto the ring buffer. Toggle sources at
+  runtime with `L` in the debug tool (see `milestone-4-debug-controls.md`).
 - **Feature extraction worker thread**: windowed FFT (pffft, 1024/512
   window/hop), mapped into 16 log-scaled bands + 1 global band; per-band
   spectral-flux onset detection with an adaptive rolling threshold; one-pole

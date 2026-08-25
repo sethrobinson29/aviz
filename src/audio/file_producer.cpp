@@ -5,11 +5,14 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "pipeline_format_converter.h"
+
 struct FileProducer::Impl {
     ma_decoder decoder{};
     ma_device device{};
     bool decoder_open = false;
     bool device_open = false;
+    std::unique_ptr<PipelineFormatConverter> converter;
     AudioRingBuffer* ring = nullptr;
     std::atomic<bool> finished{false};
 
@@ -28,7 +31,7 @@ struct FileProducer::Impl {
             self->finished.store(true, std::memory_order_release);
         }
         if (frames_read > 0 && self->ring != nullptr) {
-            self->ring->push_frames(out, static_cast<std::size_t>(frames_read));
+            self->converter->convert_and_push(out, static_cast<std::size_t>(frames_read), *self->ring);
         }
     }
 };
@@ -48,11 +51,13 @@ FileProducer::~FileProducer() {
     }
 }
 
-unsigned FileProducer::channels() const { return impl_->decoder.outputChannels; }
-unsigned FileProducer::sample_rate() const { return impl_->decoder.outputSampleRate; }
+unsigned FileProducer::native_channels() const { return impl_->decoder.outputChannels; }
+unsigned FileProducer::native_sample_rate() const { return impl_->decoder.outputSampleRate; }
 
 void FileProducer::start(AudioRingBuffer& ring) {
     impl_->ring = &ring;
+    impl_->converter = std::make_unique<PipelineFormatConverter>(impl_->decoder.outputChannels,
+                                                                   impl_->decoder.outputSampleRate);
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = impl_->decoder.outputFormat;

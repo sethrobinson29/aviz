@@ -80,9 +80,14 @@ TEST(FileProducerTest, ThrowsOnTruncatedWav) {
     write_bytes(path, truncated);
 
     // Either throwing or opening with fewer frames than declared is fine;
-    // a crash is not.
+    // a crash, or a producer left in a half-initialized state that merely
+    // hasn't thrown yet, is not -- if construction succeeds, it must report
+    // the header's real format and start clean, same as a fully valid file.
     try {
         FileProducer producer(path.string());
+        EXPECT_EQ(producer.native_channels(), 2u);
+        EXPECT_EQ(producer.native_sample_rate(), 44100u);
+        EXPECT_FALSE(producer.is_finished());
     } catch (const std::runtime_error&) {
     }
 
@@ -96,8 +101,8 @@ TEST(FileProducerTest, OpensValidFileAndReportsFormat) {
 
     {
         FileProducer producer(path.string());
-        EXPECT_EQ(producer.channels(), 2u);
-        EXPECT_EQ(producer.sample_rate(), 44100u);
+        EXPECT_EQ(producer.native_channels(), 2u);
+        EXPECT_EQ(producer.native_sample_rate(), 44100u);
         EXPECT_FALSE(producer.is_finished());
     }
 

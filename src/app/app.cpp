@@ -4,12 +4,15 @@
 #include <cstdio>
 #include <cstddef>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "audio/audio_config.h"
 #include "audio/audio_features.h"
 #include "audio/feature_worker.h"
 #include "audio/file_producer.h"
+#include "audio/loopback_producer.h"
+#include "audio/producer_host.h"
 #include "audio/ring_buffer.h"
 #include "compositor/compositor.h"
 #include "compositor/compositor_math.h"
@@ -123,16 +126,19 @@ void print_layers(const Compositor& compositor, std::size_t selected) {
 
 int run_app(const char* audio_path) {
     try {
-        FileProducer producer(audio_path);
-        AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, producer.channels());
-        AudioFeaturesSnapshot snapshot;
-        FeatureWorker worker(ring, snapshot, producer.sample_rate());
+        const std::string original_audio_path = audio_path;
 
-        std::printf("playing %s (%u ch, %u Hz)\n", audio_path, producer.channels(),
-                    producer.sample_rate());
+        auto initial_producer = std::make_unique<FileProducer>(original_audio_path);
+        std::printf("playing %s (%u ch, %u Hz)\n", audio_path, initial_producer->native_channels(),
+                    initial_producer->native_sample_rate());
+
+        AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+        AudioFeaturesSnapshot snapshot;
+        FeatureWorker worker(ring, snapshot, audio_config::kPipelineSampleRate);
 
         worker.start();
-        producer.start(ring);
+        ProducerHost producer_host(ring, std::move(initial_producer));
+        bool using_loopback = false;
 
 #ifdef AVIZ_VERBOSE_RAYLIB_LOG
         SetTraceLogLevel(LOG_INFO);
@@ -155,7 +161,8 @@ int run_app(const char* audio_path) {
             "  ,/.       cycle selected layer's freq_band (bands 0-15, Global)\n"
             "  [/]       cycle selected layer's reactivity_source\n"
             "  -/=       adjust selected layer's sensitivity\n"
-            "  m         toggle selected layer's enabled state\n");
+            "  m         toggle selected layer's enabled state\n"
+            "  L         toggle audio source between file playback and loopback capture\n");
 
         {
             Compositor compositor;
@@ -245,6 +252,25 @@ int run_app(const char* audio_path) {
                     Layer& layer = layers[selected];
                     layer.enabled = !layer.enabled;
                     print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_L)) {
+                    try {
+                        if (using_loopback) {
+                            auto next = std::make_unique<FileProducer>(original_audio_path);
+                            std::printf("switched to file: %s (%u ch, %u Hz)\n",
+                                        original_audio_path.c_str(), next->native_channels(),
+                                        next->native_sample_rate());
+                            producer_host.switch_to(std::move(next));
+                            using_loopback = false;
+                        } else {
+                            auto next = std::make_unique<LoopbackProducer>();
+                            std::printf("switched to loopback capture (%u ch, %u Hz)\n",
+                                        next->native_channels(), next->native_sample_rate());
+                            producer_host.switch_to(std::move(next));
+                            using_loopback = true;
+                        }
+                    } catch (const std::exception& e) {
+                        std::fprintf(stderr, "error switching audio source: %s\n", e.what());
+                    }
                 }
 
                 compositor.render(snapshot.current());
@@ -264,7 +290,6 @@ int run_app(const char* audio_path) {
 
         CloseWindow();
 
-        producer.stop();
         worker.stop();
         std::printf("done\n");
         return 0;
