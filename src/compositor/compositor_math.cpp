@@ -43,8 +43,7 @@ ReactivitySource next_reactivity_source(ReactivitySource current,
         return current == ReactivitySource::BandOnset ? ReactivitySource::BandAmplitude
                                                         : ReactivitySource::BandOnset;
     }
-    return current == ReactivitySource::GlobalBeat ? ReactivitySource::PeakFreq
-                                                     : ReactivitySource::GlobalBeat;
+    return ReactivitySource::GlobalBeat;
 }
 
 ReactivitySource prev_reactivity_source(ReactivitySource current,

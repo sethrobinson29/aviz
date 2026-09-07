@@ -8,9 +8,9 @@
 #include "raylib.h"
 
 // What audio-derived value a layer's visual is driven by. band_onset and
-// band_amplitude only make sense with freq_band set; global_beat and
-// peak_freq only make sense with freq_band == nullopt (Global).
-enum class ReactivitySource { GlobalBeat, BandOnset, BandAmplitude, PeakFreq };
+// band_amplitude only make sense with freq_band set; global_beat is the
+// only valid source when freq_band == nullopt (Global).
+enum class ReactivitySource { GlobalBeat, BandOnset, BandAmplitude };
 
 // A layer's reactivity scoping, passed into VisualModule::render() so a
 // visual can filter/modulate its display without touching Layer directly

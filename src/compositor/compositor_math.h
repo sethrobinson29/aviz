@@ -28,13 +28,14 @@ std::optional<std::size_t> prev_freq_band(std::optional<std::size_t> current,
 
 // The reactivity_source a layer should fall back to when freq_band changes
 // mode (Global <-> a specific band), since band_onset/band_amplitude only
-// apply to a band and global_beat/peak_freq only apply to Global.
+// apply to a band and global_beat is the only valid source for Global.
 ReactivitySource default_reactivity_source(std::optional<std::size_t> freq_band);
 
-// Cycles reactivity_source within the 2-option pair valid for the given
-// freq_band mode: {BandOnset, BandAmplitude} for a band, {GlobalBeat,
-// PeakFreq} for Global. If `current` isn't one of those two (stale from a
-// prior mode), returns default_reactivity_source(freq_band).
+// For a band (freq_band has a value), cycles reactivity_source within the
+// 2-option pair {BandOnset, BandAmplitude}; if `current` isn't one of those
+// two (stale from a prior mode), returns default_reactivity_source(freq_band).
+// For Global, GlobalBeat is the only valid source, so both always return it
+// -- a no-op toggle, not a 2-option cycle.
 ReactivitySource next_reactivity_source(ReactivitySource current,
                                          std::optional<std::size_t> freq_band);
 ReactivitySource prev_reactivity_source(ReactivitySource current,

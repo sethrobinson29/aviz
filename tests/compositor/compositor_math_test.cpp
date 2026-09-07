@@ -98,10 +98,8 @@ TEST(NextReactivitySourceTest, TogglesWithinValidPairForBandMode) {
               ReactivitySource::BandOnset);
 }
 
-TEST(NextReactivitySourceTest, TogglesWithinValidPairForGlobalMode) {
+TEST(NextReactivitySourceTest, GlobalModeIsANoOpSinceGlobalBeatIsTheOnlyValidSource) {
     EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
-              ReactivitySource::PeakFreq);
-    EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::PeakFreq, std::nullopt),
               ReactivitySource::GlobalBeat);
 }
 
@@ -120,10 +118,8 @@ TEST(PrevReactivitySourceTest, TogglesWithinValidPairForBandMode) {
               ReactivitySource::BandOnset);
 }
 
-TEST(PrevReactivitySourceTest, TogglesWithinValidPairForGlobalMode) {
+TEST(PrevReactivitySourceTest, GlobalModeIsANoOpSinceGlobalBeatIsTheOnlyValidSource) {
     EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
-              ReactivitySource::PeakFreq);
-    EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::PeakFreq, std::nullopt),
               ReactivitySource::GlobalBeat);
 }
 

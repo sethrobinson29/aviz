@@ -97,7 +97,7 @@ run directly from `tsan/`.
 - **Per-layer `freq_band` and `reactivity_source`**: every layer can be
   scoped to a specific band (0–15) or Global, and tagged with what
   audio-derived value it's meant to react to (`GlobalBeat`, `BandOnset`,
-  `BandAmplitude`, `PeakFreq`). Spectrum draws a single bar for a
+  `BandAmplitude`). Spectrum draws a single bar for a
   band-scoped layer, positioned/sized as it would sit in the full 16-band
   layout. Waveform still draws the full-mix signal (there's no per-band
   time-domain data) but modulates it: `BandAmplitude`/scoped-band energy
@@ -108,7 +108,7 @@ run directly from `tsan/`.
   `BandOnset`/`GlobalBeat` additionally pulse that bar's RGB toward white on
   a hit, decaying back to its normal tint color afterward (17 independent
   per-band values so switching a layer's `freq_band` never shows another
-  band's stale pulse). `PeakFreq` isn't wired to either visual yet.
+  band's stale pulse).
 - **Per-layer `sensitivity`**: a `[0, 4]`-clamped multiplier (default `1.0`)
   on a layer's reactivity strength, independent of every other layer
   reading the same band. Direct-multiplies the amplitude channel

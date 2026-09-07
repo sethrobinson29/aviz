@@ -72,8 +72,6 @@ const char* reactivity_source_name(ReactivitySource source) {
             return "BandOnset";
         case ReactivitySource::BandAmplitude:
             return "BandAmplitude";
-        case ReactivitySource::PeakFreq:
-            return "PeakFreq";
     }
     return "?";
 }

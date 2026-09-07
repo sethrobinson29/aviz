@@ -149,17 +149,6 @@ TEST(ResolveReactivityTest, GlobalBeatReadsTheGlobalBandNotABand) {
     EXPECT_TRUE(result.onset_active);
 }
 
-TEST(ResolveReactivityTest, PeakFreqInGlobalModeLeavesDefaultsUntouched) {
-    AudioFeatures features;
-    features.band_onset[audio_config::kGlobalBandIndex] = true;
-
-    LayerReactivity reactivity{/*freq_band=*/std::nullopt, ReactivitySource::PeakFreq};
-    auto result = waveform_math::resolve_reactivity(features, reactivity);
-
-    EXPECT_FALSE(result.onset_active);
-    EXPECT_FLOAT_EQ(result.amplitude_scale, 1.0f);
-}
-
 TEST(ResolveReactivityTest, BandAmplitudeIsDirectMultipliedBySensitivity) {
     AudioFeatures features;
     features.band_energy[3] = 50.0f;
