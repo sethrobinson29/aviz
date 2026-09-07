@@ -13,8 +13,7 @@ Local playback + feature extraction, waveform/spectrum visuals, the layer
 compositor (stacking, opacity, blend modes, tint), layer duplication +
 frequency mapping (`freq_band`, `reactivity_source`, `enabled`), and WASAPI
 loopback capture with mid-session source switching are implemented — see
-"Features" below. The control panel UI doesn't exist yet, so the layer stack
-is driven by a temporary keyboard-controlled debug tool. Build order follows
+"Features" below. The control panel UI doesn't exist yet. Build order follows
 `visualizer-design-spec.md` §8.
 
 ## Stack
@@ -71,8 +70,7 @@ run directly from `tsan/`.
   changes. `ProducerHost` is the sole owner of the active producer and the
   only code path that can switch it — always stopping the old producer to
   completion before starting the next, so a source switch can't race the
-  next producer's first frames onto the ring buffer. Toggle sources at
-  runtime with `L` in the debug tool (see `milestone-4-debug-controls.md`).
+  next producer's first frames onto the ring buffer.
 - **Feature extraction worker thread**: windowed FFT (pffft, 1024/512
   window/hop), mapped into 16 log-scaled bands + 1 global band; per-band
   spectral-flux onset detection with an adaptive rolling threshold; one-pole
