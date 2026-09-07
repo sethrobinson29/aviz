@@ -9,8 +9,13 @@
 struct AudioFeatures {
     std::array<float, audio_config::kWaveformSnapshotSize> waveform{};
 
-    // Post-envelope (attack/release smoothed) energy per band.
+    // Post-envelope (attack/release smoothed) energy per band. Keeps
+    // decaying under its own envelope math even once band_idle is true --
+    // never force-set to exactly 0.
     std::array<float, audio_config::kTotalBandSlots> band_energy{};
+    // True once band_energy has decayed below audio_config::kIdleFloorFraction
+    // of the band's own AGC reference.
+    std::array<bool, audio_config::kTotalBandSlots> band_idle{};
     std::array<bool, audio_config::kTotalBandSlots> band_onset{};
     // Peak-hold reference per band; always >= audio_config::kAgcMinReference.
     std::array<float, audio_config::kTotalBandSlots> band_agc_reference{};

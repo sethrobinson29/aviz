@@ -203,6 +203,116 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     EXPECT_GT(release_calls_to_half, attack_calls_to_half);
 }
 
+// --- Idle floor -------------------------------------------------------------
+
+TEST(FeatureExtractorTest, IdleFloorMarksBandIdleWithoutForcingSmoothedEnergyToZero) {
+    constexpr float kToneHz = 1000.0f;
+    auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
+    auto quiet = fixtures::silence(audio_config::kFftWindowSize);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(tone.data(), false, out);
+    }
+    ASSERT_GT(out.band_energy[band], 0.0f);
+    ASSERT_FALSE(out.band_idle[band]);
+
+    bool saw_idle = false;
+    float prev_energy = out.band_energy[band];
+    for (int i = 0; i < 100 && !saw_idle; ++i) {
+        extractor.process(quiet.data(), false, out);
+        if (out.band_idle[band]) {
+            saw_idle = true;
+            // The hop where idle first flips true must still show smooth
+            // release decay from the previous hop, not a hard drop to 0.
+            EXPECT_GT(out.band_energy[band], prev_energy * 0.5f);
+            EXPECT_GT(out.band_energy[band], 0.0f);
+        }
+        prev_energy = out.band_energy[band];
+    }
+    ASSERT_TRUE(saw_idle);
+
+    // Energy keeps decaying under its own envelope math well after idle is
+    // set -- never hard-zeroed.
+    for (int i = 0; i < 400; ++i) {
+        extractor.process(quiet.data(), false, out);
+    }
+    EXPECT_GT(out.band_energy[band], 0.0f);
+}
+
+TEST(FeatureExtractorTest, IdleFloorScalesWithBandsOwnReferenceNotAbsoluteMagnitude) {
+    // A quiet tone gives this band a small absolute energy scale -- if the
+    // idle floor were an absolute constant tuned against louder bands, a
+    // steady low-amplitude signal like this could falsely read as idle.
+    // Calibrated well under the old fixed-epsilon scale it replaced
+    // (kAgcMinReference = 0.01; per OnsetThresholdEnforcesAbsoluteFloor-
+    // AfterQuietWarmup's amplitude-to-energy calibration, ~0.0001 amplitude
+    // -> ~0.0063 energy) so a reverted absolute-threshold implementation
+    // would actually fail this test.
+    constexpr float kToneHz = 1000.0f;
+    constexpr float kQuietAmplitude = 0.0001f;
+    auto quiet_tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize, kQuietAmplitude);
+    std::size_t band = band_for_frequency(kToneHz, kSampleRate);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(quiet_tone.data(), false, out);
+    }
+
+    EXPECT_GT(out.band_energy[band], 0.0f);
+    EXPECT_GT(out.band_energy[band] / out.band_agc_reference[band], 0.5f)
+        << "band_energy=" << out.band_energy[band] << " reference=" << out.band_agc_reference[band];
+    EXPECT_FALSE(out.band_idle[band]);
+}
+
+TEST(FeatureExtractorTest, IdleCheckReadsThisHopsUpdatedReferenceNotStalePreviousValue) {
+    // agc_reference_ starts at 0 before any hop runs. On the very first
+    // hop of true silence, this hop's update floor-clamps it to
+    // kAgcMinReference, so the idle check (0 < fraction * kAgcMinReference)
+    // correctly reads idle. A reordered implementation that compares
+    // against the pre-update (still 0) reference instead would compute
+    // (0 < fraction * 0), i.e. 0 < 0 -- never true -- so idle would never
+    // be detected on cold-start silence, no matter how long it holds.
+    auto silence = fixtures::silence(audio_config::kFftWindowSize);
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+
+    extractor.process(silence.data(), false, out);
+
+    for (std::size_t b = 0; b < audio_config::kTotalBandSlots; ++b) {
+        EXPECT_TRUE(out.band_idle[b]) << "band " << b;
+    }
+}
+
+TEST(FeatureExtractorTest, IdleFloorAppliesPerBandIndependently) {
+    constexpr float kSteadyHz = 8000.0f;
+    constexpr float kSilentHz = 60.0f;
+    auto steady_tone = fixtures::sine_wave(kSteadyHz, kSampleRate, audio_config::kFftWindowSize);
+    std::size_t steady_band = band_for_frequency(kSteadyHz, kSampleRate);
+    std::size_t silent_band = band_for_frequency(kSilentHz, kSampleRate);
+    ASSERT_NE(steady_band, silent_band);
+
+    FeatureExtractor extractor(kSampleRate);
+    AudioFeatures out;
+    for (int i = 0; i < 200; ++i) {
+        extractor.process(steady_tone.data(), false, out);
+    }
+
+    EXPECT_GT(out.band_energy[steady_band], 0.0f)
+        << "band with real, stable energy must not be forced idle by another band's state";
+    EXPECT_FALSE(out.band_idle[steady_band]);
+
+    // The unexcited band reads far quieter relative to its own reference
+    // than the driven band does -- each band's classification depends only
+    // on its own energy/reference, not shared/whole-mix state.
+    float steady_ratio = out.band_energy[steady_band] / out.band_agc_reference[steady_band];
+    float silent_ratio = out.band_energy[silent_band] / out.band_agc_reference[silent_band];
+    EXPECT_LT(silent_ratio, steady_ratio);
+}
+
 // --- AGC reference ----------------------------------------------------------
 
 TEST(FeatureExtractorTest, AgcReferenceSeededFromFirstCallNotZero) {

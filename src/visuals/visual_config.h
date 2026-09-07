@@ -2,8 +2,6 @@
 
 namespace visual_config {
 
-inline constexpr float kIdleRmsFloor = 0.01f;
-
 // Per-rendered-frame multiplicative decay applied to a BandOnset/GlobalBeat
 // pulse (e.g. WaveformVisual::onset_pulse_). Frame-rate-scoped, not
 // audio-hop-scoped, since it decays once per render() call.
@@ -20,5 +18,10 @@ inline constexpr float kSpectrumOnsetPulseDecayPerFrame = 0.92f;
 // rests at with no pulse in flight; rises to full bar_color (unchanged) at
 // pulse == 1. Tunable; needs tuning against real material.
 inline constexpr float kSpectrumOnsetPulseRestBrightnessFraction = 0.55f;
+
+// Floor on a rendered spectrum bar's pixel height -- a bar at rest (or
+// genuinely idle) renders at this height rather than disappearing to 0px.
+// Initial guess, unconfirmed against real material; tunable.
+inline constexpr float kMinBarHeightPx = 4.0f;
 
 }  // namespace visual_config

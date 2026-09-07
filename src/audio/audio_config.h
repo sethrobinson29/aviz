@@ -40,6 +40,12 @@ inline constexpr float kOnsetAbsoluteFluxFloor = 0.1f;
 inline constexpr float kEnvelopeAttackMs = 10.0f;
 inline constexpr float kEnvelopeReleaseMs = 200.0f;
 
+// Below this fraction of a band's own AGC reference, that band is
+// classified idle (AudioFeatures::band_idle). Does not affect
+// band_energy/smoothed_energy_ itself, which keeps decaying under its own
+// envelope math regardless. Tunable.
+inline constexpr float kIdleFloorFraction = 0.02f;
+
 // Rise is an exact snap to any new peak (no tau); this constant covers
 // decay only.
 inline constexpr float kAgcDecayTauMs = 20000.0f;

@@ -5,26 +5,36 @@
 #include "visuals/visual_config.h"
 
 TEST(SpectrumToBarsTest, ZeroBandCountReturnsEmpty) {
-    auto bars = spectrum_math::to_bars(nullptr, nullptr, 0, 100, 100, 0.2f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(nullptr, nullptr, 0, 100, 100, 0.2f, 1.0f);
     EXPECT_TRUE(bars.empty());
 }
 
-TEST(SpectrumToBarsTest, IdleReturnsZeroHeightBarsAtBaseline) {
-    float energy[3] = {10.0f, 10.0f, 10.0f};
+TEST(SpectrumToBarsTest, ZeroEnergySnapsToMinBarHeightFloor) {
+    float energy[3] = {0.0f, 0.0f, 0.0f};
     float reference[3] = {10.0f, 10.0f, 10.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 3, 300, 150, 0.2f, 1.0f, /*idle=*/true);
+    auto bars = spectrum_math::to_bars(energy, reference, 3, 300, 150, 0.2f, 1.0f);
 
     ASSERT_EQ(bars.size(), 3u);
     for (const auto& bar : bars) {
-        EXPECT_FLOAT_EQ(bar.height, 0.0f);
-        EXPECT_FLOAT_EQ(bar.y, 150.0f);
+        EXPECT_FLOAT_EQ(bar.height, visual_config::kMinBarHeightPx);
+        EXPECT_FLOAT_EQ(bar.y, 150.0f - visual_config::kMinBarHeightPx);
     }
+}
+
+TEST(SpectrumToBarsTest, LowButRealEnergyRendersNonZeroHeightRegardlessOfOtherBands) {
+    float energy[2] = {0.0f, 0.045f};
+    float reference[2] = {10.0f, 0.11f};  // band 1 ratio ~0.409
+    auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
+
+    ASSERT_EQ(bars.size(), 2u);
+    EXPECT_FLOAT_EQ(bars[0].height, visual_config::kMinBarHeightPx);
+    EXPECT_NEAR(bars[1].height, 40.9f, 0.5f);
 }
 
 TEST(SpectrumToBarsTest, NormalizesEachBandAgainstItsOwnReferenceAndClamps) {
     float energy[2] = {50.0f, 200.0f};
     float reference[2] = {100.0f, 100.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 2u);
     EXPECT_NEAR(bars[0].height, 50.0f, 1e-4f);   // 50/100 -> half height
@@ -34,7 +44,7 @@ TEST(SpectrumToBarsTest, NormalizesEachBandAgainstItsOwnReferenceAndClamps) {
 TEST(SpectrumToBarsTest, DifferentReferencesGiveDifferentNormalizationForEqualEnergy) {
     float energy[2] = {10.0f, 10.0f};
     float reference[2] = {10.0f, 100.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 2u);
     EXPECT_NEAR(bars[0].height, 100.0f, 1e-4f);  // 10/10 -> full height
@@ -44,7 +54,7 @@ TEST(SpectrumToBarsTest, DifferentReferencesGiveDifferentNormalizationForEqualEn
 TEST(SpectrumToBarsTest, BarsAreEvenlySpacedWithGap) {
     float energy[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float reference[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 4, 400, 100, 0.25f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 4, 400, 100, 0.25f, 1.0f);
 
     ASSERT_EQ(bars.size(), 4u);
     EXPECT_NEAR(bars[0].x, 10.0f, 1e-4f);
@@ -54,29 +64,37 @@ TEST(SpectrumToBarsTest, BarsAreEvenlySpacedWithGap) {
     EXPECT_NEAR(bars[3].x, 310.0f, 1e-4f);
 }
 
-TEST(SpectrumToBarsTest, NegativeEnergyClampsToZeroHeight) {
+TEST(SpectrumToBarsTest, NegativeEnergyClampsToMinBarHeightFloor) {
     float energy[1] = {-5.0f};
     float reference[1] = {1.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 1u);
-    EXPECT_FLOAT_EQ(bars[0].height, 0.0f);
+    EXPECT_FLOAT_EQ(bars[0].height, visual_config::kMinBarHeightPx);
 }
 
-TEST(SpectrumToBarsTest, ZeroReferenceYieldsZeroHeightInsteadOfDividingByIt) {
+TEST(SpectrumToBarsTest, ZeroReferenceYieldsMinBarHeightFloorInsteadOfDividingByIt) {
     float energy[1] = {5.0f};
     float reference[1] = {0.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 1u);
-    EXPECT_FLOAT_EQ(bars[0].height, 0.0f);
+    EXPECT_FLOAT_EQ(bars[0].height, visual_config::kMinBarHeightPx);
+}
+
+TEST(SpectrumToBarsTest, MinBarHeightFloorDoesNotAffectBarsAboveIt) {
+    float energy[1] = {50.0f};
+    float reference[1] = {100.0f};
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f);
+
+    ASSERT_EQ(bars.size(), 1u);
+    EXPECT_NEAR(bars[0].height, 50.0f, 1e-4f);
 }
 
 TEST(SpectrumToBarsTest, MaxHeightFractionCapsAFullyNormalizedBar) {
     float energy[1] = {100.0f};
     float reference[1] = {100.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 0.8f,
-                                        /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 0.8f);
 
     ASSERT_EQ(bars.size(), 1u);
     EXPECT_NEAR(bars[0].height, 80.0f, 1e-4f);  // capped to 80% of window height
@@ -106,7 +124,7 @@ TEST(BarIndicesToDrawTest, OutOfRangeBandDrawsNothing) {
 TEST(SpectrumToBarsTest, DefaultSensitivityIsUnity) {
     float energy[1] = {50.0f};
     float reference[1] = {100.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/false);
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 1u);
     EXPECT_NEAR(bars[0].height, 50.0f, 1e-4f);
@@ -115,7 +133,7 @@ TEST(SpectrumToBarsTest, DefaultSensitivityIsUnity) {
 TEST(SpectrumToBarsTest, SensitivityDirectMultipliesNormalizedRatio) {
     float energy[1] = {50.0f};
     float reference[1] = {100.0f};  // ratio -> 0.5
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/false,
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f,
                                         /*sensitivity=*/2.0f);
 
     ASSERT_EQ(bars.size(), 1u);
@@ -125,21 +143,11 @@ TEST(SpectrumToBarsTest, SensitivityDirectMultipliesNormalizedRatio) {
 TEST(SpectrumToBarsTest, SensitivityIsUncappedBeyondFullHeight) {
     float energy[1] = {100.0f};
     float reference[1] = {100.0f};  // ratio -> 1.0
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/false,
+    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f,
                                         /*sensitivity=*/2.0f);
 
     ASSERT_EQ(bars.size(), 1u);
     EXPECT_NEAR(bars[0].height, 200.0f, 1e-4f);  // uncapped, exceeds window height
-}
-
-TEST(SpectrumToBarsTest, IdleIgnoresSensitivity) {
-    float energy[1] = {100.0f};
-    float reference[1] = {100.0f};
-    auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f, /*idle=*/true,
-                                        /*sensitivity=*/4.0f);
-
-    ASSERT_EQ(bars.size(), 1u);
-    EXPECT_FLOAT_EQ(bars[0].height, 0.0f);
 }
 
 TEST(UpdateOnsetPulseTest, OnsetSnapsToSensitivity) {

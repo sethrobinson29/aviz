@@ -165,7 +165,6 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
 
         float coeff = raw_energy[band] > smoothed_energy_[band] ? attack_coeff_ : release_coeff_;
         smoothed_energy_[band] += (raw_energy[band] - smoothed_energy_[band]) * coeff;
-        out.band_energy[band] = smoothed_energy_[band];
 
         if (first_call || smoothed_energy_[band] > agc_reference_[band]) {
             agc_reference_[band] = smoothed_energy_[band];
@@ -173,6 +172,10 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
             agc_reference_[band] += (smoothed_energy_[band] - agc_reference_[band]) * agc_decay_coeff_;
         }
         agc_reference_[band] = std::max(agc_reference_[band], audio_config::kAgcMinReference);
+
+        out.band_idle[band] =
+            smoothed_energy_[band] < audio_config::kIdleFloorFraction * agc_reference_[band];
+        out.band_energy[band] = smoothed_energy_[band];
         out.band_agc_reference[band] = agc_reference_[band];
     }
 

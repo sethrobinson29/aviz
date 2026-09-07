@@ -16,12 +16,13 @@ namespace spectrum_math {
 // low-to-high frequency. Each band's height is band_energy[i] normalized
 // against its own band_reference[i] then direct-multiplied by `sensitivity`
 // (may exceed 1.0 for sensitivity > 1); `band_reference[i] <= 0` yields a
-// zero-height bar regardless of sensitivity. `max_height_fraction` caps a
-// fully-normalized (sensitivity == 1) bar short of the window edge. `idle`
-// returns zero-height bars, ignoring both arrays and sensitivity.
+// bar at the visual_config::kMinBarHeightPx floor regardless of sensitivity.
+// `max_height_fraction` caps a fully-normalized (sensitivity == 1) bar short
+// of the window edge; every bar's final pixel height is then floored to
+// kMinBarHeightPx so a bar at rest never fully disappears.
 std::vector<Rectangle> to_bars(const float* band_energy, const float* band_reference,
                                 std::size_t band_count, int width, int height, float gap_ratio,
-                                float max_height_fraction, bool idle, float sensitivity = 1.0f);
+                                float max_height_fraction, float sensitivity = 1.0f);
 
 // Indices into a to_bars() result to actually draw: {*freq_band} alone when
 // set (a band-scoped layer draws only its own bar), or every index

@@ -79,7 +79,8 @@ void WaveformVisual::resize(int width, int height) {
 }
 
 void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
-    const bool idle = features.rms < visual_config::kIdleRmsFloor;
+    const std::size_t idle_band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
+    const bool idle = features.band_idle[idle_band];
 
     const waveform_math::ReactivityResult reactivity_result =
         waveform_math::resolve_reactivity(features, reactivity);
