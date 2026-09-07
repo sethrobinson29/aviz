@@ -58,6 +58,8 @@ const char* visual_type_name(VisualType type) {
             return "Waveform";
         case VisualType::Spectrum:
             return "Spectrum";
+        case VisualType::Radial:
+            return "Radial";
     }
     return "?";
 }
@@ -194,6 +196,9 @@ int run_app(const char* audio_path) {
                     print_layers(compositor, selected);
                 } else if (IsKeyPressed(KEY_TWO) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Spectrum);
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_THREE) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Radial);
                     print_layers(compositor, selected);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
