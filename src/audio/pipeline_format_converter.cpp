@@ -10,12 +10,8 @@
 #include "ring_buffer.h"
 
 namespace {
-// Output-frame capacity of the scratch buffer used per conversion call.
-// Bounded so convert_and_push never allocates; a caller feeding more input
-// frames than this can produce output for in one pass simply loops (see
-// convert_and_push below).
 constexpr std::size_t kScratchOutputFrames = 8192;
-}  // namespace
+}
 
 struct PipelineFormatConverter::Impl {
     ma_data_converter converter{};
@@ -60,9 +56,6 @@ void PipelineFormatConverter::convert_and_push(const float* interleaved_in, std:
         in_cursor += static_cast<std::size_t>(frames_in) * impl_->channels_in;
         frames_remaining_in -= frames_in;
 
-        // Not reachable with a correctly sized scratch buffer for any
-        // supported conversion ratio -- a converter that consumes no input
-        // and produces no output on a non-empty request would loop forever.
         assert(!(frames_in == 0 && frames_out == 0));
     }
 }

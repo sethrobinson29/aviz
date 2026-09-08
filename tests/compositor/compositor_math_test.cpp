@@ -33,7 +33,6 @@ TEST(ToBlendFactorsTest, BuiltInModesMapToRaylibConstants) {
 TEST(ToBlendFactorsTest, ScreenModeIsCustomWithScreenFormulaFactors) {
     const auto factors = compositor_math::to_blend_factors(LayerBlendMode::Screen);
     EXPECT_EQ(factors.raylib_mode, BLEND_CUSTOM);
-    // result = src*(1-dst) + dst*1 = src + dst - src*dst
     EXPECT_EQ(factors.src_factor, RL_ONE_MINUS_DST_COLOR);
     EXPECT_EQ(factors.dst_factor, RL_ONE);
     EXPECT_EQ(factors.equation, RL_FUNC_ADD);
@@ -104,9 +103,6 @@ TEST(NextReactivitySourceTest, GlobalModeIsANoOpSinceGlobalBeatIsTheOnlyValidSou
 }
 
 TEST(NextReactivitySourceTest, StaleValueFromOtherModeFallsBackToDefault) {
-    // GlobalBeat is not a valid option while a specific band is selected;
-    // this happens transiently right after freq_band changes mode, before
-    // the caller applies default_reactivity_source.
     EXPECT_EQ(compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, 3),
               ReactivitySource::BandOnset);
 }

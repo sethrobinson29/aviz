@@ -11,7 +11,6 @@
 
 namespace {
 
-// Builds `count` mono frames with values [start, start+1, ...).
 std::vector<float> MakeMonoFrames(float start, std::size_t count) {
     std::vector<float> frames(count);
     for (std::size_t i = 0; i < count; ++i) {
@@ -20,7 +19,7 @@ std::vector<float> MakeMonoFrames(float start, std::size_t count) {
     return frames;
 }
 
-}  // namespace
+}
 
 TEST(RingBufferTest, PushPopRoundTrip) {
     AudioRingBuffer rb(8, 1);
@@ -124,7 +123,6 @@ TEST(RingBufferTest, ClearDiscontinuityResetsFlag) {
 
 TEST(RingBufferTest, InterleavedMultiChannelRoundTrip) {
     AudioRingBuffer rb(4, 2);
-    // 3 stereo frames: (L,R) = (0,100), (1,101), (2,102).
     float in[6] = {0.0f, 100.0f, 1.0f, 101.0f, 2.0f, 102.0f};
     rb.push_frames(in, 3);
 
@@ -136,8 +134,6 @@ TEST(RingBufferTest, InterleavedMultiChannelRoundTrip) {
         EXPECT_EQ(out[i], in[i]) << "sample " << i;
     }
 }
-
-// --- Boundary conditions -----------------------------------------------------
 
 TEST(RingBufferTest, EmptyBufferPopReturnsZeroAndLeavesOutputUntouched) {
     AudioRingBuffer rb(8, 1);
@@ -188,10 +184,8 @@ TEST(RingBufferTest, PushPopExactCapacityRepeatedCyclesNeverOverflow) {
     }
 }
 
-// --- Concurrent producer/consumer ---------------------------------------------
-
 TEST(RingBufferConcurrencyTest, NoOverflowRegimePreservesExactOrder) {
-    constexpr std::size_t kCapacity = 1 << 16;  // test-local, unrelated to audio_config
+    constexpr std::size_t kCapacity = 1 << 16;
     constexpr std::size_t kTotalFrames = 20000;
     AudioRingBuffer rb(kCapacity, 1);
 
@@ -261,7 +255,6 @@ TEST(RingBufferConcurrencyTest, ForcedOverflowRegimeStaysMonotonicAndFlagsDiscon
             collected.push_back(buf[i]);
         }
         if (n == 0) {
-            // Producer done and buffer confirmed empty: nothing left to drain.
             if (producer_finished.load(std::memory_order_acquire)) {
                 break;
             }
@@ -271,8 +264,6 @@ TEST(RingBufferConcurrencyTest, ForcedOverflowRegimeStaysMonotonicAndFlagsDiscon
     }
     producer.join();
 
-    // Strict ordering isn't asserted under forced overflow -- only that
-    // every value was actually pushed and discontinuity() fired.
     EXPECT_TRUE(saw_discontinuity.load(std::memory_order_relaxed));
     ASSERT_FALSE(collected.empty());
     for (float v : collected) {

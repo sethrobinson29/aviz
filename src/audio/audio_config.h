@@ -4,10 +4,6 @@
 
 namespace audio_config {
 
-// Canonical pipeline format. Every producer converts its native output to
-// this format before push_frames(); the ring buffer, worker, and extractor
-// are constructed once against these constants and never rebuilt on a
-// producer switch.
 inline constexpr unsigned kPipelineSampleRate = 48000;
 inline constexpr unsigned kPipelineChannels = 2;
 
@@ -18,21 +14,15 @@ inline constexpr std::size_t kWaveformSnapshotSize = kFftWindowSize;
 
 inline constexpr std::size_t kRingBufferCapacityFrames = 1 << 13;
 
-// Worker poll interval = (kFftHopSize / sample_rate) / this.
 inline constexpr int kWorkerPollIntervalDivisor = 2;
 
-// Log-scaled frequency bands, 20 Hz to Nyquist.
 inline constexpr std::size_t kNumBands = 16;
 
 inline constexpr std::size_t kGlobalBandIndex = kNumBands;
 inline constexpr std::size_t kTotalBandSlots = kNumBands + 1;
 
-// High edge is always the runtime Nyquist frequency (sample_rate / 2).
 inline constexpr float kMinBandFrequencyHz = 20.0f;
 
-// Onset fires when spectral flux exceeds
-// max(mean + kOnsetThresholdMultiplier * stddev, kOnsetAbsoluteFluxFloor),
-// over the trailing kOnsetHistoryLength flux values for that band.
 inline constexpr std::size_t kOnsetHistoryLength = 43;
 inline constexpr float kOnsetThresholdMultiplier = 1.5f;
 inline constexpr float kOnsetAbsoluteFluxFloor = 0.1f;
@@ -40,18 +30,10 @@ inline constexpr float kOnsetAbsoluteFluxFloor = 0.1f;
 inline constexpr float kEnvelopeAttackMs = 10.0f;
 inline constexpr float kEnvelopeReleaseMs = 200.0f;
 
-// Below this fraction of a band's own AGC reference, that band is
-// classified idle (AudioFeatures::band_idle). Does not affect
-// band_energy/smoothed_energy_ itself, which keeps decaying under its own
-// envelope math regardless. Tunable.
 inline constexpr float kIdleFloorFraction = 0.02f;
 
-// Rise is an exact snap to any new peak (no tau); this constant covers
-// decay only.
 inline constexpr float kAgcDecayTauMs = 20000.0f;
 
-// Also the seed value a band's AGC reference starts at on the first
-// process() call.
 inline constexpr float kAgcMinReference = 0.01f;
 
-}  // namespace audio_config
+}

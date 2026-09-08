@@ -9,41 +9,22 @@
 
 namespace waveform_math {
 
-// Maps a mono waveform sample window to screen-space points for a line
-// strip. `amplitude_scale` multiplies every sample before it's mapped to a
-// Y offset (1.0 = unmodified). When `idle` is true, returns a flat
-// mid-height line instead, ignoring amplitude_scale.
 std::vector<Vector2> to_points(const float* samples, std::size_t count, int width, int height,
                                 bool idle, float amplitude_scale = 1.0f);
 
-// energy/reference normalized to [0, 1], clamped; reference <= 0 yields 0.
-// Same normalization spectrum_math::to_bars uses for a single band.
 float band_amplitude_scale(float energy, float reference);
 
-// base_thickness scaled up by `pulse` (clamped to [0, 1]) via
-// visual_config::kOnsetPulseThicknessBoost; pulse == 0 returns base_thickness
-// unchanged.
 float pulse_thickness(float base_thickness, float pulse);
 
 struct ReactivityResult {
     float amplitude_scale = 1.0f;
     bool onset_active = false;
-    // Value onset_pulse_ should snap to when onset_active is true (equals
-    // reactivity.sensitivity, pre-clamp -- pulse_thickness clamps it to
-    // [0, 1] before applying its own boost). Meaningless when onset_active
-    // is false.
     float onset_pulse_target = 0.0f;
 };
 
-// Selects amplitude_scale/onset_active from `reactivity`'s freq_band/source:
-// BandAmplitude scales by that band's energy/reference, direct-multiplied
-// by reactivity.sensitivity; BandOnset or GlobalBeat (Global-scoped) set
-// onset_active from that band's onset flag and onset_pulse_target from
-// reactivity.sensitivity. Any other combination leaves the defaults (unity
-// scale, no onset).
 ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity);
 
-}  // namespace waveform_math
+}
 
 struct WaveformParams {
     Color line_color = WHITE;
@@ -68,8 +49,5 @@ private:
     RenderTexture2D texture_{};
     int width_ = 0;
     int height_ = 0;
-    // Snaps to 1.0 on a followed onset, decays toward 0 each rendered
-    // frame otherwise. Not part of params_/clone() -- a clone starts with
-    // no pulse in flight, same as a freshly constructed instance.
     float onset_pulse_ = 0.0f;
 };

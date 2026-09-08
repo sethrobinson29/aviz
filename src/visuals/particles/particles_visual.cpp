@@ -91,7 +91,7 @@ Color faded_color(Color base, int age_frames, int lifetime_frames) {
     return Color{base.r, base.g, base.b, alpha};
 }
 
-}  // namespace particles_math
+}
 
 ParticlesVisual::ParticlesVisual(ParticlesParams params) : params_(params) {}
 

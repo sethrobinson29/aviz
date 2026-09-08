@@ -6,7 +6,6 @@ using audio_worker_utils::mixdown_to_mono;
 using audio_worker_utils::slide_window;
 
 TEST(MixdownToMonoTest, AveragesStereoChannels) {
-    // 3 stereo frames: (2,4), (0,0), (-1,1)
     float interleaved[] = {2.0f, 4.0f, 0.0f, 0.0f, -1.0f, 1.0f};
     float mono[3] = {};
 

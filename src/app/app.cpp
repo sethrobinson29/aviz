@@ -26,8 +26,6 @@ constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 720;
 constexpr int kTargetFps = 60;
 
-// Milestone 4 debug tool palette -- see milestone-4-debug-controls.md.
-// clang-format off
 constexpr Color kLayerPalette[Compositor::kMaxLayers] = {
     Color{0xFF, 0x3B, 0x30, 0xFF}, Color{0xFF, 0x95, 0x00, 0xFF},
     Color{0xFF, 0xCC, 0x00, 0xFF}, Color{0xA3, 0xD9, 0x00, 0xFF},
@@ -38,7 +36,6 @@ constexpr Color kLayerPalette[Compositor::kMaxLayers] = {
     Color{0xC7, 0xA2, 0x6A, 0xFF}, Color{0x7E, 0xD3, 0x21, 0xFF},
     Color{0xFF, 0x6B, 0x6B, 0xFF}, Color{0x4A, 0x90, 0xD9, 0xFF},
 };
-// clang-format on
 
 const char* blend_mode_name(LayerBlendMode mode) {
     switch (mode) {
@@ -94,9 +91,6 @@ LayerBlendMode next_blend_mode(LayerBlendMode mode) {
     return LayerBlendMode::Normal;
 }
 
-// Reassigns every layer's tint_color from kLayerPalette by current stack
-// position -- called after any add/duplicate/remove, per
-// milestone-4-debug-controls.md's Color assignment section.
 void reassign_tints(Compositor& compositor) {
     std::vector<Layer>& layers = compositor.layers();
     for (std::size_t i = 0; i < layers.size(); ++i) {
@@ -126,7 +120,7 @@ void print_layers(const Compositor& compositor, std::size_t selected) {
     }
     std::printf("--------------------------------------------------------------\n");
 }
-}  // namespace
+}
 
 int run_app(const char* audio_path) {
     try {
@@ -333,7 +327,6 @@ int run_app(const char* audio_path) {
                 BeginDrawing();
                 ClearBackground(BLACK);
                 RenderTexture2D& tex = compositor.output();
-                // Negate height: offscreen textures are Y-flipped vs. screen.
                 DrawTextureRec(
                     tex.texture,
                     Rectangle{0.0f, 0.0f, static_cast<float>(tex.texture.width),

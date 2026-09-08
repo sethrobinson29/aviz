@@ -31,7 +31,6 @@ void write_u16le(std::vector<std::uint8_t>& out, std::uint16_t v) {
     out.push_back(static_cast<std::uint8_t>(v >> 8));
 }
 
-// Minimal valid 16-bit PCM WAV: header + `num_frames` silent frames.
 std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_t channels,
                                           std::uint32_t num_frames) {
     std::uint32_t data_bytes = num_frames * channels * 2;
@@ -43,20 +42,20 @@ std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_
 
     out.insert(out.end(), {'f', 'm', 't', ' '});
     write_u32le(out, 16);
-    write_u16le(out, 1);  // PCM
+    write_u16le(out, 1);
     write_u16le(out, channels);
     write_u32le(out, sample_rate);
-    write_u32le(out, sample_rate * channels * 2);  // byte rate
-    write_u16le(out, static_cast<std::uint16_t>(channels * 2));  // block align
-    write_u16le(out, 16);  // bits per sample
+    write_u32le(out, sample_rate * channels * 2);
+    write_u16le(out, static_cast<std::uint16_t>(channels * 2));
+    write_u16le(out, 16);
 
     out.insert(out.end(), {'d', 'a', 't', 'a'});
     write_u32le(out, data_bytes);
-    out.resize(out.size() + data_bytes, 0);  // silence
+    out.resize(out.size() + data_bytes, 0);
     return out;
 }
 
-}  // namespace
+}
 
 TEST(FileProducerTest, ThrowsOnMissingFile) {
     EXPECT_THROW(FileProducer producer("this_file_does_not_exist.wav"), std::runtime_error);
@@ -73,16 +72,11 @@ TEST(FileProducerTest, ThrowsOnMalformedFile) {
 
 TEST(FileProducerTest, ThrowsOnTruncatedWav) {
     auto full = make_valid_wav(44100, 2, 1000);
-    // Cut off partway through the declared data chunk.
     std::vector<std::uint8_t> truncated(full.begin(), full.begin() + 60);
 
     auto path = temp_path("aviz_test_truncated.wav");
     write_bytes(path, truncated);
 
-    // Either throwing or opening with fewer frames than declared is fine;
-    // a crash, or a producer left in a half-initialized state that merely
-    // hasn't thrown yet, is not -- if construction succeeds, it must report
-    // the header's real format and start clean, same as a fully valid file.
     try {
         FileProducer producer(path.string());
         EXPECT_EQ(producer.native_channels(), 2u);

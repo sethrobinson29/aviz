@@ -52,7 +52,7 @@ float clamp_max_radius_fraction(float outer, float inner) {
     return std::clamp(outer, lower, 1.0f);
 }
 
-}  // namespace radial_math
+}
 
 RadialVisual::RadialVisual(RadialParams params) : params_(params) {}
 
@@ -80,9 +80,6 @@ void RadialVisual::render(const AudioFeatures& features, const LayerReactivity& 
                                                               reactivity.sensitivity);
     }
 
-    // Always laid out across the full kNumBands-wide angle grid, even when
-    // only one segment will be drawn, so a band-scoped layer's segment sits
-    // at the same angle it would occupy in the Global view.
     const std::vector<radial_math::RadialSegment> segments = radial_math::to_radial_bars(
         features.band_energy.data(), features.band_agc_reference.data(), audio_config::kNumBands,
         width_, height_, params_.inner_radius_fraction, params_.max_radius_fraction,

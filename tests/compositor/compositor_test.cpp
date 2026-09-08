@@ -31,10 +31,10 @@ TEST(CompositorRemoveLayerTest, OutOfRangeIndexIsNoOp) {
     compositor.add_layer(VisualType::Waveform);
     compositor.add_layer(VisualType::Spectrum);
 
-    compositor.remove_layer(2);  // == size(): one past the last valid index
+    compositor.remove_layer(2);
     EXPECT_EQ(compositor.layers().size(), 2u);
 
-    compositor.remove_layer(99);  // > size()
+    compositor.remove_layer(99);
     EXPECT_EQ(compositor.layers().size(), 2u);
 }
 

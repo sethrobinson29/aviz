@@ -15,7 +15,7 @@ TEST(PipelineFormatConverterTest, IdentityFormatPassesSamplesThroughUnchanged) {
     constexpr std::size_t kFrames = 1000;
     std::vector<float> input(kFrames * audio_config::kPipelineChannels);
     for (std::size_t i = 0; i < input.size(); ++i) {
-        input[i] = static_cast<float>(i % 97) / 97.0f - 0.5f;  // distinct per-sample values
+        input[i] = static_cast<float>(i % 97) / 97.0f - 0.5f;
     }
 
     converter.convert_and_push(input.data(), kFrames, ring);
@@ -49,11 +49,11 @@ TEST(PipelineFormatConverterTest, MonoInputUpmixesToStereoChannelCount) {
 }
 
 TEST(PipelineFormatConverterTest, UpsamplingProducesApproximatelyExpectedFrameCount) {
-    constexpr unsigned kSourceRate = 44100;  // < kPipelineSampleRate (48000)
+    constexpr unsigned kSourceRate = 44100;
     PipelineFormatConverter converter(audio_config::kPipelineChannels, kSourceRate);
     AudioRingBuffer ring(1 << 17, audio_config::kPipelineChannels);
 
-    constexpr std::size_t kFrames = 44100;  // 1 second at source rate
+    constexpr std::size_t kFrames = 44100;
     std::vector<float> input(kFrames * audio_config::kPipelineChannels, 0.1f);
 
     converter.convert_and_push(input.data(), kFrames, ring);
@@ -64,11 +64,11 @@ TEST(PipelineFormatConverterTest, UpsamplingProducesApproximatelyExpectedFrameCo
 }
 
 TEST(PipelineFormatConverterTest, DownsamplingProducesApproximatelyExpectedFrameCount) {
-    constexpr unsigned kSourceRate = 96000;  // > kPipelineSampleRate (48000)
+    constexpr unsigned kSourceRate = 96000;
     PipelineFormatConverter converter(audio_config::kPipelineChannels, kSourceRate);
     AudioRingBuffer ring(1 << 17, audio_config::kPipelineChannels);
 
-    constexpr std::size_t kFrames = 96000;  // 1 second at source rate
+    constexpr std::size_t kFrames = 96000;
     std::vector<float> input(kFrames * audio_config::kPipelineChannels, 0.1f);
 
     converter.convert_and_push(input.data(), kFrames, ring);
@@ -76,5 +76,5 @@ TEST(PipelineFormatConverterTest, DownsamplingProducesApproximatelyExpectedFrame
     double expected =
         static_cast<double>(kFrames) * audio_config::kPipelineSampleRate / static_cast<double>(kSourceRate);
     EXPECT_NEAR(static_cast<double>(ring.available_frames()), expected, 50.0);
-    EXPECT_LT(ring.available_frames(), kFrames);  // confirms downsampling actually reduced the count
+    EXPECT_LT(ring.available_frames(), kFrames);
 }

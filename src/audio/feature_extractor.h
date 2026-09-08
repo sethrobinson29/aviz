@@ -17,23 +17,20 @@ public:
     FeatureExtractor(const FeatureExtractor&) = delete;
     FeatureExtractor& operator=(const FeatureExtractor&) = delete;
 
-    // `mono_window` must have exactly audio_config::kFftWindowSize samples.
-    // `discontinuity` resets per-band onset history; envelope/AGC state is
-    // left alone.
     void process(const float* mono_window, bool discontinuity, AudioFeatures& out);
 
 private:
     struct BandRange {
         std::size_t bin_begin;
-        std::size_t bin_end;  // exclusive
+        std::size_t bin_end;
     };
 
     unsigned sample_rate_;
     PFFFT_Setup* fft_setup_;
     std::vector<float> hann_window_;
 
-    float* windowed_input_;  // size kFftWindowSize
-    float* fft_output_;      // ordered output, size kFftWindowSize
+    float* windowed_input_;
+    float* fft_output_;
 
     std::vector<float> magnitude_;
     std::array<BandRange, audio_config::kNumBands> band_ranges_{};

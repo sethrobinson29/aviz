@@ -64,7 +64,7 @@ std::vector<std::size_t> bar_indices_to_draw(std::optional<std::size_t> freq_ban
     return indices;
 }
 
-}  // namespace spectrum_math
+}
 
 SpectrumVisual::SpectrumVisual(SpectrumParams params) : params_(params) {}
 
@@ -92,9 +92,6 @@ void SpectrumVisual::render(const AudioFeatures& features, const LayerReactivity
                                                               reactivity.sensitivity);
     }
 
-    // Always laid out across the full kNumBands-wide slot grid, even when
-    // only one bar will be drawn, so a band-scoped layer's bar sits at the
-    // same position/size it would occupy in the Global view.
     const std::vector<Rectangle> bars = spectrum_math::to_bars(
         features.band_energy.data(), features.band_agc_reference.data(), audio_config::kNumBands,
         width_, height_, params_.gap_ratio, params_.max_height_fraction, reactivity.sensitivity);

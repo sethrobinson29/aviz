@@ -103,7 +103,6 @@ void Compositor::render(const AudioFeatures& features) {
         RenderTexture2D& tex = layer.visual->render_texture();
         const float alpha = compositor_math::clamp_opacity(layer.opacity) * 255.0f;
         const Color& tint = layer.tint_color;
-        // Negate height: offscreen textures are Y-flipped vs. screen/output.
         DrawTextureRec(tex.texture,
                         Rectangle{0.0f, 0.0f, static_cast<float>(tex.texture.width),
                                   -static_cast<float>(tex.texture.height)},

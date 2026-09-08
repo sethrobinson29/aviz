@@ -66,11 +66,6 @@ TEST(AudioFeaturesSnapshotTest, BandArraysCarryThroughPublish) {
     EXPECT_FLOAT_EQ(current.band_energy[0], 0.25f);
 }
 
-// --- Concurrent worker/render ------------------------------------------------
-//
-// Each published AudioFeatures carries the same sequence number written into
-// six fields spread across the struct; a reader seeing disagreement between
-// them read a torn mix of two different publishes.
 TEST(AudioFeaturesSnapshotConcurrencyTest, RenderNeverObservesTornOrOutOfOrderPublish) {
     constexpr int kIterations = 200000;
     AudioFeaturesSnapshot snap;

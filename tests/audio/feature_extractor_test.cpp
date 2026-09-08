@@ -10,8 +10,6 @@ namespace {
 
 constexpr unsigned kSampleRate = 48000;
 
-// Independent re-derivation of the log-band-edge-to-FFT-bin formula, not a
-// call into FeatureExtractor's private banding.
 std::size_t band_for_frequency(float hz, unsigned sample_rate) {
     constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;
     float low = audio_config::kMinBandFrequencyHz;
@@ -37,9 +35,7 @@ std::size_t band_for_frequency(float hz, unsigned sample_rate) {
     return audio_config::kNumBands - 1;
 }
 
-}  // namespace
-
-// --- Banding -------------------------------------------------------------
+}
 
 TEST(FeatureExtractorTest, KnownFrequencyLandsInExpectedBandAndPeak) {
     constexpr float kToneHz = 1000.0f;
@@ -64,8 +60,8 @@ TEST(FeatureExtractorTest, KnownFrequencyLandsInExpectedBandAndPeak) {
 }
 
 TEST(FeatureExtractorTest, LowFrequencyBandsDoNotOverlap) {
-    constexpr float kBin1Hz = 46.875f;  // 1 * sample_rate/kFftWindowSize -> FFT bin 1
-    constexpr float kBin2Hz = 93.75f;   // 2 * sample_rate/kFftWindowSize -> FFT bin 2
+    constexpr float kBin1Hz = 46.875f;
+    constexpr float kBin2Hz = 93.75f;
 
     auto tone1 = fixtures::sine_wave(kBin1Hz, kSampleRate, audio_config::kFftWindowSize);
     auto tone2 = fixtures::sine_wave(kBin2Hz, kSampleRate, audio_config::kFftWindowSize);
@@ -91,12 +87,8 @@ TEST(FeatureExtractorTest, LowFrequencyBandsDoNotOverlap) {
     EXPECT_NE(band1, band2) << "adjacent low-frequency bins mapped to the same band";
 }
 
-// --- Onset differentiation ------------------------------------------------
-
 namespace {
 
-// Runs `signal` through a fresh extractor in overlapping hop-spaced windows
-// and returns, per band, whether that band ever fired an onset.
 std::array<bool, audio_config::kTotalBandSlots> onsets_seen(const std::vector<float>& signal) {
     FeatureExtractor extractor(kSampleRate);
     std::array<bool, audio_config::kTotalBandSlots> seen{};
@@ -137,14 +129,14 @@ std::vector<float> gated_tone(float carrier_hz, std::size_t num_samples, std::si
     return carrier;
 }
 
-}  // namespace
+}
 
 TEST(FeatureExtractorTest, KickAndHiHatFireDistinctBands) {
     constexpr float kKickHz = 60.0f;
     constexpr float kHiHatHz = 8000.0f;
-    constexpr std::size_t kNumSamples = kSampleRate * 2;   // 2 seconds
-    constexpr std::size_t kPeriod = kSampleRate / 2;       // 2 beats/sec
-    constexpr std::size_t kBurstLen = 2048;                // wider than one FFT window
+    constexpr std::size_t kNumSamples = kSampleRate * 2;
+    constexpr std::size_t kPeriod = kSampleRate / 2;
+    constexpr std::size_t kBurstLen = 2048;
 
     std::size_t kick_band = band_for_frequency(kKickHz, kSampleRate);
     std::size_t hihat_band = band_for_frequency(kHiHatHz, kSampleRate);
@@ -160,8 +152,6 @@ TEST(FeatureExtractorTest, KickAndHiHatFireDistinctBands) {
     EXPECT_TRUE(hihat_onsets[hihat_band]) << "hi-hat band never fired an onset";
     EXPECT_FALSE(hihat_onsets[kick_band]) << "kick band fired on a hi-hat-only signal";
 }
-
-// --- Envelope attack/release ----------------------------------------------
 
 TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     constexpr float kToneHz = 1000.0f;
@@ -203,8 +193,6 @@ TEST(FeatureExtractorTest, AttackRisesFasterThanRelease) {
     EXPECT_GT(release_calls_to_half, attack_calls_to_half);
 }
 
-// --- Idle floor -------------------------------------------------------------
-
 TEST(FeatureExtractorTest, IdleFloorMarksBandIdleWithoutForcingSmoothedEnergyToZero) {
     constexpr float kToneHz = 1000.0f;
     auto tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize);
@@ -225,8 +213,6 @@ TEST(FeatureExtractorTest, IdleFloorMarksBandIdleWithoutForcingSmoothedEnergyToZ
         extractor.process(quiet.data(), false, out);
         if (out.band_idle[band]) {
             saw_idle = true;
-            // The hop where idle first flips true must still show smooth
-            // release decay from the previous hop, not a hard drop to 0.
             EXPECT_GT(out.band_energy[band], prev_energy * 0.5f);
             EXPECT_GT(out.band_energy[band], 0.0f);
         }
@@ -234,8 +220,6 @@ TEST(FeatureExtractorTest, IdleFloorMarksBandIdleWithoutForcingSmoothedEnergyToZ
     }
     ASSERT_TRUE(saw_idle);
 
-    // Energy keeps decaying under its own envelope math well after idle is
-    // set -- never hard-zeroed.
     for (int i = 0; i < 400; ++i) {
         extractor.process(quiet.data(), false, out);
     }
@@ -243,14 +227,6 @@ TEST(FeatureExtractorTest, IdleFloorMarksBandIdleWithoutForcingSmoothedEnergyToZ
 }
 
 TEST(FeatureExtractorTest, IdleFloorScalesWithBandsOwnReferenceNotAbsoluteMagnitude) {
-    // A quiet tone gives this band a small absolute energy scale -- if the
-    // idle floor were an absolute constant tuned against louder bands, a
-    // steady low-amplitude signal like this could falsely read as idle.
-    // Calibrated well under the old fixed-epsilon scale it replaced
-    // (kAgcMinReference = 0.01; per OnsetThresholdEnforcesAbsoluteFloor-
-    // AfterQuietWarmup's amplitude-to-energy calibration, ~0.0001 amplitude
-    // -> ~0.0063 energy) so a reverted absolute-threshold implementation
-    // would actually fail this test.
     constexpr float kToneHz = 1000.0f;
     constexpr float kQuietAmplitude = 0.0001f;
     auto quiet_tone = fixtures::sine_wave(kToneHz, kSampleRate, audio_config::kFftWindowSize, kQuietAmplitude);
@@ -269,13 +245,6 @@ TEST(FeatureExtractorTest, IdleFloorScalesWithBandsOwnReferenceNotAbsoluteMagnit
 }
 
 TEST(FeatureExtractorTest, IdleCheckReadsThisHopsUpdatedReferenceNotStalePreviousValue) {
-    // agc_reference_ starts at 0 before any hop runs. On the very first
-    // hop of true silence, this hop's update floor-clamps it to
-    // kAgcMinReference, so the idle check (0 < fraction * kAgcMinReference)
-    // correctly reads idle. A reordered implementation that compares
-    // against the pre-update (still 0) reference instead would compute
-    // (0 < fraction * 0), i.e. 0 < 0 -- never true -- so idle would never
-    // be detected on cold-start silence, no matter how long it holds.
     auto silence = fixtures::silence(audio_config::kFftWindowSize);
     FeatureExtractor extractor(kSampleRate);
     AudioFeatures out;
@@ -305,15 +274,10 @@ TEST(FeatureExtractorTest, IdleFloorAppliesPerBandIndependently) {
         << "band with real, stable energy must not be forced idle by another band's state";
     EXPECT_FALSE(out.band_idle[steady_band]);
 
-    // The unexcited band reads far quieter relative to its own reference
-    // than the driven band does -- each band's classification depends only
-    // on its own energy/reference, not shared/whole-mix state.
     float steady_ratio = out.band_energy[steady_band] / out.band_agc_reference[steady_band];
     float silent_ratio = out.band_energy[silent_band] / out.band_agc_reference[silent_band];
     EXPECT_LT(silent_ratio, steady_ratio);
 }
-
-// --- AGC reference ----------------------------------------------------------
 
 TEST(FeatureExtractorTest, AgcReferenceSeededFromFirstCallNotZero) {
     constexpr float kToneHz = 1000.0f;
@@ -341,8 +305,6 @@ TEST(FeatureExtractorTest, AgcReferenceSnapsExactlyToRisingEnergy) {
         extractor.process(silence.data(), false, out);
     }
 
-    // Every hop of the attack (energy still rising toward its steady state)
-    // must show the reference exactly matching the just-updated energy.
     float prev_energy = out.band_energy[band];
     for (int i = 0; i < 20; ++i) {
         extractor.process(tone.data(), false, out);
@@ -368,7 +330,6 @@ TEST(FeatureExtractorTest, AgcReferenceDecaysSlowerThanItRises) {
     float peak_reference = out.band_agc_reference[band];
     ASSERT_GT(peak_reference, 0.0f);
 
-    // ~2.13s of silence at this hop rate.
     for (int i = 0; i < 200; ++i) {
         extractor.process(silence.data(), false, out);
     }
@@ -391,11 +352,6 @@ TEST(FeatureExtractorTest, AgcReferenceNeverBelowFloorEvenOnSilence) {
     }
 }
 
-// --- Onset absolute floor ---------------------------------------------------
-
-// After a long silence, mean and stddev of the flux history are exactly 0.
-// The spike amplitude below is calibrated so the resulting flux is ~0.044:
-// above 0.01, below kOnsetAbsoluteFluxFloor (0.1).
 TEST(FeatureExtractorTest, OnsetThresholdEnforcesAbsoluteFloorAfterQuietWarmup) {
     constexpr float kToneHz = 1000.0f;
     auto silence = fixtures::silence(audio_config::kFftWindowSize);

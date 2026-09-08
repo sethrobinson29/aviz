@@ -9,11 +9,8 @@
 namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
-constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;  // [0, N/2] inclusive
+constexpr std::size_t kNumFftBins = audio_config::kFftWindowSize / 2 + 1;
 
-// dt is the nominal time between process() calls (one hop), used to convert
-// an attack/release time constant in ms into a per-call one-pole
-// coefficient: coeff = 1 - exp(-dt / tau).
 float one_pole_coeff(float time_constant_ms, double dt_seconds) {
     double tau = static_cast<double>(time_constant_ms) / 1000.0;
     if (tau <= 0.0) {
@@ -28,7 +25,7 @@ std::size_t bin_for_frequency(float hz, unsigned sample_rate) {
     return std::min(rounded, kNumFftBins - 1);
 }
 
-}  // namespace
+}
 
 FeatureExtractor::FeatureExtractor(unsigned sample_rate)
     : sample_rate_(sample_rate),
@@ -94,8 +91,6 @@ void FeatureExtractor::process(const float* mono_window, bool discontinuity, Aud
 
     pffft_transform_ordered(fft_setup_, windowed_input_, fft_output_, nullptr, PFFFT_FORWARD);
 
-    // Ordered real-FFT layout (pffft.h): out[0]=DC.re, out[1]=Nyquist.re,
-    // out[2k]/out[2k+1] = re/im of bin k for k in [1, N/2-1].
     magnitude_[0] = std::abs(fft_output_[0]);
     magnitude_[audio_config::kFftWindowSize / 2] = std::abs(fft_output_[1]);
     std::size_t peak_bin = 1;

@@ -59,7 +59,7 @@ ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerRe
     return result;
 }
 
-}  // namespace waveform_math
+}
 
 WaveformVisual::WaveformVisual(WaveformParams params) : params_(params) {}
 

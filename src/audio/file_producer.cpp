@@ -16,7 +16,7 @@ struct FileProducer::Impl {
     AudioRingBuffer* ring = nullptr;
     std::atomic<bool> finished{false};
 
-    static void data_callback(ma_device* device, void* output, const void* /*input*/,
+    static void data_callback(ma_device* device, void* output, const void*,
                                ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
         auto* out = static_cast<float*>(output);

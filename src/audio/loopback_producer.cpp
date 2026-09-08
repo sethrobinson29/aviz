@@ -14,7 +14,7 @@ struct LoopbackProducer::Impl {
     unsigned native_channels = 0;
     unsigned native_sample_rate = 0;
 
-    static void data_callback(ma_device* device, void* /*output*/, const void* input,
+    static void data_callback(ma_device* device, void*, const void* input,
                                ma_uint32 frame_count) {
         auto* self = static_cast<Impl*>(device->pUserData);
         if (frame_count > 0 && self->ring != nullptr) {
@@ -26,10 +26,10 @@ struct LoopbackProducer::Impl {
 
 LoopbackProducer::LoopbackProducer() : impl_(std::make_unique<Impl>()) {
     ma_device_config config = ma_device_config_init(ma_device_type_loopback);
-    config.capture.pDeviceID = nullptr;  // default output device's mix
+    config.capture.pDeviceID = nullptr;
     config.capture.format = ma_format_f32;
-    config.capture.channels = 0;  // accept the device's native channel count
-    config.sampleRate = 0;        // accept the device's native rate
+    config.capture.channels = 0;
+    config.sampleRate = 0;
     config.dataCallback = Impl::data_callback;
     config.pUserData = impl_.get();
 

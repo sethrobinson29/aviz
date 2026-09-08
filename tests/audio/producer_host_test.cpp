@@ -18,7 +18,7 @@ public:
     MOCK_METHOD(unsigned, native_sample_rate, (), (const, override));
 };
 
-}  // namespace
+}
 
 TEST(ProducerHostTest, ConstructorStartsInitialProducer) {
     AudioRingBuffer ring(64, 2);
@@ -28,10 +28,6 @@ TEST(ProducerHostTest, ConstructorStartsInitialProducer) {
     ProducerHost host(ring, std::move(initial));
 }
 
-// This is the invariant the whole mid-session-switch design in
-// visualizer-design-spec.md §8 milestone 5 relies on: switch_to() must never
-// let the new producer's start() run before the old producer's stop() has
-// fully returned.
 TEST(ProducerHostTest, SwitchToStopsOldProducerBeforeStartingNew) {
     AudioRingBuffer ring(64, 2);
     auto initial = std::make_unique<MockProducer>();

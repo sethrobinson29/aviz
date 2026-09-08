@@ -5,12 +5,8 @@
 #include "audio_producer.h"
 #include "ring_buffer.h"
 
-// WASAPI loopback capture -- taps whatever is currently playing on the
-// default output device. Windows-only (see CLAUDE.md's Target Platform
-// section); loopback is only supported by miniaudio's WASAPI backend.
 class LoopbackProducer : public AudioProducer {
 public:
-    // Throws std::runtime_error if the loopback device can't be opened.
     LoopbackProducer();
     ~LoopbackProducer() override;
 

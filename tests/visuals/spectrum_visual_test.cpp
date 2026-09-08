@@ -23,7 +23,7 @@ TEST(SpectrumToBarsTest, ZeroEnergySnapsToMinBarHeightFloor) {
 
 TEST(SpectrumToBarsTest, LowButRealEnergyRendersNonZeroHeightRegardlessOfOtherBands) {
     float energy[2] = {0.0f, 0.045f};
-    float reference[2] = {10.0f, 0.11f};  // band 1 ratio ~0.409
+    float reference[2] = {10.0f, 0.11f};
     auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 2u);
@@ -37,8 +37,8 @@ TEST(SpectrumToBarsTest, NormalizesEachBandAgainstItsOwnReferenceAndClamps) {
     auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 2u);
-    EXPECT_NEAR(bars[0].height, 50.0f, 1e-4f);   // 50/100 -> half height
-    EXPECT_NEAR(bars[1].height, 100.0f, 1e-4f);  // 200/100 -> clamped to full height
+    EXPECT_NEAR(bars[0].height, 50.0f, 1e-4f);
+    EXPECT_NEAR(bars[1].height, 100.0f, 1e-4f);
 }
 
 TEST(SpectrumToBarsTest, DifferentReferencesGiveDifferentNormalizationForEqualEnergy) {
@@ -47,8 +47,8 @@ TEST(SpectrumToBarsTest, DifferentReferencesGiveDifferentNormalizationForEqualEn
     auto bars = spectrum_math::to_bars(energy, reference, 2, 200, 100, 0.0f, 1.0f);
 
     ASSERT_EQ(bars.size(), 2u);
-    EXPECT_NEAR(bars[0].height, 100.0f, 1e-4f);  // 10/10 -> full height
-    EXPECT_NEAR(bars[1].height, 10.0f, 1e-4f);   // 10/100 -> 10% height
+    EXPECT_NEAR(bars[0].height, 100.0f, 1e-4f);
+    EXPECT_NEAR(bars[1].height, 10.0f, 1e-4f);
 }
 
 TEST(SpectrumToBarsTest, BarsAreEvenlySpacedWithGap) {
@@ -97,8 +97,8 @@ TEST(SpectrumToBarsTest, MaxHeightFractionCapsAFullyNormalizedBar) {
     auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 0.8f);
 
     ASSERT_EQ(bars.size(), 1u);
-    EXPECT_NEAR(bars[0].height, 80.0f, 1e-4f);  // capped to 80% of window height
-    EXPECT_NEAR(bars[0].y, 20.0f, 1e-4f);       // leaves a 20px margin at the top
+    EXPECT_NEAR(bars[0].height, 80.0f, 1e-4f);
+    EXPECT_NEAR(bars[0].y, 20.0f, 1e-4f);
 }
 
 TEST(BarIndicesToDrawTest, GlobalDrawsEveryIndexInOrder) {
@@ -132,30 +132,30 @@ TEST(SpectrumToBarsTest, DefaultSensitivityIsUnity) {
 
 TEST(SpectrumToBarsTest, SensitivityDirectMultipliesNormalizedRatio) {
     float energy[1] = {50.0f};
-    float reference[1] = {100.0f};  // ratio -> 0.5
+    float reference[1] = {100.0f};
     auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f,
-                                        /*sensitivity=*/2.0f);
+                                        2.0f);
 
     ASSERT_EQ(bars.size(), 1u);
-    EXPECT_NEAR(bars[0].height, 100.0f, 1e-4f);  // 0.5 * 2.0 -> full height
+    EXPECT_NEAR(bars[0].height, 100.0f, 1e-4f);
 }
 
 TEST(SpectrumToBarsTest, SensitivityIsUncappedBeyondFullHeight) {
     float energy[1] = {100.0f};
-    float reference[1] = {100.0f};  // ratio -> 1.0
+    float reference[1] = {100.0f};
     auto bars = spectrum_math::to_bars(energy, reference, 1, 100, 100, 0.0f, 1.0f,
-                                        /*sensitivity=*/2.0f);
+                                        2.0f);
 
     ASSERT_EQ(bars.size(), 1u);
-    EXPECT_NEAR(bars[0].height, 200.0f, 1e-4f);  // uncapped, exceeds window height
+    EXPECT_NEAR(bars[0].height, 200.0f, 1e-4f);
 }
 
 TEST(UpdateOnsetPulseTest, OnsetSnapsToSensitivity) {
-    EXPECT_FLOAT_EQ(spectrum_math::update_onset_pulse(0.1f, /*onset=*/true, /*sensitivity=*/2.5f), 2.5f);
+    EXPECT_FLOAT_EQ(spectrum_math::update_onset_pulse(0.1f, true, 2.5f), 2.5f);
 }
 
 TEST(UpdateOnsetPulseTest, NoOnsetDecaysCurrentValue) {
-    EXPECT_FLOAT_EQ(spectrum_math::update_onset_pulse(1.0f, /*onset=*/false, /*sensitivity=*/1.0f),
+    EXPECT_FLOAT_EQ(spectrum_math::update_onset_pulse(1.0f, false, 1.0f),
                     visual_config::kSpectrumOnsetPulseDecayPerFrame);
 }
 

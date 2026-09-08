@@ -32,7 +32,7 @@ void slide_window(std::vector<float>& window, const float* new_samples, std::siz
     }
 }
 
-}  // namespace audio_worker_utils
+}
 
 FeatureWorker::FeatureWorker(AudioRingBuffer& ring, AudioFeaturesSnapshot& snapshot,
                               unsigned sample_rate)

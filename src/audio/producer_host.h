@@ -6,12 +6,6 @@
 #include "audio_producer.h"
 #include "ring_buffer.h"
 
-// Owns the single active AudioProducer and is the only code path that may
-// change which one is active. switch_to() is the only mutator: it always
-// stops the current producer to completion (see AudioProducer::stop()'s
-// postcondition) before starting the next one, so that ordering can't be
-// violated by a caller reaching start()/stop() directly -- there is no
-// other public path to either.
 class ProducerHost {
 public:
     ProducerHost(AudioRingBuffer& ring, std::unique_ptr<AudioProducer> initial)

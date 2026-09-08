@@ -9,13 +9,7 @@
 
 enum class VisualType { Waveform, Spectrum, Radial, Particles };
 
-// Blend modes applied per layer when its offscreen texture is drawn onto
-// the compositor's output texture.
 enum class LayerBlendMode { Normal, Additive, Multiply, Screen };
-
-// ReactivitySource is defined in visual_module.h (VisualModule::render()
-// needs it too; defining it there avoids a visuals/ <-> compositor/
-// include cycle).
 
 struct Layer {
     VisualType visual_type;
@@ -23,11 +17,8 @@ struct Layer {
     float opacity = 1.0f;
     LayerBlendMode blend_mode = LayerBlendMode::Normal;
     Color tint_color = WHITE;
-    // nullopt = Global; otherwise a band index in [0, audio_config::kNumBands).
     std::optional<std::size_t> freq_band;
     ReactivitySource reactivity_source = ReactivitySource::GlobalBeat;
-    // Multiplier on this layer's reactivity strength; see
-    // compositor_math::clamp_sensitivity for valid range.
     float sensitivity = 1.0f;
     bool enabled = true;
 };

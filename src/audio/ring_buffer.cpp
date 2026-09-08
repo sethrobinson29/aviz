@@ -6,7 +6,7 @@ namespace {
 bool is_power_of_two(std::size_t value) {
     return value != 0 && (value & (value - 1)) == 0;
 }
-}  // namespace
+}
 
 AudioRingBuffer::AudioRingBuffer(std::size_t capacity_frames, unsigned channels)
     : buffer_(capacity_frames * channels),
@@ -42,7 +42,6 @@ std::size_t AudioRingBuffer::pop_frames(float* out, std::size_t frame_count) {
     std::size_t write = write_index_.load(std::memory_order_acquire);
     std::size_t read = read_index_.load(std::memory_order_relaxed);
 
-    // Producer has lapped us: snap forward to the oldest still-valid frame.
     if (write - read > capacity_frames_) {
         read = write - capacity_frames_;
     }
