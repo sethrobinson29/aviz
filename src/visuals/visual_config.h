@@ -39,4 +39,11 @@ inline constexpr float kParticleBaseSpeedPxPerFrame = 4.0f;
 // tunable.
 inline constexpr float kParticleAngleJitterRadians = 0.35f;
 
+// Default for ParticlesParams::lifetime_frames (frame-scoped, not
+// GetFrameTime-based -- see kOnsetPulseDecayPerFrame above for the same
+// convention). ~2.5s at 60fps. A per-instance ParticlesParams field, not a
+// fixed constant, so a layer (and eventually a UI slider) can override it;
+// this just centralizes the default instead of leaving it a bare literal.
+inline constexpr int kParticleDefaultLifetimeFrames = 150;
+
 }  // namespace visual_config

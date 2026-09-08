@@ -18,6 +18,7 @@
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
 #include "raylib.h"
+#include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 
 namespace {
@@ -167,6 +168,7 @@ int run_app(const char* audio_path) {
             "  m         toggle selected layer's enabled state\n"
             "  r/t       adjust selected Radial layer's inner_radius_fraction (no-op on other types)\n"
             "  y/u       adjust selected Radial layer's max_radius_fraction (outer radius, no-op on other types)\n"
+            "  f/g       adjust selected Particles layer's inner_radius_fraction (no-op on other types)\n"
             "  L         toggle audio source between file playback and loopback capture\n");
 
         {
@@ -289,6 +291,20 @@ int run_app(const char* audio_path) {
                         RadialParams& p = radial->mutable_params();
                         p.max_radius_fraction = radial_math::clamp_max_radius_fraction(
                             p.max_radius_fraction - 0.05f, p.inner_radius_fraction);
+                    }
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_F) && !layers.empty()) {
+                    if (auto* particles = dynamic_cast<ParticlesVisual*>(layers[selected].visual.get())) {
+                        ParticlesParams& p = particles->mutable_params();
+                        p.inner_radius_fraction =
+                            particles_math::clamp_inner_radius_fraction(p.inner_radius_fraction + 0.05f);
+                    }
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_G) && !layers.empty()) {
+                    if (auto* particles = dynamic_cast<ParticlesVisual*>(layers[selected].visual.get())) {
+                        ParticlesParams& p = particles->mutable_params();
+                        p.inner_radius_fraction =
+                            particles_math::clamp_inner_radius_fraction(p.inner_radius_fraction - 0.05f);
                     }
                     print_layers(compositor, selected);
                 } else if (IsKeyPressed(KEY_L)) {

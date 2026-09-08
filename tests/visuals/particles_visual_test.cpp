@@ -62,6 +62,37 @@ TEST(ParticlesSpawnDirectionTest, GlobalBandIgnoresGridAcrossManyTrials) {
     EXPECT_GT(max_angle - min_angle, PI);
 }
 
+TEST(ParticlesBandInRangeTest, GlobalIsAlwaysInRange) {
+    EXPECT_TRUE(particles_math::band_in_range(std::nullopt, 16));
+    EXPECT_TRUE(particles_math::band_in_range(std::nullopt, 0));
+}
+
+TEST(ParticlesBandInRangeTest, LastValidBandIndexIsInRange) {
+    EXPECT_TRUE(particles_math::band_in_range(15, 16));
+}
+
+TEST(ParticlesBandInRangeTest, BandIndexEqualToCountIsOutOfRange) {
+    EXPECT_FALSE(particles_math::band_in_range(16, 16));
+}
+
+TEST(ParticlesSpawnPositionTest, ZeroInnerRadiusReturnsCenterUnchanged) {
+    Vector2 pos = particles_math::spawn_position(Vector2{50.0f, 50.0f}, Vector2{1.0f, 0.0f}, 0.0f);
+    EXPECT_NEAR(pos.x, 50.0f, kEpsilon);
+    EXPECT_NEAR(pos.y, 50.0f, kEpsilon);
+}
+
+TEST(ParticlesSpawnPositionTest, OffsetsAlongDirectionByInnerRadius) {
+    Vector2 pos = particles_math::spawn_position(Vector2{50.0f, 50.0f}, Vector2{0.0f, -1.0f}, 20.0f);
+    EXPECT_NEAR(pos.x, 50.0f, kEpsilon);
+    EXPECT_NEAR(pos.y, 30.0f, kEpsilon);
+}
+
+TEST(ClampInnerRadiusFractionTest, ClampsToUnitRange) {
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(0.5f), 0.5f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-0.2f), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1.5f), 1.0f);
+}
+
 TEST(ParticlesAccumulateSpawnCountTest, CarriesFractionalRemainderAcrossFrames) {
     float accumulator = 0.0f;
     EXPECT_EQ(particles_math::accumulate_spawn_count(accumulator, 0.3f), 0);
@@ -108,7 +139,7 @@ TEST(ParticlesStepPoolTest, AdvancesPositionAndAgeForActiveParticles) {
     pool[0].age_frames = 0;
     pool[0].lifetime_frames = 5;
 
-    particles_math::step_pool(pool);
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/200.0f, /*margin=*/3.0f);
 
     EXPECT_NEAR(pool[0].position.x, 1.0f, kEpsilon);
     EXPECT_NEAR(pool[0].position.y, 2.0f, kEpsilon);
@@ -122,7 +153,7 @@ TEST(ParticlesStepPoolTest, DeactivatesOnceAgeReachesLifetime) {
     pool[0].lifetime_frames = 1;
     pool[0].age_frames = 0;
 
-    particles_math::step_pool(pool);
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/200.0f, /*margin=*/3.0f);
 
     EXPECT_FALSE(pool[0].active);
 }
@@ -131,11 +162,80 @@ TEST(ParticlesStepPoolTest, IgnoresInactiveSlots) {
     particles_math::Pool pool{};
     pool[0].active = false;
     pool[0].position = Vector2{5.0f, 5.0f};
+    pool[0].velocity = Vector2{1.0f, 2.0f};  // nonzero -- would reveal a missing active guard
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 5;
 
-    particles_math::step_pool(pool);
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/200.0f, /*margin=*/3.0f);
 
     EXPECT_NEAR(pool[0].position.x, 5.0f, kEpsilon);
     EXPECT_NEAR(pool[0].position.y, 5.0f, kEpsilon);
+    EXPECT_EQ(pool[0].age_frames, 0);
+}
+
+TEST(ParticlesStepPoolTest, DeactivatesImmediatelyOnceFullyOffscreenRegardlessOfLifetime) {
+    particles_math::Pool pool{};
+    pool[0].active = true;
+    pool[0].position = Vector2{190.0f, 50.0f};
+    pool[0].velocity = Vector2{20.0f, 0.0f};  // lands at x=210, well past width+margin
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 1000;  // far from aging out
+
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/100.0f, /*margin=*/3.0f);
+
+    EXPECT_FALSE(pool[0].active);
+}
+
+TEST(ParticlesStepPoolTest, StaysActiveWhileStillWithinMarginOfEdge) {
+    particles_math::Pool pool{};
+    pool[0].active = true;
+    pool[0].position = Vector2{199.0f, 50.0f};
+    pool[0].velocity = Vector2{2.0f, 0.0f};  // lands at x=201, within width+margin (203)
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 1000;
+
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/100.0f, /*margin=*/3.0f);
+
+    EXPECT_TRUE(pool[0].active);
+}
+
+TEST(ParticlesStepPoolTest, NegativeYSideOffscreenAlsoDeactivates) {
+    particles_math::Pool pool{};
+    pool[0].active = true;
+    pool[0].position = Vector2{10.0f, 5.0f};
+    pool[0].velocity = Vector2{0.0f, -20.0f};  // lands at y=-15, past -margin (-3)
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 1000;
+
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/100.0f, /*margin=*/3.0f);
+
+    EXPECT_FALSE(pool[0].active);
+}
+
+TEST(ParticlesStepPoolTest, NegativeXSideOffscreenAlsoDeactivates) {
+    particles_math::Pool pool{};
+    pool[0].active = true;
+    pool[0].position = Vector2{5.0f, 10.0f};
+    pool[0].velocity = Vector2{-20.0f, 0.0f};  // lands at x=-15, past -margin (-3)
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 1000;
+
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/100.0f, /*margin=*/3.0f);
+
+    EXPECT_FALSE(pool[0].active);
+}
+
+TEST(ParticlesStepPoolTest, PositiveYSideOffscreenAlsoDeactivates) {
+    particles_math::Pool pool{};
+    pool[0].active = true;
+    pool[0].position = Vector2{10.0f, 90.0f};
+    pool[0].velocity = Vector2{0.0f, 20.0f};  // lands at y=110, well past height+margin (103)
+    pool[0].age_frames = 0;
+    pool[0].lifetime_frames = 1000;
+
+    particles_math::step_pool(pool, /*width=*/200.0f, /*height=*/100.0f, /*margin=*/3.0f);
+
+    EXPECT_FALSE(pool[0].active);
 }
 
 TEST(ParticlesFadedColorTest, FullAlphaAtSpawn) {
@@ -151,6 +251,35 @@ TEST(ParticlesFadedColorTest, FullyTransparentAtLifetimeEnd) {
 TEST(ParticlesFadedColorTest, LinearlyInterpolatesMidLifetime) {
     Color c = particles_math::faded_color(WHITE, 36, 72);
     EXPECT_NEAR(static_cast<int>(c.a), 127, 2);
+}
+
+TEST(ParticlesAmplitudeSpawnRatioTest, ZeroWhenIdleRegardlessOfEnergyOrReference) {
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(500.0f, 100.0f, /*idle=*/true), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(0.05f, 0.1f, /*idle=*/true), 0.0f);
+}
+
+TEST(ParticlesAmplitudeSpawnRatioTest, ZeroSpawnRateWhenIdleRegardlessOfSensitivity) {
+    // Direct regression test for the streaming bug: an idle band's ratio
+    // must be 0 so rate = spawn_rate_per_frame * ratio * sensitivity stays
+    // 0 for every sensitivity value in its valid [0, 4] range
+    // (compositor_math::kSensitivityMin/kSensitivityMax) -- confirming the
+    // clamp can't produce a non-finite value that would defeat the zero-out.
+    const float ratio = particles_math::amplitude_spawn_ratio(50.0f, 100.0f, /*idle=*/true);
+    for (float sensitivity : {0.0f, 1.0f, 2.5f, 4.0f}) {
+        const float rate = 2.0f /* spawn_rate_per_frame */ * ratio * sensitivity;
+        ASSERT_TRUE(std::isfinite(sensitivity));
+        EXPECT_FLOAT_EQ(rate, 0.0f);
+    }
+}
+
+TEST(ParticlesAmplitudeSpawnRatioTest, NormalizesAndClampsWhenNotIdle) {
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(50.0f, 100.0f, /*idle=*/false), 0.5f);
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(200.0f, 100.0f, /*idle=*/false), 1.0f);
+}
+
+TEST(ParticlesAmplitudeSpawnRatioTest, NonPositiveReferenceYieldsZeroEvenWhenNotIdle) {
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(5.0f, 0.0f, /*idle=*/false), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::amplitude_spawn_ratio(5.0f, -1.0f, /*idle=*/false), 0.0f);
 }
 
 TEST(ParticlesFadedColorTest, PreservesRgbChannels) {
