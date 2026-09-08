@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 #include "visuals/spectrum/spectrum_visual.h"
 #include "visuals/waveform/waveform_visual.h"
@@ -22,6 +23,12 @@ TEST(MakeVisualTest, RadialTypeConstructsRadialVisual) {
     auto visual = make_visual(VisualType::Radial);
     EXPECT_NE(dynamic_cast<RadialVisual*>(visual.get()), nullptr);
     EXPECT_EQ(dynamic_cast<SpectrumVisual*>(visual.get()), nullptr);
+}
+
+TEST(MakeVisualTest, ParticlesTypeConstructsParticlesVisual) {
+    auto visual = make_visual(VisualType::Particles);
+    EXPECT_NE(dynamic_cast<ParticlesVisual*>(visual.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<RadialVisual*>(visual.get()), nullptr);
 }
 
 TEST(VisualCloneTest, WaveformCloneIsIndependentInstanceOfSameType) {
@@ -88,4 +95,28 @@ TEST(VisualCloneTest, RadialClonePreservesParams) {
     EXPECT_FLOAT_EQ(params.thickness, 4.0f);
     EXPECT_FLOAT_EQ(params.inner_radius_fraction, 0.2f);
     EXPECT_FLOAT_EQ(params.max_radius_fraction, 0.8f);
+}
+
+TEST(VisualCloneTest, ParticlesCloneIsIndependentInstanceOfSameType) {
+    auto original = make_visual(VisualType::Particles);
+    auto clone = original->clone();
+
+    EXPECT_NE(clone.get(), original.get());
+    EXPECT_NE(dynamic_cast<ParticlesVisual*>(clone.get()), nullptr);
+}
+
+TEST(VisualCloneTest, ParticlesClonePreservesParams) {
+    ParticlesVisual original(ParticlesParams{ORANGE, 5.0f, 90, 30, 3.0f});
+    auto clone = original.clone();
+
+    auto* particles_clone = dynamic_cast<ParticlesVisual*>(clone.get());
+    ASSERT_NE(particles_clone, nullptr);
+    const ParticlesParams& params = particles_clone->params();
+    EXPECT_EQ(params.particle_color.r, ORANGE.r);
+    EXPECT_EQ(params.particle_color.g, ORANGE.g);
+    EXPECT_EQ(params.particle_color.b, ORANGE.b);
+    EXPECT_FLOAT_EQ(params.radius, 5.0f);
+    EXPECT_EQ(params.lifetime_frames, 90);
+    EXPECT_EQ(params.burst_count, 30);
+    EXPECT_FLOAT_EQ(params.spawn_rate_per_frame, 3.0f);
 }

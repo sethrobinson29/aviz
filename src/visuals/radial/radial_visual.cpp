@@ -5,7 +5,6 @@
 
 #include "audio/audio_config.h"
 #include "visuals/spectrum/spectrum_visual.h"
-#include "visuals/visual_config.h"
 
 namespace radial_math {
 
@@ -23,7 +22,7 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
     const float unit_radius = std::min(width, height) * 0.5f;
     const float inner_radius = unit_radius * inner_radius_fraction;
     const float max_outer_radius = unit_radius * max_radius_fraction;
-    const float max_length = max_outer_radius - inner_radius;
+    const float max_length = std::max(max_outer_radius - inner_radius, 0.0f);
     const float angle_step = 2.0f * PI / static_cast<float>(band_count);
 
     for (std::size_t i = 0; i < band_count; ++i) {
@@ -31,7 +30,7 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
         if (band_reference[i] > 0.0f) {
             normalized = std::clamp(band_energy[i] / band_reference[i], 0.0f, 1.0f) * sensitivity;
         }
-        const float length = std::max(normalized * max_length, visual_config::kMinBarHeightPx);
+        const float length = normalized * max_length;
         const float angle = -PI * 0.5f + static_cast<float>(i) * angle_step;
         const float cos_a = std::cos(angle);
         const float sin_a = std::sin(angle);
@@ -41,6 +40,16 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
                     center.y + (inner_radius + length) * sin_a}});
     }
     return segments;
+}
+
+float clamp_inner_radius_fraction(float inner, float outer) {
+    const float upper = std::max(outer - kMinRadiusGapFraction, 0.0f);
+    return std::clamp(inner, 0.0f, upper);
+}
+
+float clamp_max_radius_fraction(float outer, float inner) {
+    const float lower = std::min(inner + kMinRadiusGapFraction, 1.0f);
+    return std::clamp(outer, lower, 1.0f);
 }
 
 }  // namespace radial_math

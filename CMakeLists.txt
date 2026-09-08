@@ -82,6 +82,7 @@ add_executable(aviz
   src/visuals/waveform/waveform_visual.cpp
   src/visuals/spectrum/spectrum_visual.cpp
   src/visuals/radial/radial_visual.cpp
+  src/visuals/particles/particles_visual.cpp
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp

@@ -18,6 +18,7 @@
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
 #include "raylib.h"
+#include "visuals/radial/radial_visual.h"
 
 namespace {
 constexpr int kWindowWidth = 1280;
@@ -60,6 +61,8 @@ const char* visual_type_name(VisualType type) {
             return "Spectrum";
         case VisualType::Radial:
             return "Radial";
+        case VisualType::Particles:
+            return "Particles";
     }
     return "?";
 }
@@ -152,7 +155,7 @@ int run_app(const char* audio_path) {
             "compositor controls (no control panel UI yet -- milestone 8, see "
             "milestone-4-debug-controls.md):\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
-            "  1/2       set selected layer's visual type to waveform/spectrum\n"
+            "  1/2/3/4   set selected layer's visual type to waveform/spectrum/radial/particles\n"
             "  D         duplicate selected layer\n"
             "  X/Delete  remove selected layer\n"
             "  up/down   change selected layer\n"
@@ -162,6 +165,8 @@ int run_app(const char* audio_path) {
             "  [/]       cycle selected layer's reactivity_source\n"
             "  -/=       adjust selected layer's sensitivity\n"
             "  m         toggle selected layer's enabled state\n"
+            "  r/t       adjust selected Radial layer's inner_radius_fraction (no-op on other types)\n"
+            "  y/u       adjust selected Radial layer's max_radius_fraction (outer radius, no-op on other types)\n"
             "  L         toggle audio source between file playback and loopback capture\n");
 
         {
@@ -197,6 +202,9 @@ int run_app(const char* audio_path) {
                     print_layers(compositor, selected);
                 } else if (IsKeyPressed(KEY_THREE) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Radial);
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_FOUR) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Particles);
                     print_layers(compositor, selected);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
@@ -254,6 +262,34 @@ int run_app(const char* audio_path) {
                 } else if (IsKeyPressed(KEY_M) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.enabled = !layer.enabled;
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_R) && !layers.empty()) {
+                    if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
+                        RadialParams& p = radial->mutable_params();
+                        p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
+                            p.inner_radius_fraction + 0.05f, p.max_radius_fraction);
+                    }
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_T) && !layers.empty()) {
+                    if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
+                        RadialParams& p = radial->mutable_params();
+                        p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
+                            p.inner_radius_fraction - 0.05f, p.max_radius_fraction);
+                    }
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_Y) && !layers.empty()) {
+                    if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
+                        RadialParams& p = radial->mutable_params();
+                        p.max_radius_fraction = radial_math::clamp_max_radius_fraction(
+                            p.max_radius_fraction + 0.05f, p.inner_radius_fraction);
+                    }
+                    print_layers(compositor, selected);
+                } else if (IsKeyPressed(KEY_U) && !layers.empty()) {
+                    if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
+                        RadialParams& p = radial->mutable_params();
+                        p.max_radius_fraction = radial_math::clamp_max_radius_fraction(
+                            p.max_radius_fraction - 0.05f, p.inner_radius_fraction);
+                    }
                     print_layers(compositor, selected);
                 } else if (IsKeyPressed(KEY_L)) {
                     try {

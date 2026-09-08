@@ -9,12 +9,12 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Local playback + feature extraction, waveform/spectrum visuals, the layer
-compositor (stacking, opacity, blend modes, tint), layer duplication +
-frequency mapping (`freq_band`, `reactivity_source`, `enabled`), and WASAPI
-loopback capture with mid-session source switching are implemented — see
-"Features" below. The control panel UI doesn't exist yet. Build order follows
-`visualizer-design-spec.md` §8.
+Local playback + feature extraction, waveform/spectrum/radial/particles
+visuals, the layer compositor (stacking, opacity, blend modes, tint), layer
+duplication + frequency mapping (`freq_band`, `reactivity_source`,
+`enabled`), and WASAPI loopback capture with mid-session source switching are
+implemented — see "Features" below. The control panel UI doesn't exist yet.
+Build order follows `visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -78,13 +78,20 @@ run directly from `tsan/`.
 - **Triple-buffered `AudioFeatures` handoff** from the worker thread to the
   render/consumer side — see `CLAUDE.md` invariant #1 for why a plain
   double-buffer isn't sufficient here.
-- **Waveform and spectrum bar visuals**, each rendering to its own
-  offscreen texture, cleared to transparent so the compositor can stack
-  them. Spectrum bars normalize per band against a peak-hold-with-slow-release
-  reference (fast attack, slow release) rather than a single shared scale,
-  since band energy magnitude varies by orders of magnitude bass-to-presence.
-  Both settle to a flat/idle rest pose below an RMS floor instead of
-  rendering near-silence noise.
+- **Waveform, spectrum bar, radial, and particle visuals**, each rendering
+  to its own offscreen texture, cleared to transparent so the compositor can
+  stack them. Spectrum/radial bars normalize per band against a
+  peak-hold-with-slow-release reference (fast attack, slow release) rather
+  than a single shared scale, since band energy magnitude varies by orders
+  of magnitude bass-to-presence; both settle to a flat/idle rest pose below
+  an RMS floor instead of rendering near-silence noise. Radial maps the same
+  per-band bars around a circle instead of left-to-right. Particles is a
+  fixed-size pool (no per-frame allocation): `BandOnset`/`GlobalBeat` fire a
+  decaying-count burst from center on each onset, `BandAmplitude` spawns
+  continuously at a rate proportional to the band's energy/reference ratio;
+  spawn direction follows the same per-band angle grid as Radial's bars
+  (random full-circle direction for Global), and particles fade out linearly
+  over a fixed lifetime.
 - **Layer compositor**: add/remove/reorder layers, each with independent
   opacity, blend mode (normal, additive, multiply, screen), and tint color.
   Layers composite in stack order, bottom to top, into a single output

@@ -24,4 +24,19 @@ inline constexpr float kSpectrumOnsetPulseRestBrightnessFraction = 0.55f;
 // Initial guess, unconfirmed against real material; tunable.
 inline constexpr float kMinBarHeightPx = 4.0f;
 
+// Fixed-size particle pool per ParticlesVisual instance -- no per-frame
+// heap allocation. Initial guess, unconfirmed against real material;
+// tunable.
+inline constexpr int kMaxParticles = 1024;
+
+// Base particle speed in px/frame (frame-scoped, not GetFrameTime-based --
+// see kOnsetPulseDecayPerFrame above for the same convention). Initial
+// guess, unconfirmed against real material; tunable.
+inline constexpr float kParticleBaseSpeedPxPerFrame = 4.0f;
+
+// Uniform random jitter, in radians, applied on top of a particle's
+// band-grid spawn angle. Initial guess, unconfirmed against real material;
+// tunable.
+inline constexpr float kParticleAngleJitterRadians = 0.35f;
+
 }  // namespace visual_config

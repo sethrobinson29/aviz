@@ -7,7 +7,7 @@
 #include "raylib.h"
 #include "visuals/visual_module.h"
 
-enum class VisualType { Waveform, Spectrum, Radial };
+enum class VisualType { Waveform, Spectrum, Radial, Particles };
 
 // Blend modes applied per layer when its offscreen texture is drawn onto
 // the compositor's output texture.
