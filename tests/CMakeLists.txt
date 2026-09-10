@@ -64,3 +64,15 @@ add_executable(compositor_tests
 target_include_directories(compositor_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
 gtest_discover_tests(compositor_tests)
+
+# Startup layer-generation logic (-n debug flag, milestone-4-debug-controls.md).
+# Pure logic over VisualType/ReactivitySource/freq_band combinations -- no
+# window/GL context, same raylib-linked-but-uninitialized pattern as
+# compositor_tests above.
+add_executable(app_tests
+  app/layer_generator_test.cpp
+  ../src/app/layer_generator.cpp
+)
+target_include_directories(app_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+target_link_libraries(app_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
+gtest_discover_tests(app_tests)

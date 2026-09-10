@@ -72,6 +72,7 @@ include(GoogleTest)
 add_executable(aviz
   src/main.cpp
   src/app/app.cpp
+  src/app/layer_generator.cpp
   src/audio/miniaudio_backend.cpp
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
