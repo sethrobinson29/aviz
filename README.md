@@ -9,8 +9,9 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Local playback + feature extraction, waveform/spectrum/radial/particles
-visuals, the layer compositor (stacking, opacity, blend modes, tint), layer
+Local playback + feature extraction, waveform/spectrum/radial/particles/
+lissajous visuals, the layer compositor (stacking, opacity, blend modes,
+tint), layer
 duplication + frequency mapping (`freq_band`, `reactivity_source`,
 `enabled`), and WASAPI loopback capture with mid-session source switching are
 implemented — see "Features" below. The control panel UI doesn't exist yet.
@@ -92,6 +93,14 @@ run directly from `tsan/`.
   spawn direction follows the same per-band angle grid as Radial's bars
   (random full-circle direction for Global), and particles fade out linearly
   over a fixed lifetime.
+- **Lissajous** plots the stereo pair directly (left channel on X, right on
+  Y) as a connected trace, reusing `WaveformVisual`'s reactivity/onset-pulse
+  logic since it's a full-mix (not per-band) visual like Waveform. Idle
+  collapses to a single center point rather than trusting near-zero samples,
+  matching the other visuals' forced rest pose. `AudioFeatures` carries
+  `waveform_l`/`waveform_r` snapshots alongside the existing mono `waveform`
+  for this; `FeatureWorker` slides three parallel windows (mono, left,
+  right) per hop rather than deriving stereo from the mono mixdown.
 - **Layer compositor**: add/remove/reorder layers, each with independent
   opacity, blend mode (normal, additive, multiply, screen), and tint color.
   Layers composite in stack order, bottom to top, into a single output

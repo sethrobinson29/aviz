@@ -20,6 +20,7 @@
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
 #include "raylib.h"
+#include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 
@@ -60,6 +61,8 @@ const char* visual_type_name(VisualType type) {
             return "Radial";
         case VisualType::Particles:
             return "Particles";
+        case VisualType::Lissajous:
+            return "Lissajous";
     }
     return "?";
 }
@@ -190,7 +193,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "compositor controls (no control panel UI yet -- milestone 8, see "
             "milestone-4-debug-controls.md):\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
-            "  1/2/3/4   set selected layer's visual type to waveform/spectrum/radial/particles\n"
+            "  1/2/3/4/5 set selected layer's visual type to waveform/spectrum/radial/particles/lissajous\n"
             "  D         duplicate selected layer\n"
             "  X/Delete  remove selected layer\n"
             "  up/down   change selected layer\n"
@@ -246,6 +249,9 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_FOUR) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Particles);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_FIVE) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Lissajous);
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);

@@ -20,6 +20,14 @@ void mixdown_to_mono(const float* interleaved, std::size_t frame_count, unsigned
     }
 }
 
+void deinterleave_stereo(const float* interleaved, std::size_t frame_count, unsigned channels,
+                          float* left_out, float* right_out) {
+    for (std::size_t i = 0; i < frame_count; ++i) {
+        left_out[i] = interleaved[i * channels];
+        right_out[i] = channels > 1 ? interleaved[i * channels + 1] : left_out[i];
+    }
+}
+
 void slide_window(std::vector<float>& window, const float* new_samples, std::size_t count) {
     if (count == 0) {
         return;
@@ -41,8 +49,12 @@ FeatureWorker::FeatureWorker(AudioRingBuffer& ring, AudioFeaturesSnapshot& snaps
       sample_rate_(sample_rate),
       extractor_(sample_rate),
       analysis_window_(audio_config::kFftWindowSize, 0.0f),
+      analysis_window_l_(audio_config::kWaveformSnapshotSize, 0.0f),
+      analysis_window_r_(audio_config::kWaveformSnapshotSize, 0.0f),
       interleaved_scratch_(kScratchChunkFrames * ring.channels()),
-      mono_scratch_(kScratchChunkFrames) {}
+      mono_scratch_(kScratchChunkFrames),
+      left_scratch_(kScratchChunkFrames),
+      right_scratch_(kScratchChunkFrames) {}
 
 FeatureWorker::~FeatureWorker() { stop(); }
 
@@ -74,6 +86,12 @@ std::size_t FeatureWorker::drain_ring_buffer() {
         audio_worker_utils::mixdown_to_mono(interleaved_scratch_.data(), popped, channels,
                                              mono_scratch_.data());
         audio_worker_utils::slide_window(analysis_window_, mono_scratch_.data(), popped);
+
+        audio_worker_utils::deinterleave_stereo(interleaved_scratch_.data(), popped, channels,
+                                                 left_scratch_.data(), right_scratch_.data());
+        audio_worker_utils::slide_window(analysis_window_l_, left_scratch_.data(), popped);
+        audio_worker_utils::slide_window(analysis_window_r_, right_scratch_.data(), popped);
+
         total += popped;
 
         if (popped < kScratchChunkFrames) {
@@ -101,6 +119,8 @@ void FeatureWorker::run() {
         if (new_samples > 0) {
             AudioFeatures& back = snapshot_.back_buffer();
             extractor_.process(analysis_window_.data(), had_discontinuity, back);
+            std::copy(analysis_window_l_.begin(), analysis_window_l_.end(), back.waveform_l.begin());
+            std::copy(analysis_window_r_.begin(), analysis_window_r_.end(), back.waveform_r.begin());
             snapshot_.publish();
         }
 

@@ -39,6 +39,12 @@ float pulse_thickness(float base_thickness, float pulse) {
     return base_thickness * (1.0f + (visual_config::kOnsetPulseThicknessBoost - 1.0f) * pulse);
 }
 
+float next_onset_pulse(float current_pulse, bool band_changed, bool onset_active,
+                        float pulse_target, float decay_per_frame) {
+    const float base_pulse = band_changed ? 0.0f : current_pulse;
+    return onset_active ? pulse_target : base_pulse * decay_per_frame;
+}
+
 ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity) {
     ReactivityResult result;
     if (reactivity.freq_band.has_value()) {
@@ -84,9 +90,11 @@ void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity
 
     const waveform_math::ReactivityResult reactivity_result =
         waveform_math::resolve_reactivity(features, reactivity);
-    onset_pulse_ = reactivity_result.onset_active
-                       ? reactivity_result.onset_pulse_target
-                       : onset_pulse_ * visual_config::kOnsetPulseDecayPerFrame;
+    const bool band_changed = last_freq_band_ != reactivity.freq_band;
+    onset_pulse_ = waveform_math::next_onset_pulse(
+        onset_pulse_, band_changed, reactivity_result.onset_active,
+        reactivity_result.onset_pulse_target, visual_config::kOnsetPulseDecayPerFrame);
+    last_freq_band_ = reactivity.freq_band;
 
     const std::vector<Vector2> points =
         waveform_math::to_points(features.waveform.data(), features.waveform.size(), width_,

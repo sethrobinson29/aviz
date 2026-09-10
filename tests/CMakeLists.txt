@@ -33,10 +33,12 @@ add_executable(visuals_tests
   visuals/spectrum_visual_test.cpp
   visuals/radial_visual_test.cpp
   visuals/particles_visual_test.cpp
+  visuals/lissajous_visual_test.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp
   ../src/visuals/particles/particles_visual.cpp
+  ../src/visuals/lissajous/lissajous_visual.cpp
 )
 target_include_directories(visuals_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(visuals_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
@@ -60,6 +62,7 @@ add_executable(compositor_tests
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp
   ../src/visuals/particles/particles_visual.cpp
+  ../src/visuals/lissajous/lissajous_visual.cpp
 )
 target_include_directories(compositor_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib)

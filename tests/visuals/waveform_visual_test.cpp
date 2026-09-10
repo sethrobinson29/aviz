@@ -103,6 +103,26 @@ TEST(PulseThicknessTest, ClampsOutOfRangePulse) {
                     waveform_math::pulse_thickness(2.0f, 0.0f));
 }
 
+TEST(NextOnsetPulseTest, DecaysWhenNoOnsetAndBandUnchanged) {
+    float pulse = waveform_math::next_onset_pulse(0.8f, false, false, 2.0f, 0.85f);
+    EXPECT_FLOAT_EQ(pulse, 0.8f * 0.85f);
+}
+
+TEST(NextOnsetPulseTest, SnapsToTargetOnActiveOnset) {
+    float pulse = waveform_math::next_onset_pulse(0.1f, false, true, 2.0f, 0.85f);
+    EXPECT_FLOAT_EQ(pulse, 2.0f);
+}
+
+TEST(NextOnsetPulseTest, BandChangeDropsStaleCarryoverBeforeDecay) {
+    float pulse = waveform_math::next_onset_pulse(0.9f, true, false, 2.0f, 0.85f);
+    EXPECT_FLOAT_EQ(pulse, 0.0f);
+}
+
+TEST(NextOnsetPulseTest, BandChangeDoesNotSuppressAFreshOnsetOnTheNewBand) {
+    float pulse = waveform_math::next_onset_pulse(0.9f, true, true, 2.0f, 0.85f);
+    EXPECT_FLOAT_EQ(pulse, 2.0f);
+}
+
 TEST(ResolveReactivityTest, BandAmplitudeScalesFromItsOwnBandNotOthers) {
     AudioFeatures features;
     features.band_energy[3] = 50.0f;
