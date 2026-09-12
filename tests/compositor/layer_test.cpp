@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -36,6 +37,12 @@ TEST(MakeVisualTest, LissajousTypeConstructsLissajousVisual) {
     auto visual = make_visual(VisualType::Lissajous);
     EXPECT_NE(dynamic_cast<LissajousVisual*>(visual.get()), nullptr);
     EXPECT_EQ(dynamic_cast<WaveformVisual*>(visual.get()), nullptr);
+}
+
+TEST(MakeVisualTest, FlowFieldTypeConstructsFlowFieldVisual) {
+    auto visual = make_visual(VisualType::FlowField);
+    EXPECT_NE(dynamic_cast<FlowFieldVisual*>(visual.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<ParticlesVisual*>(visual.get()), nullptr);
 }
 
 TEST(VisualCloneTest, WaveformCloneIsIndependentInstanceOfSameType) {
@@ -147,4 +154,38 @@ TEST(VisualCloneTest, LissajousClonePreservesParams) {
     EXPECT_EQ(params.line_color.g, PURPLE.g);
     EXPECT_EQ(params.line_color.b, PURPLE.b);
     EXPECT_FLOAT_EQ(params.line_thickness, 4.5f);
+}
+
+TEST(VisualCloneTest, FlowFieldCloneIsIndependentInstanceOfSameType) {
+    auto original = make_visual(VisualType::FlowField);
+    auto clone = original->clone();
+
+    EXPECT_NE(clone.get(), original.get());
+    EXPECT_NE(dynamic_cast<FlowFieldVisual*>(clone.get()), nullptr);
+}
+
+TEST(VisualCloneTest, FlowFieldClonePreservesParams) {
+    FlowFieldParams params;
+    params.particle_color = SKYBLUE;
+    params.radius = 1.5f;
+    params.lifetime_frames = 500;
+    params.burst_count = 10;
+    params.spawn_rate_per_frame = 0.4f;
+    params.ripple_on_onset_enabled = false;
+    params.burst_on_onset_enabled = false;
+    FlowFieldVisual original(params);
+    auto clone = original.clone();
+
+    auto* flow_field_clone = dynamic_cast<FlowFieldVisual*>(clone.get());
+    ASSERT_NE(flow_field_clone, nullptr);
+    const FlowFieldParams& cloned_params = flow_field_clone->params();
+    EXPECT_EQ(cloned_params.particle_color.r, SKYBLUE.r);
+    EXPECT_EQ(cloned_params.particle_color.g, SKYBLUE.g);
+    EXPECT_EQ(cloned_params.particle_color.b, SKYBLUE.b);
+    EXPECT_FLOAT_EQ(cloned_params.radius, 1.5f);
+    EXPECT_EQ(cloned_params.lifetime_frames, 500);
+    EXPECT_EQ(cloned_params.burst_count, 10);
+    EXPECT_FLOAT_EQ(cloned_params.spawn_rate_per_frame, 0.4f);
+    EXPECT_FALSE(cloned_params.ripple_on_onset_enabled);
+    EXPECT_FALSE(cloned_params.burst_on_onset_enabled);
 }

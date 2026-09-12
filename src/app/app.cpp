@@ -20,6 +20,7 @@
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
 #include "raylib.h"
+#include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -63,6 +64,8 @@ const char* visual_type_name(VisualType type) {
             return "Particles";
         case VisualType::Lissajous:
             return "Lissajous";
+        case VisualType::FlowField:
+            return "FlowField";
     }
     return "?";
 }
@@ -193,7 +196,8 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "compositor controls (no control panel UI yet -- milestone 8, see "
             "milestone-4-debug-controls.md):\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
-            "  1/2/3/4/5 set selected layer's visual type to waveform/spectrum/radial/particles/lissajous\n"
+            "  1/2/3/4/5/6 set selected layer's visual type to "
+            "waveform/spectrum/radial/particles/lissajous/flowfield\n"
             "  D         duplicate selected layer\n"
             "  X/Delete  remove selected layer\n"
             "  up/down   change selected layer\n"
@@ -206,6 +210,8 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "  r/t       adjust selected Radial layer's inner_radius_fraction (no-op on other types)\n"
             "  y/u       adjust selected Radial layer's max_radius_fraction (outer radius, no-op on other types)\n"
             "  f/g       adjust selected Particles layer's inner_radius_fraction (no-op on other types)\n"
+            "  h         toggle selected FlowField layer's onset ripple (no-op on other types)\n"
+            "  j         toggle selected FlowField layer's burst-on-onset (no-op on other types)\n"
             "  L         toggle audio source between file playback and loopback capture\n");
 
         {
@@ -252,6 +258,9 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_FIVE) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Lissajous);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_SIX) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::FlowField);
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
@@ -350,6 +359,18 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                         ParticlesParams& p = particles->mutable_params();
                         p.inner_radius_fraction =
                             particles_math::clamp_inner_radius_fraction(p.inner_radius_fraction - 0.05f);
+                    }
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_H) && !layers.empty()) {
+                    if (auto* flow_field = dynamic_cast<FlowFieldVisual*>(layers[selected].visual.get())) {
+                        FlowFieldParams& p = flow_field->mutable_params();
+                        p.ripple_on_onset_enabled = !p.ripple_on_onset_enabled;
+                    }
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_J) && !layers.empty()) {
+                    if (auto* flow_field = dynamic_cast<FlowFieldVisual*>(layers[selected].visual.get())) {
+                        FlowFieldParams& p = flow_field->mutable_params();
+                        p.burst_on_onset_enabled = !p.burst_on_onset_enabled;
                     }
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_L)) {

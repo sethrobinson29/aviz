@@ -10,7 +10,7 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 ## Status
 
 Local playback + feature extraction, waveform/spectrum/radial/particles/
-lissajous visuals, the layer compositor (stacking, opacity, blend modes,
+lissajous/flow field visuals, the layer compositor (stacking, opacity, blend modes,
 tint), layer
 duplication + frequency mapping (`freq_band`, `reactivity_source`,
 `enabled`), and WASAPI loopback capture with mid-session source switching are
@@ -101,6 +101,18 @@ run directly from `tsan/`.
   `waveform_l`/`waveform_r` snapshots alongside the existing mono `waveform`
   for this; `FeatureWorker` slides three parallel windows (mono, left,
   right) per hop rather than deriving stereo from the mono mixdown.
+- **Flow field** reuses Particles' pool/spawn/lifetime/cleanup machinery,
+  changing only how velocity is determined: each particle steers toward a
+  direction sampled from a fixed-resolution grid of hand-rolled 2D value
+  noise, regenerated every frame and animated by a persistent phase.
+  Turbulence (noise frequency) and evolution speed (phase advance) both
+  scale continuously with the scoped band's amplitude, independent of
+  onset events. An onset additionally (a) bursts new particles via
+  Particles' existing onset-burst mechanism and (b) spawns an expanding
+  ring impulse that pushes already-in-flight particles outward as it
+  passes — two independent, simultaneously-firing effects, not a mode
+  switch. Particles render as short velocity-aligned streaks rather than
+  dots.
 - **Layer compositor**: add/remove/reorder layers, each with independent
   opacity, blend mode (normal, additive, multiply, screen), and tint color.
   Layers composite in stack order, bottom to top, into a single output

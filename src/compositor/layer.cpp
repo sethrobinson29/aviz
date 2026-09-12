@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -20,6 +21,8 @@ std::unique_ptr<VisualModule> make_visual(VisualType type) {
             return std::make_unique<ParticlesVisual>();
         case VisualType::Lissajous:
             return std::make_unique<LissajousVisual>();
+        case VisualType::FlowField:
+            return std::make_unique<FlowFieldVisual>();
     }
     throw std::invalid_argument("unknown VisualType");
 }

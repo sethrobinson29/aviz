@@ -20,4 +20,34 @@ inline constexpr float kParticleAngleJitterRadians = 0.35f;
 
 inline constexpr int kParticleDefaultLifetimeFrames = 150;
 
+inline constexpr int kFlowFieldGridCols = 32;
+
+inline constexpr int kFlowFieldGridRows = 18;
+
+inline constexpr int kFlowFieldMaxGridCells = kFlowFieldGridCols * kFlowFieldGridRows;
+
+inline constexpr float kFlowFieldBaseTurbulenceFrequency = 0.01f;
+
+inline constexpr float kFlowFieldBaseEvolutionPerFrame = 0.01f;
+
+inline constexpr float kFlowFieldSteerFactor = 0.15f;
+
+inline constexpr float kFlowFieldSpeedPxPerFrame = 2.0f;
+
+inline constexpr int kFlowFieldDefaultLifetimeFrames = 400;
+
+inline constexpr float kFlowFieldDefaultSpawnRatePerFrame = 0.75f;
+
+inline constexpr int kFlowFieldDefaultBurstCount = 16;
+
+inline constexpr int kMaxFlowFieldRipples = 4;
+
+inline constexpr int kFlowFieldRippleLifetimeFrames = 40;
+
+inline constexpr float kFlowFieldRippleSpeedPxPerFrame = 8.0f;
+
+inline constexpr float kFlowFieldRippleBandwidthPx = 40.0f;
+
+inline constexpr float kFlowFieldRippleStrength = 3.0f;
+
 }

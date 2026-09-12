@@ -7,7 +7,7 @@
 #include "raylib.h"
 #include "visuals/visual_module.h"
 
-enum class VisualType { Waveform, Spectrum, Radial, Particles, Lissajous };
+enum class VisualType { Waveform, Spectrum, Radial, Particles, Lissajous, FlowField };
 
 enum class LayerBlendMode { Normal, Additive, Multiply, Screen };
 
