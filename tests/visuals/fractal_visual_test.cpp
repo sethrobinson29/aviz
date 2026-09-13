@@ -50,14 +50,6 @@ TEST(FractalSelectedBandAmplitudeTest, NonPositiveReferenceYieldsZero) {
     EXPECT_FLOAT_EQ(fractal_math::selected_band_amplitude(energy, reference, 0), 0.0f);
 }
 
-TEST(FractalSelectedBandOnsetTest, ReadsGlobalBandByDefault) {
-    std::array<bool, audio_config::kTotalBandSlots> onset{};
-    onset[audio_config::kGlobalBandIndex] = true;
-
-    EXPECT_TRUE(fractal_math::selected_band_onset(onset, std::nullopt));
-    EXPECT_FALSE(fractal_math::selected_band_onset(onset, 0));
-}
-
 TEST(FractalOnePoleSmoothTest, ZeroTimeConstantSnapsInstantlyToTarget) {
     EXPECT_FLOAT_EQ(fractal_math::one_pole_smooth(0.0f, 1.0f, 0.0f, 0.016f), 1.0f);
 }
@@ -107,44 +99,79 @@ TEST(FractalAmplitudeToZoomTest, IsMonotonicIncreasingInAmplitude) {
     EXPECT_LT(low, high);
 }
 
-TEST(FractalJuliaConstantTest, MagnitudeStaysWithinBaseRadiusPlusAmplitudeScale) {
+TEST(FractalJuliaConstantTest, MagnitudeStaysWithinBaseRadiusPlusAmplitudeScaleAtDefaultCenter) {
     for (float t = 0.0f; t < 10.0f; t += 0.37f) {
         for (float amplitude : {0.0f, 0.5f, 1.0f}) {
-            Vector2 c = fractal_math::julia_constant(t, amplitude, 0.7f, 0.1f, 0.2f);
+            Vector2 c = fractal_math::julia_constant(t, amplitude, 0.7f, 0.1f, 0.2f, Vector2{0.0f, 0.0f},
+                                                      true);
             const float magnitude = std::sqrt(c.x * c.x + c.y * c.y);
             EXPECT_LE(magnitude, 0.7f + 0.1f + kEpsilon);
         }
     }
 }
 
-TEST(FractalJuliaConstantTest, ZeroTimeAndZeroAmplitudeLiesOnPositiveXAxisAtBaseRadius) {
-    Vector2 c = fractal_math::julia_constant(0.0f, 0.0f, 0.7885f, 0.05f, 0.15f);
+TEST(FractalJuliaConstantTest, ZeroTimeAndZeroAmplitudeLiesOnPositiveXAxisAtBaseRadiusFromCenter) {
+    Vector2 c = fractal_math::julia_constant(0.0f, 0.0f, 0.7885f, 0.05f, 0.15f, Vector2{0.0f, 0.0f}, true);
     EXPECT_NEAR(c.x, 0.7885f, kEpsilon);
     EXPECT_NEAR(c.y, 0.0f, kEpsilon);
 }
 
 TEST(FractalJuliaConstantTest, HigherAmplitudeIncreasesRadiusAtFixedTime) {
-    Vector2 low = fractal_math::julia_constant(1.0f, 0.0f, 0.7f, 0.2f, 0.15f);
-    Vector2 high = fractal_math::julia_constant(1.0f, 1.0f, 0.7f, 0.2f, 0.15f);
+    Vector2 low =
+        fractal_math::julia_constant(1.0f, 0.0f, 0.7f, 0.2f, 0.15f, Vector2{0.0f, 0.0f}, true);
+    Vector2 high =
+        fractal_math::julia_constant(1.0f, 1.0f, 0.7f, 0.2f, 0.15f, Vector2{0.0f, 0.0f}, true);
     const float low_mag = std::sqrt(low.x * low.x + low.y * low.y);
     const float high_mag = std::sqrt(high.x * high.x + high.y * high.y);
     EXPECT_LT(low_mag, high_mag);
 }
 
+TEST(FractalJuliaConstantTest, ArbitraryOrbitCenterOffsetsResultRatherThanDefaultingToOrigin) {
+    Vector2 center{2.0f, -1.0f};
+    Vector2 c = fractal_math::julia_constant(0.0f, 0.0f, 0.7885f, 0.05f, 0.15f, center, true);
+    EXPECT_NEAR(c.x, center.x + 0.7885f, kEpsilon);
+    EXPECT_NEAR(c.y, center.y, kEpsilon);
+}
+
+TEST(FractalJuliaConstantTest, ArbitraryOrbitCenterTracksThroughTimeNotJustAtZero) {
+    Vector2 center{3.5f, 4.5f};
+    Vector2 c = fractal_math::julia_constant(2.0f, 0.3f, 0.5f, 0.1f, 0.4f, center, true);
+    const float angle = 2.0f * 0.4f;
+    const float radius = 0.5f + 0.3f * 0.1f;
+    EXPECT_NEAR(c.x, center.x + radius * std::cos(angle), kEpsilon);
+    EXPECT_NEAR(c.y, center.y + radius * std::sin(angle), kEpsilon);
+}
+
+TEST(FractalJuliaConstantTest, CounterClockwiseIsSignFlipOfClockwiseAngularVelocity) {
+    Vector2 center{0.0f, 0.0f};
+    Vector2 cw = fractal_math::julia_constant(3.0f, 0.2f, 0.6f, 0.1f, 0.25f, center, true);
+    Vector2 ccw = fractal_math::julia_constant(3.0f, 0.2f, 0.6f, 0.1f, 0.25f, center, false);
+    EXPECT_NEAR(cw.x, ccw.x, kEpsilon);
+    EXPECT_NEAR(cw.y, -ccw.y, kEpsilon);
+}
+
+TEST(FractalJuliaConstantTest, DirectionSignFlipStillHonorsArbitraryCenter) {
+    Vector2 center{-1.5f, 2.5f};
+    Vector2 cw = fractal_math::julia_constant(3.0f, 0.2f, 0.6f, 0.1f, 0.25f, center, true);
+    Vector2 ccw = fractal_math::julia_constant(3.0f, 0.2f, 0.6f, 0.1f, 0.25f, center, false);
+    EXPECT_NEAR(cw.x - center.x, ccw.x - center.x, kEpsilon);
+    EXPECT_NEAR(cw.y - center.y, -(ccw.y - center.y), kEpsilon);
+}
+
 TEST(FractalColorCycleHueTest, StaysWithinUnitRange) {
     for (float t = 0.0f; t < 1000.0f; t += 37.0f) {
-        const float hue = fractal_math::color_cycle_hue(t, 0.05f, 0.5f, 0.6f);
+        const float hue = fractal_math::color_cycle_hue(t, 0.05f);
         EXPECT_GE(hue, 0.0f);
         EXPECT_LT(hue, 1.0f);
     }
 }
 
 TEST(FractalColorCycleHueTest, ZeroInputsYieldZeroHue) {
-    EXPECT_NEAR(fractal_math::color_cycle_hue(0.0f, 0.05f, 0.0f, 0.6f), 0.0f, kEpsilon);
+    EXPECT_NEAR(fractal_math::color_cycle_hue(0.0f, 0.05f), 0.0f, kEpsilon);
 }
 
-TEST(FractalColorCycleHueTest, PulseShiftsHueForwardBeforeWrapping) {
-    const float without_pulse = fractal_math::color_cycle_hue(1.0f, 0.05f, 0.0f, 0.6f);
-    const float with_pulse = fractal_math::color_cycle_hue(1.0f, 0.05f, 0.5f, 0.6f);
-    EXPECT_GT(with_pulse, without_pulse);
+TEST(FractalColorCycleHueTest, AdvancesMonotonicallyBeforeWrapping) {
+    const float early = fractal_math::color_cycle_hue(1.0f, 0.05f);
+    const float later = fractal_math::color_cycle_hue(2.0f, 0.05f);
+    EXPECT_GT(later, early);
 }

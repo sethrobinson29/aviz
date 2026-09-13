@@ -5,7 +5,6 @@
 #include <string>
 
 #include "audio/audio_config.h"
-#include "visuals/spectrum/spectrum_visual.h"
 
 namespace {
 
@@ -42,15 +41,6 @@ float selected_band_amplitude(const std::array<float, audio_config::kTotalBandSl
     return std::clamp(band_energy[index] / band_reference[index], 0.0f, 1.0f);
 }
 
-bool selected_band_onset(const std::array<bool, audio_config::kTotalBandSlots>& band_onset,
-                          std::optional<std::size_t> freq_band) {
-    const std::size_t index = freq_band.value_or(audio_config::kGlobalBandIndex);
-    if (index >= audio_config::kTotalBandSlots) {
-        return false;
-    }
-    return band_onset[index];
-}
-
 float one_pole_smooth(float current, float target, float time_constant_ms, float dt_seconds) {
     if (time_constant_ms <= 0.0f) {
         return target;
@@ -66,15 +56,17 @@ float amplitude_to_zoom(float amplitude01, float base_zoom, float zoom_amplitude
 }
 
 Vector2 julia_constant(float time_seconds, float amplitude01, float base_radius,
-                        float radius_amplitude_scale, float angular_speed_radians_per_sec) {
+                        float radius_amplitude_scale, float angular_speed_radians_per_sec,
+                        Vector2 orbit_center, bool clockwise) {
     const float clamped = std::clamp(amplitude01, 0.0f, 1.0f);
     const float radius = base_radius + clamped * radius_amplitude_scale;
-    const float angle = time_seconds * angular_speed_radians_per_sec;
-    return Vector2{radius * std::cos(angle), radius * std::sin(angle)};
+    const float direction = clockwise ? 1.0f : -1.0f;
+    const float angle = time_seconds * angular_speed_radians_per_sec * direction;
+    return Vector2{orbit_center.x + radius * std::cos(angle), orbit_center.y + radius * std::sin(angle)};
 }
 
-float color_cycle_hue(float time_seconds, float cycle_speed_hz, float pulse, float pulse_hue_boost) {
-    const float raw = time_seconds * cycle_speed_hz + std::clamp(pulse, 0.0f, 1.0f) * pulse_hue_boost;
+float color_cycle_hue(float time_seconds, float cycle_speed_hz) {
+    const float raw = time_seconds * cycle_speed_hz;
     return raw - std::floor(raw);
 }
 
@@ -92,8 +84,8 @@ void FractalVisual::cache_uniform_locations() {
     loc_zoom_ = GetShaderLocation(*shader_, "zoom");
     loc_julia_c_ = GetShaderLocation(*shader_, "juliaC");
     loc_hue_shift_ = GetShaderLocation(*shader_, "hueShift");
-    loc_pulse_ = GetShaderLocation(*shader_, "pulse");
     loc_max_iterations_ = GetShaderLocation(*shader_, "maxIterations");
+    loc_boundary_margin_px_ = GetShaderLocation(*shader_, "boundaryMarginPx");
 }
 
 FractalVisual::~FractalVisual() {
@@ -123,11 +115,6 @@ void FractalVisual::resize(int width, int height) {
 void FractalVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
     const float amplitude = fractal_math::selected_band_amplitude(
         features.band_energy, features.band_agc_reference, reactivity.freq_band);
-    const bool onset = fractal_math::selected_band_onset(features.band_onset, reactivity.freq_band);
-
-    const std::size_t band_index = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
-    onset_pulse_[band_index] = spectrum_math::update_onset_pulse(onset_pulse_[band_index], onset,
-                                                                    reactivity.sensitivity);
 
     const float dt = GetFrameTime();
     elapsed_seconds_ += dt;
@@ -138,9 +125,9 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
                                                           params_.zoom_amplitude_scale);
     const Vector2 julia_c = fractal_math::julia_constant(
         elapsed_seconds_, smoothed_amplitude_, params_.julia_base_radius,
-        params_.julia_radius_amplitude_scale, params_.julia_angular_speed_radians_per_sec);
-    const float hue = fractal_math::color_cycle_hue(elapsed_seconds_, params_.color_cycle_speed_hz,
-                                                       onset_pulse_[band_index], params_.pulse_hue_boost);
+        params_.julia_radius_amplitude_scale, params_.julia_angular_speed_radians_per_sec,
+        Vector2{params_.julia_orbit_center_x, params_.julia_orbit_center_y}, params_.julia_orbit_clockwise);
+    const float hue = fractal_math::color_cycle_hue(elapsed_seconds_, params_.color_cycle_speed_hz);
 
     const float resolution[2] = {static_cast<float>(width_), static_cast<float>(height_)};
     const float julia_c_uniform[2] = {julia_c.x, julia_c.y};
@@ -150,8 +137,8 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
     SetShaderValue(*shader_, loc_zoom_, &zoom, SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_julia_c_, julia_c_uniform, SHADER_UNIFORM_VEC2);
     SetShaderValue(*shader_, loc_hue_shift_, &hue, SHADER_UNIFORM_FLOAT);
-    SetShaderValue(*shader_, loc_pulse_, &onset_pulse_[band_index], SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_max_iterations_, &max_iterations, SHADER_UNIFORM_INT);
+    SetShaderValue(*shader_, loc_boundary_margin_px_, &params_.boundary_margin_px, SHADER_UNIFORM_FLOAT);
 
     BeginTextureMode(texture_);
     ClearBackground(BLANK);

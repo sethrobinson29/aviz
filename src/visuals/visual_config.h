@@ -62,10 +62,14 @@ inline constexpr float kFractalJuliaRadiusAmplitudeScale = 0.05f;
 
 inline constexpr float kFractalJuliaAngularSpeedRadiansPerSec = 0.15f;
 
+inline constexpr float kFractalJuliaOrbitCenterX = 0.0f;
+
+inline constexpr float kFractalJuliaOrbitCenterY = 0.0f;
+
 inline constexpr float kFractalAmplitudeSmoothingTauMs = 2000.0f;
 
 inline constexpr float kFractalColorCycleSpeedHz = 0.05f;
 
-inline constexpr float kFractalPulseHueBoost = 0.6f;
+inline constexpr float kFractalBoundaryMarginPx = 18.0f;
 
 }

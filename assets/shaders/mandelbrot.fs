@@ -9,14 +9,19 @@ uniform vec2 resolution;
 uniform float zoom;
 uniform vec2 juliaC;
 uniform float hueShift;
-uniform float pulse;
 uniform int maxIterations;
+uniform float boundaryMarginPx;
 
 vec3 hsv2rgb(vec3 c)
 {
     vec4 k = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     vec3 p = abs(fract(c.xxx + k.xyz) * 6.0 - k.www);
     return c.z * mix(k.xxx, clamp(p - k.xxx, 0.0, 1.0), c.y);
+}
+
+vec2 complexMul(vec2 a, vec2 b)
+{
+    return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
 
 void main()
@@ -28,18 +33,17 @@ void main()
 
     vec2 z = uv;
     vec2 c = juliaC;
+    vec2 dz = vec2(1.0, 0.0);
 
     int iterations = 0;
-    float smoothIterations = 0.0;
     bool escaped = false;
 
     for (int i = 0; i < 1024; i++)
     {
         if (i >= maxIterations) break;
 
-        float x = z.x * z.x - z.y * z.y + c.x;
-        float y = 2.0 * z.x * z.y + c.y;
-        z = vec2(x, y);
+        dz = 2.0 * complexMul(z, dz);
+        z = complexMul(z, z) + c;
         iterations = i + 1;
 
         if (dot(z, z) > 4.0)
@@ -49,20 +53,30 @@ void main()
         }
     }
 
+    float t = 0.0;
+    float pixelDistance = 0.0;
+
     if (escaped)
     {
         float logZn = log(dot(z, z)) * 0.5;
         float nu = log(logZn / log(2.0)) / log(2.0);
-        smoothIterations = float(iterations) + 1.0 - nu;
+        float smoothIterations = float(iterations) + 1.0 - nu;
+        t = clamp(smoothIterations / float(maxIterations), 0.0, 1.0);
+
+        float zLen = length(z);
+        float dzLen = max(length(dz), 0.0001);
+        float distanceEstimate = 0.5 * zLen * log(zLen) / dzLen;
+        float worldPerPixel = (2.5 / max(zoom, 0.0001)) / max(resolution.y, 1.0);
+        pixelDistance = distanceEstimate / max(worldPerPixel, 0.0000001);
     }
 
-    float t = clamp(smoothIterations / float(maxIterations), 0.0, 1.0);
     float hue = fract(hueShift + t * 0.85);
-    float saturation = mix(0.65, 1.0, clamp(pulse, 0.0, 1.0));
-    float value = escaped ? mix(0.4, 1.0, sqrt(t)) : 0.0;
+    float value = escaped ? mix(0.4, 1.0, sqrt(t)) : 1.0;
+    vec3 rgb = hsv2rgb(vec3(hue, 1.0, value));
 
-    vec3 rgb = hsv2rgb(vec3(hue, saturation, value));
-    float alpha = escaped ? 1.0 : 0.0;
+    float margin = max(boundaryMarginPx, 0.0001);
+    float boundaryFade = clamp(1.0 - pixelDistance / margin, 0.0, 1.0);
+    float alpha = escaped ? boundaryFade : 1.0;
 
     finalColor = vec4(rgb, alpha) * fragColor;
 }
