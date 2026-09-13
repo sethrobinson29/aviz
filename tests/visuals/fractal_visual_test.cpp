@@ -58,6 +58,34 @@ TEST(FractalSelectedBandOnsetTest, ReadsGlobalBandByDefault) {
     EXPECT_FALSE(fractal_math::selected_band_onset(onset, 0));
 }
 
+TEST(FractalOnePoleSmoothTest, ZeroTimeConstantSnapsInstantlyToTarget) {
+    EXPECT_FLOAT_EQ(fractal_math::one_pole_smooth(0.0f, 1.0f, 0.0f, 0.016f), 1.0f);
+}
+
+TEST(FractalOnePoleSmoothTest, ZeroDtLeavesValueUnchanged) {
+    EXPECT_NEAR(fractal_math::one_pole_smooth(0.3f, 1.0f, 2000.0f, 0.0f), 0.3f, kEpsilon);
+}
+
+TEST(FractalOnePoleSmoothTest, MovesOnlyASmallStepTowardTargetAfterOneFrameAtSlowTau) {
+    const float result = fractal_math::one_pole_smooth(0.0f, 1.0f, 2000.0f, 0.016f);
+    EXPECT_GT(result, 0.0f);
+    EXPECT_LT(result, 0.05f);
+}
+
+TEST(FractalOnePoleSmoothTest, ConvergesToTargetOverManySteps) {
+    float value = 0.0f;
+    for (int i = 0; i < 1000; ++i) {
+        value = fractal_math::one_pole_smooth(value, 1.0f, 2000.0f, 0.016f);
+    }
+    EXPECT_NEAR(value, 1.0f, 0.05f);
+}
+
+TEST(FractalOnePoleSmoothTest, LargerTimeConstantMovesSlowerForSameStep) {
+    const float fast = fractal_math::one_pole_smooth(0.0f, 1.0f, 250.0f, 0.016f);
+    const float slow = fractal_math::one_pole_smooth(0.0f, 1.0f, 2000.0f, 0.016f);
+    EXPECT_LT(slow, fast);
+}
+
 TEST(FractalAmplitudeToZoomTest, ZeroAmplitudeYieldsBaseZoom) {
     EXPECT_FLOAT_EQ(fractal_math::amplitude_to_zoom(0.0f, 2.0f, 1.5f), 2.0f);
 }

@@ -51,6 +51,15 @@ bool selected_band_onset(const std::array<bool, audio_config::kTotalBandSlots>& 
     return band_onset[index];
 }
 
+float one_pole_smooth(float current, float target, float time_constant_ms, float dt_seconds) {
+    if (time_constant_ms <= 0.0f) {
+        return target;
+    }
+    const float tau = time_constant_ms / 1000.0f;
+    const float coeff = 1.0f - std::exp(-dt_seconds / tau);
+    return current + (target - current) * coeff;
+}
+
 float amplitude_to_zoom(float amplitude01, float base_zoom, float zoom_amplitude_scale) {
     const float clamped = std::clamp(amplitude01, 0.0f, 1.0f);
     return base_zoom * (1.0f + clamped * zoom_amplitude_scale);
@@ -120,13 +129,16 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
     onset_pulse_[band_index] = spectrum_math::update_onset_pulse(onset_pulse_[band_index], onset,
                                                                     reactivity.sensitivity);
 
-    elapsed_seconds_ += GetFrameTime();
+    const float dt = GetFrameTime();
+    elapsed_seconds_ += dt;
+    smoothed_amplitude_ =
+        fractal_math::one_pole_smooth(smoothed_amplitude_, amplitude, params_.amplitude_smoothing_tau_ms, dt);
 
-    const float zoom =
-        fractal_math::amplitude_to_zoom(amplitude, params_.base_zoom, params_.zoom_amplitude_scale);
+    const float zoom = fractal_math::amplitude_to_zoom(smoothed_amplitude_, params_.base_zoom,
+                                                          params_.zoom_amplitude_scale);
     const Vector2 julia_c = fractal_math::julia_constant(
-        elapsed_seconds_, amplitude, params_.julia_base_radius, params_.julia_radius_amplitude_scale,
-        params_.julia_angular_speed_radians_per_sec);
+        elapsed_seconds_, smoothed_amplitude_, params_.julia_base_radius,
+        params_.julia_radius_amplitude_scale, params_.julia_angular_speed_radians_per_sec);
     const float hue = fractal_math::color_cycle_hue(elapsed_seconds_, params_.color_cycle_speed_hz,
                                                        onset_pulse_[band_index], params_.pulse_hue_boost);
 

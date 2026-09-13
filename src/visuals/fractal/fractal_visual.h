@@ -19,6 +19,8 @@ float selected_band_amplitude(const std::array<float, audio_config::kTotalBandSl
 bool selected_band_onset(const std::array<bool, audio_config::kTotalBandSlots>& band_onset,
                           std::optional<std::size_t> freq_band);
 
+float one_pole_smooth(float current, float target, float time_constant_ms, float dt_seconds);
+
 float amplitude_to_zoom(float amplitude01, float base_zoom, float zoom_amplitude_scale);
 
 Vector2 julia_constant(float time_seconds, float amplitude01, float base_radius,
@@ -36,6 +38,7 @@ struct FractalParams {
     float julia_angular_speed_radians_per_sec = visual_config::kFractalJuliaAngularSpeedRadiansPerSec;
     float color_cycle_speed_hz = visual_config::kFractalColorCycleSpeedHz;
     float pulse_hue_boost = visual_config::kFractalPulseHueBoost;
+    float amplitude_smoothing_tau_ms = visual_config::kFractalAmplitudeSmoothingTauMs;
 };
 
 class FractalVisual : public VisualModule {
@@ -68,5 +71,6 @@ private:
     int loc_pulse_ = -1;
     int loc_max_iterations_ = -1;
     float elapsed_seconds_ = 0.0f;
+    float smoothed_amplitude_ = 0.0f;
     std::array<float, audio_config::kTotalBandSlots> onset_pulse_{};
 };

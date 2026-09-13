@@ -54,13 +54,15 @@ inline constexpr int kFractalMaxIterations = 200;
 
 inline constexpr float kFractalBaseZoom = 1.0f;
 
-inline constexpr float kFractalZoomAmplitudeScale = 1.5f;
+inline constexpr float kFractalZoomAmplitudeScale = 0.5f;
 
 inline constexpr float kFractalJuliaBaseRadius = 0.7885f;
 
 inline constexpr float kFractalJuliaRadiusAmplitudeScale = 0.05f;
 
 inline constexpr float kFractalJuliaAngularSpeedRadiansPerSec = 0.15f;
+
+inline constexpr float kFractalAmplitudeSmoothingTauMs = 2000.0f;
 
 inline constexpr float kFractalColorCycleSpeedHz = 0.05f;
 
