@@ -86,6 +86,7 @@ add_executable(aviz
   src/visuals/particles/particles_visual.cpp
   src/visuals/lissajous/lissajous_visual.cpp
   src/visuals/flow_field/flow_field_visual.cpp
+  src/visuals/fractal/fractal_visual.cpp
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
@@ -95,6 +96,12 @@ target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
 if(AVIZ_VERBOSE_RAYLIB_LOG)
   target_compile_definitions(aviz PRIVATE AVIZ_VERBOSE_RAYLIB_LOG)
 endif()
+
+add_custom_command(TARGET aviz POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets/shaders
+    $<TARGET_FILE_DIR:aviz>/assets/shaders
+  COMMENT "Copying assets/shaders next to aviz executable")
 
 # --- tests ---------------------------------------------------------------------
 add_subdirectory(tests)

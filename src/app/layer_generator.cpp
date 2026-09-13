@@ -20,7 +20,7 @@ std::vector<GeneratedLayerSpec> generate_layer_specs(std::size_t count, std::mt1
         return specs;
     }
 
-    std::uniform_int_distribution<int> visual_dist(0, 5);
+    std::uniform_int_distribution<int> visual_dist(0, 6);
     std::uniform_int_distribution<std::size_t> band_choice_dist(0, audio_config::kNumBands);
     for (GeneratedLayerSpec& spec : specs) {
         spec.visual_type = static_cast<VisualType>(visual_dist(rng));

@@ -21,6 +21,7 @@
 #include "compositor/layer.h"
 #include "raylib.h"
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -66,6 +67,8 @@ const char* visual_type_name(VisualType type) {
             return "Lissajous";
         case VisualType::FlowField:
             return "FlowField";
+        case VisualType::Fractal:
+            return "Fractal";
     }
     return "?";
 }
@@ -196,8 +199,8 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "compositor controls (no control panel UI yet -- milestone 8, see "
             "milestone-4-debug-controls.md):\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
-            "  1/2/3/4/5/6 set selected layer's visual type to "
-            "waveform/spectrum/radial/particles/lissajous/flowfield\n"
+            "  1/2/3/4/5/6/7 set selected layer's visual type to "
+            "waveform/spectrum/radial/particles/lissajous/flowfield/fractal\n"
             "  D         duplicate selected layer\n"
             "  X/Delete  remove selected layer\n"
             "  up/down   change selected layer\n"
@@ -261,6 +264,9 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_SIX) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::FlowField);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_SEVEN) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Fractal);
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
