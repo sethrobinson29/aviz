@@ -67,6 +67,7 @@ private:
     int width_ = 0;
     int height_ = 0;
     std::shared_ptr<Shader> shader_;
+    bool shader_ready_ = false;
     int loc_resolution_ = -1;
     int loc_zoom_ = -1;
     int loc_julia_c_ = -1;
