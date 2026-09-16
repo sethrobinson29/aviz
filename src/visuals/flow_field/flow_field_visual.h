@@ -49,7 +49,8 @@ public:
     ~FlowFieldVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                const std::optional<Palette>& palette_override) override;
     RenderTexture2D& render_texture() override { return texture_; }
     std::unique_ptr<VisualModule> clone() const override {
         return std::make_unique<FlowFieldVisual>(params_);

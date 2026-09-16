@@ -29,6 +29,7 @@ gtest_discover_tests(audio_tests)
 # initialize a window/GL context, since the functions under test don't call
 # into one.
 add_executable(visuals_tests
+  visuals/palette_test.cpp
   visuals/waveform_visual_test.cpp
   visuals/spectrum_visual_test.cpp
   visuals/radial_visual_test.cpp
@@ -36,6 +37,7 @@ add_executable(visuals_tests
   visuals/lissajous_visual_test.cpp
   visuals/flow_field_visual_test.cpp
   visuals/fractal_visual_test.cpp
+  ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp
@@ -62,6 +64,7 @@ add_executable(compositor_tests
   ../src/compositor/compositor_math.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/layer.cpp
+  ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp

@@ -11,6 +11,8 @@ uniform vec2 juliaC;
 uniform float hueShift;
 uniform int maxIterations;
 uniform float boundaryMarginPx;
+uniform sampler2D paletteTex;
+uniform int usePaletteTexture;
 
 vec3 hsv2rgb(vec3 c)
 {
@@ -70,9 +72,18 @@ void main()
         pixelDistance = distanceEstimate / max(worldPerPixel, 0.0000001);
     }
 
-    float hue = fract(hueShift + t * 0.85);
     float value = escaped ? mix(0.4, 1.0, sqrt(t)) : 1.0;
-    vec3 rgb = hsv2rgb(vec3(hue, 1.0, value));
+    vec3 rgb;
+    if (usePaletteTexture != 0)
+    {
+        float u = fract(t + hueShift);
+        rgb = texture(paletteTex, vec2(u, 0.5)).rgb * value;
+    }
+    else
+    {
+        float hue = fract(hueShift + t * 0.85);
+        rgb = hsv2rgb(vec3(hue, 1.0, value));
+    }
 
     float margin = max(boundaryMarginPx, 0.0001);
     float boundaryFade = clamp(1.0 - pixelDistance / margin, 0.0, 1.0);

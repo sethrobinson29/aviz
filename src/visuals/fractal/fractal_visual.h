@@ -48,7 +48,8 @@ public:
     ~FractalVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                const std::optional<Palette>& palette_override) override;
     RenderTexture2D& render_texture() override { return texture_; }
     std::unique_ptr<VisualModule> clone() const override;
     const FractalParams& params() const { return params_; }
@@ -58,6 +59,7 @@ private:
     FractalVisual(FractalParams params, std::shared_ptr<Shader> shared_shader);
 
     void cache_uniform_locations();
+    void sync_palette_texture(const std::optional<Palette>& palette_override);
 
     FractalParams params_;
     RenderTexture2D texture_{};
@@ -71,6 +73,11 @@ private:
     int loc_hue_shift_ = -1;
     int loc_max_iterations_ = -1;
     int loc_boundary_margin_px_ = -1;
+    int loc_palette_tex_ = -1;
+    int loc_use_palette_texture_ = -1;
     float elapsed_seconds_ = 0.0f;
     float smoothed_amplitude_ = 0.0f;
+    Texture2D palette_texture_{};
+    bool has_palette_texture_ = false;
+    std::optional<Palette> cached_palette_;
 };

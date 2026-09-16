@@ -6,6 +6,7 @@
 
 #include "audio/audio_features.h"
 #include "raylib.h"
+#include "visuals/palette.h"
 
 enum class ReactivitySource { GlobalBeat, BandOnset, BandAmplitude };
 
@@ -21,7 +22,8 @@ public:
 
     virtual void resize(int width, int height) = 0;
 
-    virtual void render(const AudioFeatures& features, const LayerReactivity& reactivity) = 0;
+    virtual void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                         const std::optional<Palette>& palette_override) = 0;
 
     virtual RenderTexture2D& render_texture() = 0;
 

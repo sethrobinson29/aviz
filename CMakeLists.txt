@@ -80,6 +80,7 @@ add_executable(aviz
   src/audio/file_producer.cpp
   src/audio/loopback_producer.cpp
   src/audio/pipeline_format_converter.cpp
+  src/visuals/palette.cpp
   src/visuals/waveform/waveform_visual.cpp
   src/visuals/spectrum/spectrum_visual.cpp
   src/visuals/radial/radial_visual.cpp

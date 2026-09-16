@@ -86,6 +86,7 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     source.opacity = 0.4f;
     source.blend_mode = LayerBlendMode::Additive;
     source.tint_color = Color{10, 20, 30, 255};
+    source.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}, {1.0f, Color{4, 5, 6, 255}}}};
     source.freq_band = 3;
     source.reactivity_source = ReactivitySource::BandAmplitude;
     source.sensitivity = 2.5f;
@@ -101,6 +102,9 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     EXPECT_EQ(copy.opacity, 0.4f);
     EXPECT_EQ(copy.blend_mode, LayerBlendMode::Additive);
     EXPECT_EQ(copy.tint_color.r, 10);
+    ASSERT_TRUE(copy.palette_override.has_value());
+    EXPECT_EQ(copy.palette_override->stops.size(), 2u);
+    EXPECT_EQ(copy.palette_override->stops[1].color.r, 4);
     EXPECT_EQ(copy.freq_band, std::optional<std::size_t>(3));
     EXPECT_EQ(copy.reactivity_source, ReactivitySource::BandAmplitude);
     EXPECT_FLOAT_EQ(copy.sensitivity, 2.5f);

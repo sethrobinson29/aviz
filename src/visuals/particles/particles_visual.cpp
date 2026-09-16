@@ -91,6 +91,17 @@ Color faded_color(Color base, int age_frames, int lifetime_frames) {
     return Color{base.r, base.g, base.b, alpha};
 }
 
+Color base_color(Color flat_color, const std::optional<Palette>& palette_override, int age_frames,
+                  int lifetime_frames) {
+    if (!palette_override.has_value()) {
+        return flat_color;
+    }
+    const float t = lifetime_frames > 0
+                         ? static_cast<float>(age_frames) / static_cast<float>(lifetime_frames)
+                         : 0.0f;
+    return palette_math::sample(*palette_override, t);
+}
+
 }
 
 ParticlesVisual::ParticlesVisual(ParticlesParams params) : params_(params) {}
@@ -110,7 +121,8 @@ void ParticlesVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
+void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                              const std::optional<Palette>& palette_override) {
     const bool band_in_range =
         particles_math::band_in_range(reactivity.freq_band, audio_config::kNumBands);
     const std::size_t band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
@@ -159,8 +171,10 @@ void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivit
         if (!p.active) {
             continue;
         }
+        const Color base =
+            particles_math::base_color(params_.particle_color, palette_override, p.age_frames, p.lifetime_frames);
         DrawCircleV(p.position, params_.radius,
-                    particles_math::faded_color(params_.particle_color, p.age_frames, p.lifetime_frames));
+                    particles_math::faded_color(base, p.age_frames, p.lifetime_frames));
     }
     EndTextureMode();
 }

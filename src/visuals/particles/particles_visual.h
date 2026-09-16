@@ -41,6 +41,9 @@ void step_pool(Pool& pool, float width, float height, float margin);
 
 Color faded_color(Color base, int age_frames, int lifetime_frames);
 
+Color base_color(Color flat_color, const std::optional<Palette>& palette_override, int age_frames,
+                  int lifetime_frames);
+
 }
 
 struct ParticlesParams {
@@ -58,7 +61,8 @@ public:
     ~ParticlesVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                const std::optional<Palette>& palette_override) override;
     RenderTexture2D& render_texture() override { return texture_; }
     std::unique_ptr<VisualModule> clone() const override {
         return std::make_unique<ParticlesVisual>(params_);

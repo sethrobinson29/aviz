@@ -122,6 +122,19 @@ run directly from `tsan/`.
   (opacity, blend mode, tint, `freq_band`, `reactivity_source`, `enabled`).
   Disabled layers are skipped entirely — no offscreen render, no
   compositing pass.
+- **Palette override** (milestone 7): a per-layer `palette_override`
+  gradient (`Layer.palette_override`) that replaces a visual's own flat
+  color with a sampled gradient, layered under the existing tint multiply
+  rather than replacing it. Wired into all seven visual modules, each
+  sampling by its own natural axis: Spectrum/Radial by each bar's frequency
+  position, Waveform/Lissajous by position along the drawn line,
+  Particles/Flow Field by each particle's life fraction (a color-over-life
+  gradient, composed with the existing lifetime alpha fade), and Fractal by
+  escape-depth position via a small GPU gradient texture built from the
+  palette and sampled in-shader (offset by the existing slow hue-cycle
+  phase, so the established "static or slow time-based color cycling"
+  character carries over instead of being replaced). Every module falls
+  back to its existing flat/rainbow color logic when no override is set.
 - **Per-layer `freq_band` and `reactivity_source`**: every layer can be
   scoped to a specific band (0–15) or Global, and tagged with what
   audio-derived value it's meant to react to (`GlobalBeat`, `BandOnset`,

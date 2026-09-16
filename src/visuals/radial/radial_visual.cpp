@@ -71,7 +71,8 @@ void RadialVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void RadialVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
+void RadialVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                           const std::optional<Palette>& palette_override) {
     const bool onset_mode = reactivity.source == ReactivitySource::BandOnset ||
                              reactivity.source == ReactivitySource::GlobalBeat;
 
@@ -88,9 +89,10 @@ void RadialVisual::render(const AudioFeatures& features, const LayerReactivity& 
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     for (std::size_t i : spectrum_math::bar_indices_to_draw(reactivity.freq_band, segments.size())) {
-        Color draw_color = params_.bar_color;
+        Color draw_color =
+            spectrum_math::bar_base_color(params_.bar_color, palette_override, i, segments.size());
         if (onset_mode) {
-            draw_color = spectrum_math::pulse_color(params_.bar_color, onset_pulse_[i]);
+            draw_color = spectrum_math::pulse_color(draw_color, onset_pulse_[i]);
         }
         DrawLineEx(segments[i].inner, segments[i].outer, params_.thickness, draw_color);
     }

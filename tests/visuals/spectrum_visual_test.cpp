@@ -150,6 +150,27 @@ TEST(SpectrumToBarsTest, SensitivityIsUncappedBeyondFullHeight) {
     EXPECT_NEAR(bars[0].height, 200.0f, 1e-4f);
 }
 
+TEST(BarBaseColorTest, NoOverrideReturnsFlatColor) {
+    Color result = spectrum_math::bar_base_color(RED, std::nullopt, 2, 5);
+    EXPECT_EQ(result.r, RED.r);
+    EXPECT_EQ(result.g, RED.g);
+    EXPECT_EQ(result.b, RED.b);
+}
+
+TEST(BarBaseColorTest, OverrideSamplesPaletteByNormalizedIndex) {
+    Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
+    Color first = spectrum_math::bar_base_color(WHITE, palette, 0, 3);
+    Color last = spectrum_math::bar_base_color(WHITE, palette, 2, 3);
+    EXPECT_EQ(first.r, 0);
+    EXPECT_EQ(last.r, 200);
+}
+
+TEST(BarBaseColorTest, SingleBandNormalizesToZero) {
+    Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
+    Color result = spectrum_math::bar_base_color(WHITE, palette, 0, 1);
+    EXPECT_EQ(result.r, 0);
+}
+
 TEST(UpdateOnsetPulseTest, OnsetSnapsToSensitivity) {
     EXPECT_FLOAT_EQ(spectrum_math::update_onset_pulse(0.1f, true, 2.5f), 2.5f);
 }

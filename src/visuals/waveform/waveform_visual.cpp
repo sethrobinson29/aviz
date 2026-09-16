@@ -84,7 +84,8 @@ void WaveformVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
+void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                             const std::optional<Palette>& palette_override) {
     const std::size_t idle_band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
     const bool idle = features.band_idle[idle_band];
 
@@ -105,7 +106,10 @@ void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     for (std::size_t i = 1; i < points.size(); ++i) {
-        DrawLineEx(points[i - 1], points[i], draw_thickness, params_.line_color);
+        const Color segment_color = palette_override.has_value()
+                                         ? palette_math::sample_by_index(*palette_override, i, points.size())
+                                         : params_.line_color;
+        DrawLineEx(points[i - 1], points[i], draw_thickness, segment_color);
     }
     EndTextureMode();
 }

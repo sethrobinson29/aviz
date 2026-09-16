@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "audio/audio_config.h"
 
@@ -72,6 +73,24 @@ float color_cycle_hue(float time_seconds, float cycle_speed_hz) {
 
 }
 
+void FractalVisual::sync_palette_texture(const std::optional<Palette>& palette_override) {
+    if (palette_override == cached_palette_) {
+        return;
+    }
+    if (has_palette_texture_) {
+        UnloadTexture(palette_texture_);
+        has_palette_texture_ = false;
+    }
+    if (palette_override.has_value()) {
+        const int width = visual_config::kFractalPaletteGradientWidth;
+        std::vector<Color> pixels = palette_math::to_gradient_pixels(*palette_override, width);
+        Image image{pixels.data(), width, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+        palette_texture_ = LoadTextureFromImage(image);
+        has_palette_texture_ = true;
+    }
+    cached_palette_ = palette_override;
+}
+
 FractalVisual::FractalVisual(FractalParams params) : FractalVisual(params, load_shared_shader()) {}
 
 FractalVisual::FractalVisual(FractalParams params, std::shared_ptr<Shader> shared_shader)
@@ -86,12 +105,17 @@ void FractalVisual::cache_uniform_locations() {
     loc_hue_shift_ = GetShaderLocation(*shader_, "hueShift");
     loc_max_iterations_ = GetShaderLocation(*shader_, "maxIterations");
     loc_boundary_margin_px_ = GetShaderLocation(*shader_, "boundaryMarginPx");
+    loc_palette_tex_ = GetShaderLocation(*shader_, "paletteTex");
+    loc_use_palette_texture_ = GetShaderLocation(*shader_, "usePaletteTexture");
 }
 
 FractalVisual::~FractalVisual() {
     if (width_ > 0 && height_ > 0) {
         UnloadRenderTexture(texture_);
         UnloadTexture(canvas_texture_);
+    }
+    if (has_palette_texture_) {
+        UnloadTexture(palette_texture_);
     }
 }
 
@@ -112,7 +136,8 @@ void FractalVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void FractalVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
+void FractalVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                            const std::optional<Palette>& palette_override) {
     const float amplitude = fractal_math::selected_band_amplitude(
         features.band_energy, features.band_agc_reference, reactivity.freq_band);
 
@@ -129,9 +154,12 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
         Vector2{params_.julia_orbit_center_x, params_.julia_orbit_center_y}, params_.julia_orbit_clockwise);
     const float hue = fractal_math::color_cycle_hue(elapsed_seconds_, params_.color_cycle_speed_hz);
 
+    sync_palette_texture(palette_override);
+
     const float resolution[2] = {static_cast<float>(width_), static_cast<float>(height_)};
     const float julia_c_uniform[2] = {julia_c.x, julia_c.y};
     const int max_iterations = visual_config::kFractalMaxIterations;
+    const int use_palette_texture = has_palette_texture_ ? 1 : 0;
 
     SetShaderValue(*shader_, loc_resolution_, resolution, SHADER_UNIFORM_VEC2);
     SetShaderValue(*shader_, loc_zoom_, &zoom, SHADER_UNIFORM_FLOAT);
@@ -139,10 +167,14 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
     SetShaderValue(*shader_, loc_hue_shift_, &hue, SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_max_iterations_, &max_iterations, SHADER_UNIFORM_INT);
     SetShaderValue(*shader_, loc_boundary_margin_px_, &params_.boundary_margin_px, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(*shader_, loc_use_palette_texture_, &use_palette_texture, SHADER_UNIFORM_INT);
 
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     BeginShaderMode(*shader_);
+    if (has_palette_texture_) {
+        SetShaderValueTexture(*shader_, loc_palette_tex_, palette_texture_);
+    }
     DrawTexture(canvas_texture_, 0, 0, WHITE);
     EndShaderMode();
     EndTextureMode();

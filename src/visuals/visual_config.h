@@ -72,4 +72,6 @@ inline constexpr float kFractalColorCycleSpeedHz = 0.05f;
 
 inline constexpr float kFractalBoundaryMarginPx = 18.0f;
 
+inline constexpr int kFractalPaletteGradientWidth = 256;
+
 }

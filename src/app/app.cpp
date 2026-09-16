@@ -73,6 +73,22 @@ const char* visual_type_name(VisualType type) {
     return "?";
 }
 
+const Palette kDebugPaletteWarmCool{
+    {{0.0f, Color{40, 90, 255, 255}}, {1.0f, Color{255, 60, 180, 255}}}};
+const Palette kDebugPaletteSunset{{{0.0f, Color{255, 220, 0, 255}},
+                                    {0.5f, Color{255, 80, 0, 255}},
+                                    {1.0f, Color{120, 0, 200, 255}}}};
+
+std::optional<Palette> next_debug_palette(const std::optional<Palette>& current) {
+    if (!current.has_value()) {
+        return kDebugPaletteWarmCool;
+    }
+    if (*current == kDebugPaletteWarmCool) {
+        return kDebugPaletteSunset;
+    }
+    return std::nullopt;
+}
+
 const char* reactivity_source_name(ReactivitySource source) {
     switch (source) {
         case ReactivitySource::GlobalBeat:
@@ -215,6 +231,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "  f/g       adjust selected Particles layer's inner_radius_fraction (no-op on other types)\n"
             "  h         toggle selected FlowField layer's onset ripple (no-op on other types)\n"
             "  j         toggle selected FlowField layer's burst-on-onset (no-op on other types)\n"
+            "  p         cycle selected layer's palette override (off/warm-cool/sunset)\n"
             "  L         toggle audio source between file playback and loopback capture\n");
 
         {
@@ -378,6 +395,10 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                         FlowFieldParams& p = flow_field->mutable_params();
                         p.burst_on_onset_enabled = !p.burst_on_onset_enabled;
                     }
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_P) && !layers.empty()) {
+                    Layer& layer = layers[selected];
+                    layer.palette_override = next_debug_palette(layer.palette_override);
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_L)) {
                     try {
