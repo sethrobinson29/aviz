@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -43,6 +44,12 @@ TEST(MakeVisualTest, FlowFieldTypeConstructsFlowFieldVisual) {
     auto visual = make_visual(VisualType::FlowField);
     EXPECT_NE(dynamic_cast<FlowFieldVisual*>(visual.get()), nullptr);
     EXPECT_EQ(dynamic_cast<ParticlesVisual*>(visual.get()), nullptr);
+}
+
+TEST(MakeVisualTest, FractalTypeConstructsFractalVisual) {
+    auto visual = make_visual(VisualType::Fractal);
+    EXPECT_NE(dynamic_cast<FractalVisual*>(visual.get()), nullptr);
+    EXPECT_EQ(dynamic_cast<WaveformVisual*>(visual.get()), nullptr);
 }
 
 TEST(VisualCloneTest, WaveformCloneIsIndependentInstanceOfSameType) {
@@ -188,4 +195,44 @@ TEST(VisualCloneTest, FlowFieldClonePreservesParams) {
     EXPECT_FLOAT_EQ(cloned_params.spawn_rate_per_frame, 0.4f);
     EXPECT_FALSE(cloned_params.ripple_on_onset_enabled);
     EXPECT_FALSE(cloned_params.burst_on_onset_enabled);
+}
+
+TEST(VisualCloneTest, FractalCloneIsIndependentInstanceOfSameType) {
+    auto original = make_visual(VisualType::Fractal);
+    auto clone = original->clone();
+
+    EXPECT_NE(clone.get(), original.get());
+    EXPECT_NE(dynamic_cast<FractalVisual*>(clone.get()), nullptr);
+}
+
+TEST(VisualCloneTest, FractalClonePreservesParams) {
+    FractalParams params;
+    params.base_zoom = 1.5f;
+    params.zoom_amplitude_scale = 0.3f;
+    params.julia_base_radius = 0.75f;
+    params.julia_radius_amplitude_scale = 0.1f;
+    params.julia_angular_speed_radians_per_sec = 0.25f;
+    params.julia_orbit_center_x = 0.2f;
+    params.julia_orbit_center_y = -0.1f;
+    params.julia_orbit_clockwise = false;
+    params.color_cycle_speed_hz = 0.08f;
+    params.amplitude_smoothing_tau_ms = 1500.0f;
+    params.boundary_margin_px = 25.0f;
+    FractalVisual original(params);
+    auto clone = original.clone();
+
+    auto* fractal_clone = dynamic_cast<FractalVisual*>(clone.get());
+    ASSERT_NE(fractal_clone, nullptr);
+    const FractalParams& cloned = fractal_clone->params();
+    EXPECT_FLOAT_EQ(cloned.base_zoom, 1.5f);
+    EXPECT_FLOAT_EQ(cloned.zoom_amplitude_scale, 0.3f);
+    EXPECT_FLOAT_EQ(cloned.julia_base_radius, 0.75f);
+    EXPECT_FLOAT_EQ(cloned.julia_radius_amplitude_scale, 0.1f);
+    EXPECT_FLOAT_EQ(cloned.julia_angular_speed_radians_per_sec, 0.25f);
+    EXPECT_FLOAT_EQ(cloned.julia_orbit_center_x, 0.2f);
+    EXPECT_FLOAT_EQ(cloned.julia_orbit_center_y, -0.1f);
+    EXPECT_FALSE(cloned.julia_orbit_clockwise);
+    EXPECT_FLOAT_EQ(cloned.color_cycle_speed_hz, 0.08f);
+    EXPECT_FLOAT_EQ(cloned.amplitude_smoothing_tau_ms, 1500.0f);
+    EXPECT_FLOAT_EQ(cloned.boundary_margin_px, 25.0f);
 }

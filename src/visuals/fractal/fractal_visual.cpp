@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "audio/audio_config.h"
+#include "rlgl.h"
 
 namespace {
 
@@ -95,7 +96,10 @@ FractalVisual::FractalVisual(FractalParams params) : FractalVisual(params, load_
 
 FractalVisual::FractalVisual(FractalParams params, std::shared_ptr<Shader> shared_shader)
     : params_(params), shader_(std::move(shared_shader)) {
-    cache_uniform_locations();
+    shader_ready_ = shader_->id != 0 && shader_->id != rlGetShaderIdDefault();
+    if (shader_ready_) {
+        cache_uniform_locations();
+    }
 }
 
 void FractalVisual::cache_uniform_locations() {
@@ -138,6 +142,13 @@ void FractalVisual::resize(int width, int height) {
 
 void FractalVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
                             const std::optional<Palette>& palette_override) {
+    if (!shader_ready_) {
+        BeginTextureMode(texture_);
+        ClearBackground(BLANK);
+        EndTextureMode();
+        return;
+    }
+
     const float amplitude = fractal_math::selected_band_amplitude(
         features.band_energy, features.band_agc_reference, reactivity.freq_band);
 
