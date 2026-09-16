@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+using audio_worker_utils::deinterleave_stereo;
 using audio_worker_utils::mixdown_to_mono;
 using audio_worker_utils::slide_window;
 
@@ -34,6 +35,34 @@ TEST(MixdownToMonoTest, AveragesFourChannels) {
     mixdown_to_mono(interleaved, 1, 4, mono);
 
     EXPECT_FLOAT_EQ(mono[0], 2.5f);
+}
+
+TEST(DeinterleaveStereoTest, SplitsIntoLeftAndRightChannels) {
+    float interleaved[] = {2.0f, 4.0f, 0.0f, -1.0f, -3.0f, 5.0f};
+    float left[3] = {};
+    float right[3] = {};
+
+    deinterleave_stereo(interleaved, 3, 2, left, right);
+
+    EXPECT_FLOAT_EQ(left[0], 2.0f);
+    EXPECT_FLOAT_EQ(right[0], 4.0f);
+    EXPECT_FLOAT_EQ(left[1], 0.0f);
+    EXPECT_FLOAT_EQ(right[1], -1.0f);
+    EXPECT_FLOAT_EQ(left[2], -3.0f);
+    EXPECT_FLOAT_EQ(right[2], 5.0f);
+}
+
+TEST(DeinterleaveStereoTest, MonoInputDuplicatesIntoBothChannels) {
+    float interleaved[] = {1.5f, -2.5f};
+    float left[2] = {};
+    float right[2] = {};
+
+    deinterleave_stereo(interleaved, 2, 1, left, right);
+
+    EXPECT_FLOAT_EQ(left[0], 1.5f);
+    EXPECT_FLOAT_EQ(right[0], 1.5f);
+    EXPECT_FLOAT_EQ(left[1], -2.5f);
+    EXPECT_FLOAT_EQ(right[1], -2.5f);
 }
 
 TEST(SlideWindowTest, PartialAppendShiftsOldSamplesLeftAndAppendsNew) {

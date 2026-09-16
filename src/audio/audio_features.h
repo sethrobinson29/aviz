@@ -8,6 +8,8 @@
 
 struct AudioFeatures {
     std::array<float, audio_config::kWaveformSnapshotSize> waveform{};
+    std::array<float, audio_config::kWaveformSnapshotSize> waveform_l{};
+    std::array<float, audio_config::kWaveformSnapshotSize> waveform_r{};
 
     std::array<float, audio_config::kTotalBandSlots> band_energy{};
     std::array<bool, audio_config::kTotalBandSlots> band_idle{};

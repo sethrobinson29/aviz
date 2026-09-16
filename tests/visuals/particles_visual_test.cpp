@@ -277,3 +277,26 @@ TEST(ParticlesFadedColorTest, PreservesRgbChannels) {
     EXPECT_EQ(c.g, 20);
     EXPECT_EQ(c.b, 30);
 }
+
+TEST(ParticlesBaseColorTest, NoOverrideReturnsFlatColor) {
+    Color c = particles_math::base_color(RED, std::nullopt, 10, 100);
+    EXPECT_EQ(c.r, RED.r);
+    EXPECT_EQ(c.g, RED.g);
+    EXPECT_EQ(c.b, RED.b);
+}
+
+TEST(ParticlesBaseColorTest, OverrideSamplesByLifeFraction) {
+    Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
+    Color newborn = particles_math::base_color(WHITE, palette, 0, 100);
+    Color mid = particles_math::base_color(WHITE, palette, 50, 100);
+    Color old = particles_math::base_color(WHITE, palette, 100, 100);
+    EXPECT_EQ(newborn.r, 0);
+    EXPECT_NEAR(mid.r, 100, 1);
+    EXPECT_EQ(old.r, 200);
+}
+
+TEST(ParticlesBaseColorTest, ZeroLifetimeNormalizesToZero) {
+    Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
+    Color c = particles_math::base_color(WHITE, palette, 0, 0);
+    EXPECT_EQ(c.r, 0);
+}

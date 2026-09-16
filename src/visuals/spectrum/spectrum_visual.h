@@ -23,6 +23,9 @@ float update_onset_pulse(float current_pulse, bool onset, float sensitivity);
 
 Color pulse_color(Color base, float pulse);
 
+Color bar_base_color(Color flat_color, const std::optional<Palette>& palette_override, std::size_t index,
+                      std::size_t band_count);
+
 }
 
 struct SpectrumParams {
@@ -37,7 +40,8 @@ public:
     ~SpectrumVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                const std::optional<Palette>& palette_override) override;
     RenderTexture2D& render_texture() override { return texture_; }
     std::unique_ptr<VisualModule> clone() const override {
         return std::make_unique<SpectrumVisual>(params_);

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "raylib.h"
@@ -15,6 +16,9 @@ std::vector<Vector2> to_points(const float* samples, std::size_t count, int widt
 float band_amplitude_scale(float energy, float reference);
 
 float pulse_thickness(float base_thickness, float pulse);
+
+float next_onset_pulse(float current_pulse, bool band_changed, bool onset_active,
+                        float pulse_target, float decay_per_frame);
 
 struct ReactivityResult {
     float amplitude_scale = 1.0f;
@@ -37,7 +41,8 @@ public:
     ~WaveformVisual() override;
 
     void resize(int width, int height) override;
-    void render(const AudioFeatures& features, const LayerReactivity& reactivity) override;
+    void render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                const std::optional<Palette>& palette_override) override;
     RenderTexture2D& render_texture() override { return texture_; }
     std::unique_ptr<VisualModule> clone() const override {
         return std::make_unique<WaveformVisual>(params_);
@@ -50,4 +55,5 @@ private:
     int width_ = 0;
     int height_ = 0;
     float onset_pulse_ = 0.0f;
+    std::optional<std::size_t> last_freq_band_;
 };

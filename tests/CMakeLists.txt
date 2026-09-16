@@ -29,14 +29,22 @@ gtest_discover_tests(audio_tests)
 # initialize a window/GL context, since the functions under test don't call
 # into one.
 add_executable(visuals_tests
+  visuals/palette_test.cpp
   visuals/waveform_visual_test.cpp
   visuals/spectrum_visual_test.cpp
   visuals/radial_visual_test.cpp
   visuals/particles_visual_test.cpp
+  visuals/lissajous_visual_test.cpp
+  visuals/flow_field_visual_test.cpp
+  visuals/fractal_visual_test.cpp
+  ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp
   ../src/visuals/particles/particles_visual.cpp
+  ../src/visuals/lissajous/lissajous_visual.cpp
+  ../src/visuals/flow_field/flow_field_visual.cpp
+  ../src/visuals/fractal/fractal_visual.cpp
 )
 target_include_directories(visuals_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(visuals_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
@@ -56,11 +64,27 @@ add_executable(compositor_tests
   ../src/compositor/compositor_math.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/layer.cpp
+  ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
   ../src/visuals/radial/radial_visual.cpp
   ../src/visuals/particles/particles_visual.cpp
+  ../src/visuals/lissajous/lissajous_visual.cpp
+  ../src/visuals/flow_field/flow_field_visual.cpp
+  ../src/visuals/fractal/fractal_visual.cpp
 )
 target_include_directories(compositor_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
 gtest_discover_tests(compositor_tests)
+
+# Startup layer-generation logic (-n debug flag, milestone-4-debug-controls.md).
+# Pure logic over VisualType/ReactivitySource/freq_band combinations -- no
+# window/GL context, same raylib-linked-but-uninitialized pattern as
+# compositor_tests above.
+add_executable(app_tests
+  app/layer_generator_test.cpp
+  ../src/app/layer_generator.cpp
+)
+target_include_directories(app_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+target_link_libraries(app_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
+gtest_discover_tests(app_tests)

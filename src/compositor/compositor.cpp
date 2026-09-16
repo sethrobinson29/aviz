@@ -43,6 +43,7 @@ std::optional<std::size_t> Compositor::duplicate_layer(std::size_t index) {
     copy.opacity = source.opacity;
     copy.blend_mode = source.blend_mode;
     copy.tint_color = source.tint_color;
+    copy.palette_override = source.palette_override;
     copy.freq_band = source.freq_band;
     copy.reactivity_source = source.reactivity_source;
     copy.sensitivity = source.sensitivity;
@@ -80,9 +81,10 @@ void Compositor::move_layer(std::size_t from, std::size_t to) {
 void Compositor::render(const AudioFeatures& features) {
     for (Layer& layer : layers_) {
         if (layer.enabled) {
-            layer.visual->render(features, LayerReactivity{layer.freq_band, layer.reactivity_source,
-                                                             compositor_math::clamp_sensitivity(
-                                                                 layer.sensitivity)});
+            layer.visual->render(features,
+                                  LayerReactivity{layer.freq_band, layer.reactivity_source,
+                                                   compositor_math::clamp_sensitivity(layer.sensitivity)},
+                                  layer.palette_override);
         }
     }
 

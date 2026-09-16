@@ -10,7 +10,7 @@
 
 class Compositor {
 public:
-    static constexpr std::size_t kMaxLayers = 16;
+    static constexpr std::size_t kMaxLayers = 32;
 
     ~Compositor();
 

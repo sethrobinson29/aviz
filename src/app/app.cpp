@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstddef>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "app/layer_generator.h"
 #include "audio/audio_config.h"
 #include "audio/audio_features.h"
 #include "audio/feature_worker.h"
@@ -18,6 +20,9 @@
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
 #include "raylib.h"
+#include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
+#include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 
@@ -26,16 +31,13 @@ constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 720;
 constexpr int kTargetFps = 60;
 
-constexpr Color kLayerPalette[Compositor::kMaxLayers] = {
-    Color{0xFF, 0x3B, 0x30, 0xFF}, Color{0xFF, 0x95, 0x00, 0xFF},
-    Color{0xFF, 0xCC, 0x00, 0xFF}, Color{0xA3, 0xD9, 0x00, 0xFF},
-    Color{0x34, 0xC7, 0x59, 0xFF}, Color{0x00, 0xC7, 0xBE, 0xFF},
-    Color{0x00, 0xA3, 0xFF, 0xFF}, Color{0x00, 0x7A, 0xFF, 0xFF},
-    Color{0x58, 0x56, 0xD6, 0xFF}, Color{0xAF, 0x52, 0xDE, 0xFF},
-    Color{0xFF, 0x2D, 0x95, 0xFF}, Color{0x8E, 0x8E, 0x93, 0xFF},
-    Color{0xC7, 0xA2, 0x6A, 0xFF}, Color{0x7E, 0xD3, 0x21, 0xFF},
-    Color{0xFF, 0x6B, 0x6B, 0xFF}, Color{0x4A, 0x90, 0xD9, 0xFF},
-};
+constexpr float kLayerPaletteSaturation = 0.75f;
+constexpr float kLayerPaletteValue = 0.95f;
+
+Color layer_palette_color(std::size_t index) {
+    float hue = (360.0f * static_cast<float>(index)) / static_cast<float>(Compositor::kMaxLayers);
+    return ColorFromHSV(hue, kLayerPaletteSaturation, kLayerPaletteValue);
+}
 
 const char* blend_mode_name(LayerBlendMode mode) {
     switch (mode) {
@@ -61,8 +63,30 @@ const char* visual_type_name(VisualType type) {
             return "Radial";
         case VisualType::Particles:
             return "Particles";
+        case VisualType::Lissajous:
+            return "Lissajous";
+        case VisualType::FlowField:
+            return "FlowField";
+        case VisualType::Fractal:
+            return "Fractal";
     }
     return "?";
+}
+
+const Palette kDebugPaletteWarmCool{
+    {{0.0f, Color{40, 90, 255, 255}}, {1.0f, Color{255, 60, 180, 255}}}};
+const Palette kDebugPaletteSunset{{{0.0f, Color{255, 220, 0, 255}},
+                                    {0.5f, Color{255, 80, 0, 255}},
+                                    {1.0f, Color{120, 0, 200, 255}}}};
+
+std::optional<Palette> next_debug_palette(const std::optional<Palette>& current) {
+    if (!current.has_value()) {
+        return kDebugPaletteWarmCool;
+    }
+    if (*current == kDebugPaletteWarmCool) {
+        return kDebugPaletteSunset;
+    }
+    return std::nullopt;
 }
 
 const char* reactivity_source_name(ReactivitySource source) {
@@ -94,35 +118,76 @@ LayerBlendMode next_blend_mode(LayerBlendMode mode) {
 void reassign_tints(Compositor& compositor) {
     std::vector<Layer>& layers = compositor.layers();
     for (std::size_t i = 0; i < layers.size(); ++i) {
-        layers[i].tint_color = kLayerPalette[i];
+        layers[i].tint_color = layer_palette_color(i);
     }
 }
 
-void print_layer_cap_error(const Compositor& compositor) {
-    std::printf("ERROR: layer cap reached (%zu/%zu) -- cannot add or duplicate\n",
-                compositor.layers().size(), Compositor::kMaxLayers);
+std::string format_layer_cap_error(const Compositor& compositor) {
+    char line[128];
+    std::snprintf(line, sizeof(line), "ERROR: layer cap reached (%zu/%zu) -- cannot add or duplicate\n",
+                  compositor.layers().size(), Compositor::kMaxLayers);
+    return line;
 }
 
-void print_layers(const Compositor& compositor, std::size_t selected) {
+std::string format_layers_block(const Compositor& compositor, std::size_t selected) {
+    std::string block;
+    char line[160];
     const std::vector<Layer>& layers = compositor.layers();
     for (std::size_t i = 0; i < layers.size(); ++i) {
         const Layer& layer = layers[i];
-        std::printf("[%c] %zu: %-9s", i == selected ? '*' : ' ', i,
-                    visual_type_name(layer.visual_type));
-        if (layer.freq_band.has_value()) {
-            std::printf("  band=%-6zu", *layer.freq_band);
-        } else {
-            std::printf("  band=%-6s", "Global");
-        }
-        std::printf("  reactivity=%-13s  sensitivity=%.1f  opacity=%.1f  blend=%-8s%s\n",
-                    reactivity_source_name(layer.reactivity_source), layer.sensitivity, layer.opacity,
-                    blend_mode_name(layer.blend_mode), layer.enabled ? "" : "  [hidden]");
+        std::string band_str =
+            layer.freq_band.has_value() ? std::to_string(*layer.freq_band) : std::string("Global");
+        std::snprintf(line, sizeof(line),
+                      "[%c] %zu: %-9s  band=%-6s  reactivity=%-13s  sensitivity=%.1f  opacity=%.1f  "
+                      "blend=%-8s%s\n",
+                      i == selected ? '*' : ' ', i, visual_type_name(layer.visual_type), band_str.c_str(),
+                      reactivity_source_name(layer.reactivity_source), layer.sensitivity, layer.opacity,
+                      blend_mode_name(layer.blend_mode), layer.enabled ? "" : "  [hidden]");
+        block += line;
     }
-    std::printf("--------------------------------------------------------------\n");
+    block += "--------------------------------------------------------------\n";
+    return block;
+}
+
+void refresh_display(const std::string& block, int& last_display_lines) {
+    if (last_display_lines > 0) {
+        std::printf("\x1b[%dA\x1b[J", last_display_lines);
+    }
+    std::fputs(block.c_str(), stdout);
+    std::fflush(stdout);
+    last_display_lines = static_cast<int>(std::count(block.begin(), block.end(), '\n'));
+}
+
+std::mt19937 make_seeded_rng() { return std::mt19937(std::random_device{}()); }
+
+void populate_startup_layers(Compositor& compositor, std::optional<int> generate_layer_count) {
+    if (!generate_layer_count.has_value()) {
+        compositor.add_layer(VisualType::Waveform);
+        return;
+    }
+
+    std::size_t requested = static_cast<std::size_t>(*generate_layer_count);
+    std::size_t effective = std::min(requested, Compositor::kMaxLayers);
+    if (effective < requested) {
+        std::printf("note: requested %zu layers exceeds cap (%zu) -- generating %zu instead\n", requested,
+                    Compositor::kMaxLayers, effective);
+    }
+
+    std::mt19937 rng = make_seeded_rng();
+    std::vector<GeneratedLayerSpec> specs = generate_layer_specs(effective, rng);
+    for (const GeneratedLayerSpec& spec : specs) {
+        std::optional<std::size_t> idx = compositor.add_layer(spec.visual_type);
+        if (!idx.has_value()) {
+            break;
+        }
+        Layer& layer = compositor.layers()[*idx];
+        layer.freq_band = spec.freq_band;
+        layer.reactivity_source = spec.reactivity_source;
+    }
 }
 }
 
-int run_app(const char* audio_path) {
+int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
     try {
         const std::string original_audio_path = audio_path;
 
@@ -150,7 +215,8 @@ int run_app(const char* audio_path) {
             "compositor controls (no control panel UI yet -- milestone 8, see "
             "milestone-4-debug-controls.md):\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
-            "  1/2/3/4   set selected layer's visual type to waveform/spectrum/radial/particles\n"
+            "  1/2/3/4/5/6/7 set selected layer's visual type to "
+            "waveform/spectrum/radial/particles/lissajous/flowfield/fractal\n"
             "  D         duplicate selected layer\n"
             "  X/Delete  remove selected layer\n"
             "  up/down   change selected layer\n"
@@ -163,144 +229,177 @@ int run_app(const char* audio_path) {
             "  r/t       adjust selected Radial layer's inner_radius_fraction (no-op on other types)\n"
             "  y/u       adjust selected Radial layer's max_radius_fraction (outer radius, no-op on other types)\n"
             "  f/g       adjust selected Particles layer's inner_radius_fraction (no-op on other types)\n"
+            "  h         toggle selected FlowField layer's onset ripple (no-op on other types)\n"
+            "  j         toggle selected FlowField layer's burst-on-onset (no-op on other types)\n"
+            "  p         cycle selected layer's palette override (off/warm-cool/sunset)\n"
             "  L         toggle audio source between file playback and loopback capture\n");
 
         {
             Compositor compositor;
             compositor.resize(kWindowWidth, kWindowHeight);
-            compositor.add_layer(VisualType::Waveform);
+            populate_startup_layers(compositor, generate_layer_count);
             std::size_t selected = 0;
             reassign_tints(compositor);
-            print_layers(compositor, selected);
+            int last_display_lines = 0;
+            refresh_display(format_layers_block(compositor, selected), last_display_lines);
 
             while (!WindowShouldClose()) {
                 std::vector<Layer>& layers = compositor.layers();
 
                 if (IsKeyPressed(KEY_A)) {
+                    std::string block;
                     if (!compositor.add_layer(VisualType::Waveform).has_value()) {
-                        print_layer_cap_error(compositor);
+                        block = format_layer_cap_error(compositor);
                     } else {
                         reassign_tints(compositor);
                     }
-                    print_layers(compositor, selected);
+                    block += format_layers_block(compositor, selected);
+                    refresh_display(block, last_display_lines);
                 } else if (IsKeyPressed(KEY_D) && !layers.empty()) {
+                    std::string block;
                     if (!compositor.duplicate_layer(selected).has_value()) {
-                        print_layer_cap_error(compositor);
+                        block = format_layer_cap_error(compositor);
                     } else {
                         reassign_tints(compositor);
                     }
-                    print_layers(compositor, selected);
+                    block += format_layers_block(compositor, selected);
+                    refresh_display(block, last_display_lines);
                 } else if (IsKeyPressed(KEY_ONE) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Waveform);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_TWO) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Spectrum);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_THREE) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Radial);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_FOUR) && !layers.empty()) {
                     compositor.set_layer_visual_type(selected, VisualType::Particles);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_FIVE) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Lissajous);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_SIX) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::FlowField);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_SEVEN) && !layers.empty()) {
+                    compositor.set_layer_visual_type(selected, VisualType::Fractal);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
                     selected = layers.empty() ? 0 : std::min(selected, layers.size() - 1);
                     reassign_tints(compositor);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_UP) && selected > 0) {
                     --selected;
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_DOWN) && !layers.empty() && selected + 1 < layers.size()) {
                     ++selected;
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_LEFT) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.opacity = compositor_math::clamp_opacity(layer.opacity - 0.1f);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_RIGHT) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.opacity = compositor_math::clamp_opacity(layer.opacity + 0.1f);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_B) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.blend_mode = next_blend_mode(layer.blend_mode);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_COMMA) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.freq_band =
                         compositor_math::prev_freq_band(layer.freq_band, audio_config::kNumBands);
                     layer.reactivity_source = compositor_math::default_reactivity_source(layer.freq_band);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_PERIOD) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.freq_band =
                         compositor_math::next_freq_band(layer.freq_band, audio_config::kNumBands);
                     layer.reactivity_source = compositor_math::default_reactivity_source(layer.freq_band);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_LEFT_BRACKET) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.reactivity_source =
                         compositor_math::prev_reactivity_source(layer.reactivity_source, layer.freq_band);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_RIGHT_BRACKET) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.reactivity_source =
                         compositor_math::next_reactivity_source(layer.reactivity_source, layer.freq_band);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_MINUS) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.sensitivity = compositor_math::clamp_sensitivity(layer.sensitivity - 0.1f);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_EQUAL) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.sensitivity = compositor_math::clamp_sensitivity(layer.sensitivity + 0.1f);
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_M) && !layers.empty()) {
                     Layer& layer = layers[selected];
                     layer.enabled = !layer.enabled;
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_R) && !layers.empty()) {
                     if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
                         RadialParams& p = radial->mutable_params();
                         p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
                             p.inner_radius_fraction + 0.05f, p.max_radius_fraction);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_T) && !layers.empty()) {
                     if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
                         RadialParams& p = radial->mutable_params();
                         p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
                             p.inner_radius_fraction - 0.05f, p.max_radius_fraction);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_Y) && !layers.empty()) {
                     if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
                         RadialParams& p = radial->mutable_params();
                         p.max_radius_fraction = radial_math::clamp_max_radius_fraction(
                             p.max_radius_fraction + 0.05f, p.inner_radius_fraction);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_U) && !layers.empty()) {
                     if (auto* radial = dynamic_cast<RadialVisual*>(layers[selected].visual.get())) {
                         RadialParams& p = radial->mutable_params();
                         p.max_radius_fraction = radial_math::clamp_max_radius_fraction(
                             p.max_radius_fraction - 0.05f, p.inner_radius_fraction);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_F) && !layers.empty()) {
                     if (auto* particles = dynamic_cast<ParticlesVisual*>(layers[selected].visual.get())) {
                         ParticlesParams& p = particles->mutable_params();
                         p.inner_radius_fraction =
                             particles_math::clamp_inner_radius_fraction(p.inner_radius_fraction + 0.05f);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_G) && !layers.empty()) {
                     if (auto* particles = dynamic_cast<ParticlesVisual*>(layers[selected].visual.get())) {
                         ParticlesParams& p = particles->mutable_params();
                         p.inner_radius_fraction =
                             particles_math::clamp_inner_radius_fraction(p.inner_radius_fraction - 0.05f);
                     }
-                    print_layers(compositor, selected);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_H) && !layers.empty()) {
+                    if (auto* flow_field = dynamic_cast<FlowFieldVisual*>(layers[selected].visual.get())) {
+                        FlowFieldParams& p = flow_field->mutable_params();
+                        p.ripple_on_onset_enabled = !p.ripple_on_onset_enabled;
+                    }
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_J) && !layers.empty()) {
+                    if (auto* flow_field = dynamic_cast<FlowFieldVisual*>(layers[selected].visual.get())) {
+                        FlowFieldParams& p = flow_field->mutable_params();
+                        p.burst_on_onset_enabled = !p.burst_on_onset_enabled;
+                    }
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_P) && !layers.empty()) {
+                    Layer& layer = layers[selected];
+                    layer.palette_override = next_debug_palette(layer.palette_override);
+                    refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_L)) {
                     try {
                         if (using_loopback) {

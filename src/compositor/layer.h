@@ -5,9 +5,10 @@
 #include <optional>
 
 #include "raylib.h"
+#include "visuals/palette.h"
 #include "visuals/visual_module.h"
 
-enum class VisualType { Waveform, Spectrum, Radial, Particles };
+enum class VisualType { Waveform, Spectrum, Radial, Particles, Lissajous, FlowField, Fractal };
 
 enum class LayerBlendMode { Normal, Additive, Multiply, Screen };
 
@@ -17,6 +18,7 @@ struct Layer {
     float opacity = 1.0f;
     LayerBlendMode blend_mode = LayerBlendMode::Normal;
     Color tint_color = WHITE;
+    std::optional<Palette> palette_override;
     std::optional<std::size_t> freq_band;
     ReactivitySource reactivity_source = ReactivitySource::GlobalBeat;
     float sensitivity = 1.0f;

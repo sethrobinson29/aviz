@@ -49,6 +49,14 @@ Color pulse_color(Color base, float pulse) {
     return Color{rest_to_base(base.r), rest_to_base(base.g), rest_to_base(base.b), base.a};
 }
 
+Color bar_base_color(Color flat_color, const std::optional<Palette>& palette_override, std::size_t index,
+                      std::size_t band_count) {
+    if (!palette_override.has_value()) {
+        return flat_color;
+    }
+    return palette_math::sample_by_index(*palette_override, index, band_count);
+}
+
 std::vector<std::size_t> bar_indices_to_draw(std::optional<std::size_t> freq_band,
                                               std::size_t bar_count) {
     if (freq_band.has_value()) {
@@ -83,7 +91,8 @@ void SpectrumVisual::resize(int width, int height) {
     height_ = height;
 }
 
-void SpectrumVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity) {
+void SpectrumVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
+                             const std::optional<Palette>& palette_override) {
     const bool onset_mode = reactivity.source == ReactivitySource::BandOnset ||
                              reactivity.source == ReactivitySource::GlobalBeat;
 
@@ -99,9 +108,10 @@ void SpectrumVisual::render(const AudioFeatures& features, const LayerReactivity
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     for (std::size_t i : spectrum_math::bar_indices_to_draw(reactivity.freq_band, bars.size())) {
-        Color draw_color = params_.bar_color;
+        Color draw_color =
+            spectrum_math::bar_base_color(params_.bar_color, palette_override, i, bars.size());
         if (onset_mode) {
-            draw_color = spectrum_math::pulse_color(params_.bar_color, onset_pulse_[i]);
+            draw_color = spectrum_math::pulse_color(draw_color, onset_pulse_[i]);
         }
         DrawRectangleRec(bars[i], draw_color);
     }

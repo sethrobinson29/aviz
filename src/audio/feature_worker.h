@@ -13,6 +13,9 @@ namespace audio_worker_utils {
 void mixdown_to_mono(const float* interleaved, std::size_t frame_count, unsigned channels,
                       float* mono_out);
 
+void deinterleave_stereo(const float* interleaved, std::size_t frame_count, unsigned channels,
+                          float* left_out, float* right_out);
+
 void slide_window(std::vector<float>& window, const float* new_samples, std::size_t count);
 
 }
@@ -35,8 +38,12 @@ private:
     FeatureExtractor extractor_;
 
     std::vector<float> analysis_window_;
+    std::vector<float> analysis_window_l_;
+    std::vector<float> analysis_window_r_;
     std::vector<float> interleaved_scratch_;
     std::vector<float> mono_scratch_;
+    std::vector<float> left_scratch_;
+    std::vector<float> right_scratch_;
 
     std::atomic<bool> running_{false};
     std::thread thread_;

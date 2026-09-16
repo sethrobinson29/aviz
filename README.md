@@ -9,8 +9,9 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 
 ## Status
 
-Local playback + feature extraction, waveform/spectrum/radial/particles
-visuals, the layer compositor (stacking, opacity, blend modes, tint), layer
+Local playback + feature extraction, waveform/spectrum/radial/particles/
+lissajous/flow field visuals, the layer compositor (stacking, opacity, blend modes,
+tint), layer
 duplication + frequency mapping (`freq_band`, `reactivity_source`,
 `enabled`), and WASAPI loopback capture with mid-session source switching are
 implemented — see "Features" below. The control panel UI doesn't exist yet.
@@ -92,6 +93,26 @@ run directly from `tsan/`.
   spawn direction follows the same per-band angle grid as Radial's bars
   (random full-circle direction for Global), and particles fade out linearly
   over a fixed lifetime.
+- **Lissajous** plots the stereo pair directly (left channel on X, right on
+  Y) as a connected trace, reusing `WaveformVisual`'s reactivity/onset-pulse
+  logic since it's a full-mix (not per-band) visual like Waveform. Idle
+  collapses to a single center point rather than trusting near-zero samples,
+  matching the other visuals' forced rest pose. `AudioFeatures` carries
+  `waveform_l`/`waveform_r` snapshots alongside the existing mono `waveform`
+  for this; `FeatureWorker` slides three parallel windows (mono, left,
+  right) per hop rather than deriving stereo from the mono mixdown.
+- **Flow field** reuses Particles' pool/spawn/lifetime/cleanup machinery,
+  changing only how velocity is determined: each particle steers toward a
+  direction sampled from a fixed-resolution grid of hand-rolled 2D value
+  noise, regenerated every frame and animated by a persistent phase.
+  Turbulence (noise frequency) and evolution speed (phase advance) both
+  scale continuously with the scoped band's amplitude, independent of
+  onset events. An onset additionally (a) bursts new particles via
+  Particles' existing onset-burst mechanism and (b) spawns an expanding
+  ring impulse that pushes already-in-flight particles outward as it
+  passes — two independent, simultaneously-firing effects, not a mode
+  switch. Particles render as short velocity-aligned streaks rather than
+  dots.
 - **Layer compositor**: add/remove/reorder layers, each with independent
   opacity, blend mode (normal, additive, multiply, screen), and tint color.
   Layers composite in stack order, bottom to top, into a single output
@@ -101,6 +122,19 @@ run directly from `tsan/`.
   (opacity, blend mode, tint, `freq_band`, `reactivity_source`, `enabled`).
   Disabled layers are skipped entirely — no offscreen render, no
   compositing pass.
+- **Palette override** (milestone 7): a per-layer `palette_override`
+  gradient (`Layer.palette_override`) that replaces a visual's own flat
+  color with a sampled gradient, layered under the existing tint multiply
+  rather than replacing it. Wired into all seven visual modules, each
+  sampling by its own natural axis: Spectrum/Radial by each bar's frequency
+  position, Waveform/Lissajous by position along the drawn line,
+  Particles/Flow Field by each particle's life fraction (a color-over-life
+  gradient, composed with the existing lifetime alpha fade), and Fractal by
+  escape-depth position via a small GPU gradient texture built from the
+  palette and sampled in-shader (offset by the existing slow hue-cycle
+  phase, so the established "static or slow time-based color cycling"
+  character carries over instead of being replaced). Every module falls
+  back to its existing flat/rainbow color logic when no override is set.
 - **Per-layer `freq_band` and `reactivity_source`**: every layer can be
   scoped to a specific band (0–15) or Global, and tagged with what
   audio-derived value it's meant to react to (`GlobalBeat`, `BandOnset`,

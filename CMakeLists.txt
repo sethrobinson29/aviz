@@ -72,6 +72,7 @@ include(GoogleTest)
 add_executable(aviz
   src/main.cpp
   src/app/app.cpp
+  src/app/layer_generator.cpp
   src/audio/miniaudio_backend.cpp
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
@@ -79,10 +80,14 @@ add_executable(aviz
   src/audio/file_producer.cpp
   src/audio/loopback_producer.cpp
   src/audio/pipeline_format_converter.cpp
+  src/visuals/palette.cpp
   src/visuals/waveform/waveform_visual.cpp
   src/visuals/spectrum/spectrum_visual.cpp
   src/visuals/radial/radial_visual.cpp
   src/visuals/particles/particles_visual.cpp
+  src/visuals/lissajous/lissajous_visual.cpp
+  src/visuals/flow_field/flow_field_visual.cpp
+  src/visuals/fractal/fractal_visual.cpp
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
@@ -92,6 +97,12 @@ target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
 if(AVIZ_VERBOSE_RAYLIB_LOG)
   target_compile_definitions(aviz PRIVATE AVIZ_VERBOSE_RAYLIB_LOG)
 endif()
+
+add_custom_command(TARGET aviz POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets/shaders
+    $<TARGET_FILE_DIR:aviz>/assets/shaders
+  COMMENT "Copying assets/shaders next to aviz executable")
 
 # --- tests ---------------------------------------------------------------------
 add_subdirectory(tests)
