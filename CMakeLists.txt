@@ -105,6 +105,7 @@ add_executable(aviz
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
   src/compositor/layer_preset.cpp
+  src/compositor/preset_file_io.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT nlohmann_json::nlohmann_json)

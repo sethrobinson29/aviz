@@ -19,6 +19,8 @@
 #include "compositor/compositor.h"
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
+#include "compositor/layer_preset.h"
+#include "compositor/preset_file_io.h"
 #include "raylib.h"
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
@@ -33,6 +35,8 @@ constexpr int kTargetFps = 60;
 
 constexpr float kLayerPaletteSaturation = 0.75f;
 constexpr float kLayerPaletteValue = 0.95f;
+
+const char* kDebugPresetFilename = "debug-preset.json";
 
 Color layer_palette_color(std::size_t index) {
     float hue = (360.0f * static_cast<float>(index)) / static_cast<float>(Compositor::kMaxLayers);
@@ -232,7 +236,10 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "  h         toggle selected FlowField layer's onset ripple (no-op on other types)\n"
             "  j         toggle selected FlowField layer's burst-on-onset (no-op on other types)\n"
             "  p         cycle selected layer's palette override (off/warm-cool/sunset)\n"
-            "  L         toggle audio source between file playback and loopback capture\n");
+            "  L         toggle audio source between file playback and loopback capture\n"
+            "  S         save the layer stack to presets/%s\n"
+            "  O         load the layer stack from presets/%s\n",
+            kDebugPresetFilename, kDebugPresetFilename);
 
         {
             Compositor compositor;
@@ -400,6 +407,36 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     Layer& layer = layers[selected];
                     layer.palette_override = next_debug_palette(layer.palette_override);
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_S)) {
+                    const std::string path = preset_file_io::preset_path(kDebugPresetFilename);
+                    const std::string json_text = layer_preset::serialize(compositor.layers());
+                    preset_file_io::WriteResult result = preset_file_io::write_file(path, json_text);
+                    std::string status = result.success
+                                              ? "saved " + std::to_string(compositor.layers().size()) +
+                                                    " layer(s) to " + path + "\n"
+                                              : "ERROR: failed saving preset to " + path + ": " + result.error + "\n";
+                    refresh_display(status + format_layers_block(compositor, selected), last_display_lines);
+                } else if (IsKeyPressed(KEY_O)) {
+                    const std::string path = preset_file_io::preset_path(kDebugPresetFilename);
+                    preset_file_io::ReadResult read_result = preset_file_io::read_file(path);
+                    std::string status;
+                    if (!read_result.success) {
+                        status = "ERROR: failed loading preset from " + path + ": " + read_result.error + "\n";
+                    } else {
+                        std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(read_result.contents);
+                        if (!loaded.has_value()) {
+                            status = "ERROR: preset at " + path + " is malformed or invalid\n";
+                        } else if (!compositor.replace_layers_if_ids_valid(std::move(*loaded))) {
+                            status = "ERROR: preset at " + path + " was rejected by the compositor\n";
+                        } else {
+                            selected = compositor.layers().empty()
+                                           ? 0
+                                           : std::min(selected, compositor.layers().size() - 1);
+                            status = "loaded " + std::to_string(compositor.layers().size()) + " layer(s) from " +
+                                      path + "\n";
+                        }
+                    }
+                    refresh_display(status + format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_L)) {
                     try {
                         if (using_loopback) {

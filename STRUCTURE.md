@@ -34,7 +34,9 @@ music-visualizer/
 ├── src/
 │   ├── audio/           # producers (file, loopback), ring buffer,
 │   │                     # feature extraction (FFT, banding, onset/envelope)
-│   ├── compositor/       # layer stack, blend modes, offscreen texture management
+│   ├── compositor/       # layer stack, blend modes, offscreen texture management,
+│   │                      # layer preset serialization (layer_preset.h/.cpp) and file I/O
+│   │                      # (preset_file_io.h/.cpp)
 │   ├── visuals/           # one subdirectory per visual module
 │   │   ├── waveform/
 │   │   ├── spectrum/
@@ -47,7 +49,8 @@ music-visualizer/
 │   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI, theme selection)
 ├── tests/
 │   ├── audio/             # mirrors src/audio — FFT banding, onset, envelope tests
-│   ├── compositor/         # layer stack serialization, blend logic tests
+│   ├── compositor/         # layer stack serialization, blend logic tests, layer preset
+│   │                        # serialization/adversarial tests, preset file I/O tests
 │   ├── visuals/             # mirrors src/visuals — per-module logic tests (e.g.
 │   │                         # spectrum_visual_test.cpp, waveform_visual_test.cpp)
 │   ├── ui_host/             # state bridge serialization/message-format tests
@@ -64,6 +67,8 @@ music-visualizer/
 │                               # directory itself is kept via .gitkeep. See Conventions below.
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
+
+**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to the built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The debug tool's `S`/`O` keybindings write/read a fixed debug filename here (`kDebugPresetFilename`, `src/app/app.cpp`) for testing before the real control panel UI exists.
 
 ## Build options
 

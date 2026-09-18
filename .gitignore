@@ -1,5 +1,6 @@
 build/
 tsan/build/
+presets/
 milestone-4-debug-controls.md
 milestone-4-debug-controls.md
 
