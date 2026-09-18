@@ -13,7 +13,7 @@ A real-time, layered audio-reactive visualizer. Audio comes from local files or 
 - raylib for rendering
 - WebView2 (HTML/CSS/JS) for the control panel UI — a deliberate exception to "one language" for the core; see spec §7 for why and the `UIHost` interface that contains it
 
-Don't introduce other audio or rendering libraries without discussing it first, and don't let the WebView2/JS side grow beyond the control panel (e.g., don't move visual rendering or audio logic into it) — the audio/visual core stays single-language with no FFI boundaries within it.
+Don't introduce other audio or rendering libraries without discussing it first, and don't let the WebView2/JS side grow beyond the control panel (e.g., don't move visual rendering or audio logic into it) — the audio/visual core stays single-language with no FFI boundaries within it. **Distribution is a self-contained portable folder, no installer** (spec §7) — WebView2 Fixed Version bundled next to the `.exe`, static CRT linking (`/MT`). Don't switch to Evergreen WebView2 or dynamic CRT linking without discussing it; both were deliberately chosen over Microsoft's general Evergreen recommendation specifically to keep the app installable-by-unzipping.
 
 ## Target Platform
 
