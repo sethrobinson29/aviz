@@ -2,7 +2,6 @@
 
 #include <cmath>
 
-#include "audio/audio_config.h"
 #include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
 
@@ -55,7 +54,7 @@ void LissajousVisual::resize(int width, int height) {
 
 void LissajousVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
                               const std::optional<Palette>& palette_override) {
-    const std::size_t idle_band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
+    const std::size_t idle_band = waveform_math::safe_band_index(reactivity.freq_band);
     const bool idle = features.band_idle[idle_band];
 
     const waveform_math::ReactivityResult reactivity_result =

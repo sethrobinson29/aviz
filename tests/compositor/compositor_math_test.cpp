@@ -1,9 +1,20 @@
 #include "compositor/compositor_math.h"
 
+#include <cstdint>
+#include <limits>
+
 #include <gtest/gtest.h>
 
 #include "raylib.h"
 #include "rlgl.h"
+
+namespace {
+Layer make_test_layer(std::uint64_t id) {
+    Layer layer{VisualType::Waveform, make_visual(VisualType::Waveform)};
+    layer.layer_id = id;
+    return layer;
+}
+}
 
 TEST(ClampOpacityTest, ClampsIntoZeroOneRange) {
     EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-0.5f), 0.0f);
@@ -129,4 +140,58 @@ TEST(PrevReactivitySourceTest, IsInverseOfNextReactivitySourceWithinAValidPair) 
               compositor_math::next_reactivity_source(ReactivitySource::BandOnset, 3));
     EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
               compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt));
+}
+
+TEST(HasDuplicateLayerIdsTest, EmptyIsFalse) {
+    std::vector<Layer> layers;
+    EXPECT_FALSE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasDuplicateLayerIdsTest, AllUniqueIsFalse) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(3));
+    EXPECT_FALSE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasDuplicateLayerIdsTest, RepeatedIdFromAHandEditedPresetIsDetected) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(5));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(5));
+    EXPECT_TRUE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasInvalidLayerIdTest, ZeroIdIsInvalid) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(kInvalidLayerId));
+    EXPECT_TRUE(compositor_math::has_invalid_layer_id(layers));
+}
+
+TEST(HasInvalidLayerIdTest, NonZeroIdsAreValid) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(42));
+    EXPECT_FALSE(compositor_math::has_invalid_layer_id(layers));
+}
+
+TEST(NextLayerIdAfterLoadTest, EmptyStartsAtOne) {
+    std::vector<Layer> layers;
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers), 1u);
+}
+
+TEST(NextLayerIdAfterLoadTest, ResumesFromOneAboveTheHighestLoadedId) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(3));
+    layers.push_back(make_test_layer(9));
+    layers.push_back(make_test_layer(5));
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers), 10u);
+}
+
+TEST(NextLayerIdAfterLoadTest, SaturatesInsteadOfWrappingPastUint64MaxOnAHandEditedHugeId) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(std::numeric_limits<std::uint64_t>::max()));
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers),
+              std::numeric_limits<std::uint64_t>::max());
 }

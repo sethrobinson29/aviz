@@ -1,11 +1,45 @@
 #include "compositor/compositor_math.h"
 
+#include <limits>
+#include <unordered_set>
+
 #include "raylib.h"
 #include "rlgl.h"
 
 namespace compositor_math {
 
 float clamp_opacity(float opacity) { return std::clamp(opacity, 0.0f, 1.0f); }
+
+bool has_duplicate_layer_ids(const std::vector<Layer>& layers) {
+    std::unordered_set<std::uint64_t> seen;
+    seen.reserve(layers.size());
+    for (const Layer& layer : layers) {
+        if (!seen.insert(layer.layer_id).second) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool has_invalid_layer_id(const std::vector<Layer>& layers) {
+    for (const Layer& layer : layers) {
+        if (layer.layer_id == kInvalidLayerId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::uint64_t next_layer_id_after_load(const std::vector<Layer>& layers) {
+    if (layers.empty()) {
+        return 1;
+    }
+    std::uint64_t max_id = 0;
+    for (const Layer& layer : layers) {
+        max_id = std::max(max_id, layer.layer_id);
+    }
+    return max_id == std::numeric_limits<std::uint64_t>::max() ? max_id : max_id + 1;
+}
 
 float clamp_sensitivity(float sensitivity) {
     return std::clamp(sensitivity, kSensitivityMin, kSensitivityMax);

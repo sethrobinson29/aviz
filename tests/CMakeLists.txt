@@ -61,9 +61,11 @@ add_executable(compositor_tests
   compositor/compositor_math_test.cpp
   compositor/compositor_test.cpp
   compositor/layer_test.cpp
+  compositor/layer_preset_test.cpp
   ../src/compositor/compositor_math.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/layer.cpp
+  ../src/compositor/layer_preset.cpp
   ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
@@ -74,7 +76,7 @@ add_executable(compositor_tests
   ../src/visuals/fractal/fractal_visual.cpp
 )
 target_include_directories(compositor_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
-target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
+target_link_libraries(compositor_tests PRIVATE GTest::gtest_main GTest::gmock raylib nlohmann_json::nlohmann_json)
 gtest_discover_tests(compositor_tests)
 
 # Startup layer-generation logic (-n debug flag, milestone-4-debug-controls.md).

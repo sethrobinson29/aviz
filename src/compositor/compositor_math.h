@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -10,6 +11,10 @@
 namespace compositor_math {
 
 float clamp_opacity(float opacity);
+
+bool has_duplicate_layer_ids(const std::vector<Layer>& layers);
+bool has_invalid_layer_id(const std::vector<Layer>& layers);
+std::uint64_t next_layer_id_after_load(const std::vector<Layer>& layers);
 
 inline constexpr float kSensitivityMin = 0.0f;
 inline constexpr float kSensitivityMax = 4.0f;

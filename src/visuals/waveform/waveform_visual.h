@@ -28,6 +28,8 @@ struct ReactivityResult {
 
 ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity);
 
+std::size_t safe_band_index(std::optional<std::size_t> freq_band);
+
 }
 
 struct WaveformParams {

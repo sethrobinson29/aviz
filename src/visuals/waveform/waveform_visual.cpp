@@ -48,13 +48,15 @@ float next_onset_pulse(float current_pulse, bool band_changed, bool onset_active
 ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity) {
     ReactivityResult result;
     if (reactivity.freq_band.has_value()) {
-        std::size_t band = *reactivity.freq_band;
-        if (reactivity.source == ReactivitySource::BandAmplitude) {
-            result.amplitude_scale =
-                band_amplitude_scale(features.band_energy[band], features.band_agc_reference[band]) *
-                reactivity.sensitivity;
-        } else if (reactivity.source == ReactivitySource::BandOnset) {
-            result.onset_active = features.band_onset[band];
+        const std::size_t band = *reactivity.freq_band;
+        if (band < audio_config::kNumBands) {
+            if (reactivity.source == ReactivitySource::BandAmplitude) {
+                result.amplitude_scale =
+                    band_amplitude_scale(features.band_energy[band], features.band_agc_reference[band]) *
+                    reactivity.sensitivity;
+            } else if (reactivity.source == ReactivitySource::BandOnset) {
+                result.onset_active = features.band_onset[band];
+            }
         }
     } else if (reactivity.source == ReactivitySource::GlobalBeat) {
         result.onset_active = features.band_onset[audio_config::kGlobalBandIndex];
@@ -63,6 +65,13 @@ ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerRe
         result.onset_pulse_target = reactivity.sensitivity;
     }
     return result;
+}
+
+std::size_t safe_band_index(std::optional<std::size_t> freq_band) {
+    if (freq_band.has_value() && *freq_band < audio_config::kNumBands) {
+        return *freq_band;
+    }
+    return audio_config::kGlobalBandIndex;
 }
 
 }
@@ -86,7 +95,7 @@ void WaveformVisual::resize(int width, int height) {
 
 void WaveformVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
                              const std::optional<Palette>& palette_override) {
-    const std::size_t idle_band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
+    const std::size_t idle_band = waveform_math::safe_band_index(reactivity.freq_band);
     const bool idle = features.band_idle[idle_band];
 
     const waveform_math::ReactivityResult reactivity_result =

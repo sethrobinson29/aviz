@@ -55,6 +55,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pffft)
 
+# --- nlohmann/json --------------------------------------------------------------
+# Layer preset persistence and, later, the WebView2 state bridge (spec §7/§9)
+# both serialize the same JSON shape. Header-only, chosen for idiomatic
+# modern-C++ ergonomics over RapidJSON/simdjson -- preset files are small and
+# read/written rarely, so neither of those libraries' performance edge matters
+# here, and this one reads closest to normal C++ at every call site.
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # --- GoogleTest / GoogleMock ---------------------------------------------------
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
@@ -91,9 +104,10 @@ add_executable(aviz
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
+  src/compositor/layer_preset.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
+target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT nlohmann_json::nlohmann_json)
 if(AVIZ_VERBOSE_RAYLIB_LOG)
   target_compile_definitions(aviz PRIVATE AVIZ_VERBOSE_RAYLIB_LOG)
 endif()
