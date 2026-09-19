@@ -10,12 +10,16 @@ duplicated. See `visualizer-design-spec.md` for full architecture and
 ## Status
 
 Local playback + feature extraction, waveform/spectrum/radial/particles/
-lissajous/flow field visuals, the layer compositor (stacking, opacity, blend modes,
-tint), layer
-duplication + frequency mapping (`freq_band`, `reactivity_source`,
-`enabled`), and WASAPI loopback capture with mid-session source switching are
-implemented — see "Features" below. The control panel UI doesn't exist yet.
-Build order follows `visualizer-design-spec.md` §8.
+lissajous/flow field/fractal visuals, the layer compositor (stacking,
+opacity, blend modes, tint, palette override), layer duplication + frequency
+mapping (`freq_band`, `reactivity_source`, `enabled`), layer preset
+save/load, and WASAPI loopback capture with mid-session source switching are
+implemented — see "Features" below. The WebView2 control panel window,
+security defaults, and the dispatch queue foundation (milestone 8's first
+slice) are also up; the actual layer-stack UI content (add/remove/reorder
+controls, per-layer inspector, theme selector) is not built yet — the panel
+currently shows a placeholder page. Build order follows
+`visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -23,7 +27,7 @@ Build order follows `visualizer-design-spec.md` §8.
 - [miniaudio](https://github.com/mackron/miniaudio) — audio I/O, file decoding, and loopback capture
 - [pffft](https://github.com/marton78/pffft) — real-valued FFT for feature extraction
 - [raylib](https://github.com/raysan5/raylib) — rendering
-- WebView2 (HTML/CSS/JS) — control panel UI (planned)
+- WebView2 (HTML/CSS/JS) — control panel UI (window + dispatch queue built; full layer-stack UI content not yet)
 
 ## Platform
 
@@ -122,6 +126,18 @@ run directly from `tsan/`.
   (opacity, blend mode, tint, `freq_band`, `reactivity_source`, `enabled`).
   Disabled layers are skipped entirely — no offscreen render, no
   compositing pass.
+- **Layer preset save/load**: the full layer stack (visual type, opacity,
+  blend mode, tint, palette override, `freq_band`, `reactivity_source`,
+  `sensitivity`, `enabled`) serializes to/from a versioned JSON schema
+  (`layer_preset.h`/`.cpp`) and round-trips through `presets/` (a
+  runtime-only folder next to the executable, not checked into the repo).
+  Every layer carries a stable `layer_id`, assigned on creation and
+  preserved across save/load, so a reference to a specific layer survives a
+  reorder — loading validates the id set (no duplicates, none invalid)
+  before replacing the in-memory stack, rejecting the whole file rather than
+  partially applying a malformed one. The debug tool's `S`/`O` keys exercise
+  this today (save/load a fixed debug filename); real panel-driven preset
+  management is still milestone 8 work.
 - **Palette override** (milestone 7): a per-layer `palette_override`
   gradient (`Layer.palette_override`) that replaces a visual's own flat
   color with a sampled gradient, layered under the existing tint multiply
@@ -157,3 +173,18 @@ run directly from `tsan/`.
   uncapped past 1.0, by design) and, pre-clamp, sets the snap-up magnitude
   of an onset-driven pulse (Waveform's line-thickness pulse, Spectrum's
   per-band white-flash pulse).
+- **Control panel window (milestone 8, first slice)**: a `UIHost` interface
+  (`src/ui_host/ui_host.h`) with a WebView2 implementation, opening alongside
+  the raylib visualizer window with no shared-surface compositing, on its
+  own dedicated thread. Security defaults ship with it from this first
+  version, not as a follow-up: scoped local file access (served via
+  `SetVirtualHostNameToFolderMapping` against `web/panel/` rather than a
+  `file://` URL), restricted navigation (anything outside the panel's own
+  virtual host is cancelled), a page-level Content Security Policy, and
+  DevTools disabled in release builds. WebView2 callbacks never call
+  `Compositor` directly — they push onto a mutex-guarded `PanelDispatchQueue`
+  that the render thread drains once per frame. This slice proves that
+  round trip with one minimal message type (`add_layer`, sent from a plain
+  button in the still-placeholder panel page) rather than the full
+  state-bridge message set. `F11` toggles raylib fullscreen and hides/shows
+  the panel window to match.

@@ -92,3 +92,33 @@ add_executable(app_tests
 target_include_directories(app_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(app_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
 gtest_discover_tests(app_tests)
+
+# C++-side state bridge logic only (panel_message parsing/validation, the
+# dispatch queue, and the queue-to-Compositor round trip) -- the WebView2
+# window itself (src/ui_host/ui_host_webview2.cpp) is not covered here per
+# STRUCTURE.md's note that web/panel/ and the live WebView2 host are
+# human-review territory, same as visual/audio correctness. Links Compositor
+# (GL-free here, same add_layer-without-resize() pattern as compositor_tests)
+# to prove drained messages actually apply, not just that the queue holds
+# them.
+add_executable(ui_host_tests
+  ui_host/panel_message_test.cpp
+  ui_host/panel_dispatch_queue_test.cpp
+  ui_host/panel_dispatch_round_trip_test.cpp
+  ../src/ui_host/panel_message.cpp
+  ../src/ui_host/panel_dispatch_queue.cpp
+  ../src/compositor/compositor.cpp
+  ../src/compositor/compositor_math.cpp
+  ../src/compositor/layer.cpp
+  ../src/visuals/palette.cpp
+  ../src/visuals/waveform/waveform_visual.cpp
+  ../src/visuals/spectrum/spectrum_visual.cpp
+  ../src/visuals/radial/radial_visual.cpp
+  ../src/visuals/particles/particles_visual.cpp
+  ../src/visuals/lissajous/lissajous_visual.cpp
+  ../src/visuals/flow_field/flow_field_visual.cpp
+  ../src/visuals/fractal/fractal_visual.cpp
+)
+target_include_directories(ui_host_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
+target_link_libraries(ui_host_tests PRIVATE GTest::gtest_main GTest::gmock raylib nlohmann_json::nlohmann_json)
+gtest_discover_tests(ui_host_tests)

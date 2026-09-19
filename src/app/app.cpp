@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstddef>
+#include <filesystem>
+#include <memory>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -22,6 +24,7 @@
 #include "compositor/layer_preset.h"
 #include "compositor/preset_file_io.h"
 #include "raylib.h"
+#include "ui_host/ui_host.h"
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
@@ -37,6 +40,13 @@ constexpr float kLayerPaletteSaturation = 0.75f;
 constexpr float kLayerPaletteValue = 0.95f;
 
 const char* kDebugPresetFilename = "debug-preset.json";
+
+std::string resolve_absolute_panel_content_dir() {
+    const char* app_dir = GetApplicationDirectory();
+    std::string candidate = std::string(app_dir) + "web/panel";
+    std::string resolved = DirectoryExists(candidate.c_str()) ? candidate : std::string("web/panel");
+    return std::filesystem::absolute(resolved).string();
+}
 
 Color layer_palette_color(std::size_t index) {
     float hue = (360.0f * static_cast<float>(index)) / static_cast<float>(Compositor::kMaxLayers);
@@ -215,9 +225,13 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
         InitWindow(kWindowWidth, kWindowHeight, "aviz");
         SetTargetFPS(kTargetFps);
 
+        std::unique_ptr<UIHost> ui_host = create_ui_host(resolve_absolute_panel_content_dir());
+        bool fullscreen = false;
+
         std::printf(
-            "compositor controls (no control panel UI yet -- milestone 8, see "
-            "milestone-4-debug-controls.md):\n"
+            "compositor controls (full layer-stack control panel UI not built yet -- milestone 8's first "
+            "slice only, see milestone-4-debug-controls.md):\n"
+            "  F11       toggle fullscreen (hides/restores the control panel window)\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
             "  1/2/3/4/5/6/7 set selected layer's visual type to "
             "waveform/spectrum/radial/particles/lissajous/flowfield/fractal\n"
@@ -455,6 +469,27 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                         }
                     } catch (const std::exception& e) {
                         std::fprintf(stderr, "error switching audio source: %s\n", e.what());
+                    }
+                } else if (IsKeyPressed(KEY_F11)) {
+                    ToggleFullscreen();
+                    fullscreen = !fullscreen;
+                    if (fullscreen) {
+                        ui_host->hide();
+                    } else {
+                        ui_host->show();
+                    }
+                }
+
+                for (const PanelMessage& message : ui_host->drain_pending_messages()) {
+                    if (message.type == PanelMessageType::AddLayer) {
+                        std::string block;
+                        if (!compositor.add_layer(VisualType::Waveform).has_value()) {
+                            block = format_layer_cap_error(compositor);
+                        } else {
+                            reassign_tints(compositor);
+                        }
+                        block += format_layers_block(compositor, selected);
+                        refresh_display(block, last_display_lines);
                     }
                 }
 
