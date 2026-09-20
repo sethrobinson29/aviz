@@ -6,19 +6,8 @@
 #include <gtest/gtest.h>
 
 #include "audio/audio_producer.h"
+#include "audio/mock_producer.h"
 #include "audio/ring_buffer.h"
-
-namespace {
-
-class MockProducer : public AudioProducer {
-public:
-    MOCK_METHOD(void, start, (AudioRingBuffer&), (override));
-    MOCK_METHOD(void, stop, (), (override));
-    MOCK_METHOD(unsigned, native_channels, (), (const, override));
-    MOCK_METHOD(unsigned, native_sample_rate, (), (const, override));
-};
-
-}
 
 TEST(ProducerHostTest, ConstructorStartsInitialProducer) {
     AudioRingBuffer ring(64, 2);

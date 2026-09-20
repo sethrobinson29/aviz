@@ -294,6 +294,7 @@ Each module implements a common interface: given `AudioFeatures` (filtered to it
 - Entering fullscreen is triggered either by a hotkey or a clickable button in the control panel UI.
 - On entering fullscreen, the control panel window closes/hides rather than staying open-but-covered.
 - Exiting fullscreen is available via the same hotkey or the subtle on-screen button in the visualizer window itself.
+- **Implemented as borderless-windowed fullscreen (raylib's `ToggleBorderlessWindowed()`), not a real display-mode switch (`ToggleFullscreen()`).** Deliberate, not incidental — raylib's real display-mode switch is prone to HDMI blackout/artifacting on some setups; borderless-windowed is raylib's purpose-built alternative for exactly that class of problem. Panel-visibility state (whether the control panel should be hidden) is computed fresh from `(dock mode, fullscreen state)` each time either changes, not toggled unconditionally on entry/exit — this also correctly handles toggling dock mode while already fullscreen, a case unconditional hide/show didn't handle.
 
 **Theming:** a fixed set of built-in themes (data-driven — palette, gradients, chrome/glass treatment per theme), selectable from the control panel, not an open-ended user skin/modding system. Closer to "pick a WinAmp skin from a list" than "build your own skin." Not to be confused with layer presets (above) — themes affect only the panel's own appearance, not the layer stack.
 

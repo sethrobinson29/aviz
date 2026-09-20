@@ -4,85 +4,80 @@
 
 #include "compositor/compositor.h"
 #include "compositor/layer.h"
-#include "ui_host/fake_ui_host.h"
+#include "ui_host/panel_apply_test_fixture.h"
 #include "ui_host/panel_message_apply.h"
 
 namespace {
 
-void apply_drained_messages(PanelDispatchQueue& queue, Compositor& compositor, UIHost& ui_host) {
-    for (const PanelMessage& message : queue.drain()) {
-        panel_message_apply::apply(message, compositor, ui_host);
+class PanelDispatchRoundTripTest : public PanelApplyTestFixture {
+protected:
+    void apply_drained_messages() {
+        for (const PanelMessage& message : queue_.drain()) {
+            apply(message);
+        }
     }
-}
+
+    PanelDispatchQueue queue_;
+};
 
 }
 
-TEST(PanelDispatchRoundTripTest, AddLayerMessageAddsExactlyOneLayer) {
-    PanelDispatchQueue queue;
-    Compositor compositor;
-    FakeUIHost ui_host;
+TEST_F(PanelDispatchRoundTripTest, AddLayerMessageAddsExactlyOneLayer) {
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
+    apply_drained_messages();
 
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
-    apply_drained_messages(queue, compositor, ui_host);
-
-    ASSERT_EQ(compositor.layers().size(), 1u);
-    EXPECT_EQ(compositor.layers()[0].visual_type, VisualType::Waveform);
+    ASSERT_EQ(compositor_.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Waveform);
 }
 
-TEST(PanelDispatchRoundTripTest, MultipleQueuedMessagesApplyInOrder) {
-    PanelDispatchQueue queue;
-    Compositor compositor;
-    FakeUIHost ui_host;
+TEST_F(PanelDispatchRoundTripTest, MultipleQueuedMessagesApplyInOrder) {
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Spectrum}});
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Radial}});
+    apply_drained_messages();
 
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Spectrum}});
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Radial}});
-    apply_drained_messages(queue, compositor, ui_host);
-
-    ASSERT_EQ(compositor.layers().size(), 3u);
-    EXPECT_EQ(compositor.layers()[0].visual_type, VisualType::Waveform);
-    EXPECT_EQ(compositor.layers()[1].visual_type, VisualType::Spectrum);
-    EXPECT_EQ(compositor.layers()[2].visual_type, VisualType::Radial);
+    ASSERT_EQ(compositor_.layers().size(), 3u);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Waveform);
+    EXPECT_EQ(compositor_.layers()[1].visual_type, VisualType::Spectrum);
+    EXPECT_EQ(compositor_.layers()[2].visual_type, VisualType::Radial);
 }
 
-TEST(PanelDispatchRoundTripTest, DrainingTwiceDoesNotDoubleApply) {
-    PanelDispatchQueue queue;
-    Compositor compositor;
-    FakeUIHost ui_host;
+TEST_F(PanelDispatchRoundTripTest, DrainingTwiceDoesNotDoubleApply) {
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
+    apply_drained_messages();
+    apply_drained_messages();
 
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
-    apply_drained_messages(queue, compositor, ui_host);
-    apply_drained_messages(queue, compositor, ui_host);
-
-    EXPECT_EQ(compositor.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers().size(), 1u);
 }
 
-TEST(PanelDispatchRoundTripTest, RespectsLayerCap) {
-    PanelDispatchQueue queue;
-    Compositor compositor;
-    FakeUIHost ui_host;
-
+TEST_F(PanelDispatchRoundTripTest, RespectsLayerCap) {
     for (std::size_t i = 0; i < Compositor::kMaxLayers + 5; ++i) {
-        queue.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
+        queue_.push(PanelMessage{AddLayerMessage{VisualType::Waveform}});
     }
-    apply_drained_messages(queue, compositor, ui_host);
+    apply_drained_messages();
 
-    EXPECT_EQ(compositor.layers().size(), Compositor::kMaxLayers);
+    EXPECT_EQ(compositor_.layers().size(), Compositor::kMaxLayers);
 }
 
-TEST(PanelDispatchRoundTripTest, MixedMessageTypesApplyInPushOrder) {
-    PanelDispatchQueue queue;
-    Compositor compositor;
-    FakeUIHost ui_host;
-    std::uint64_t first_id = compositor.add_layer(VisualType::Waveform).has_value()
-                                  ? compositor.layers()[0].layer_id
+TEST_F(PanelDispatchRoundTripTest, MixedMessageTypesApplyInPushOrder) {
+    std::uint64_t first_id = compositor_.add_layer(VisualType::Waveform).has_value()
+                                  ? compositor_.layers()[0].layer_id
                                   : 0;
 
-    queue.push(PanelMessage{AddLayerMessage{VisualType::Spectrum}});
-    queue.push(PanelMessage{SetLayerOpacityMessage{first_id, 0.25f}});
-    queue.push(PanelMessage{RemoveLayerMessage{first_id}});
-    apply_drained_messages(queue, compositor, ui_host);
+    queue_.push(PanelMessage{AddLayerMessage{VisualType::Spectrum}});
+    queue_.push(PanelMessage{SetLayerOpacityMessage{first_id, 0.25f}});
+    queue_.push(PanelMessage{RemoveLayerMessage{first_id}});
+    apply_drained_messages();
 
-    ASSERT_EQ(compositor.layers().size(), 1u);
-    EXPECT_EQ(compositor.layers()[0].visual_type, VisualType::Spectrum);
+    ASSERT_EQ(compositor_.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Spectrum);
+}
+
+TEST_F(PanelDispatchRoundTripTest, SetDockedAndSwitchSourceMessagesRouteThroughTheQueueToo) {
+    queue_.push(PanelMessage{SetDockedMessage{false}});
+    queue_.push(PanelMessage{SwitchSourceMessage{}});
+    apply_drained_messages();
+
+    EXPECT_EQ(window_layout_.mode(), WindowMode::Detached);
+    EXPECT_TRUE(audio_source_.is_loopback());
 }

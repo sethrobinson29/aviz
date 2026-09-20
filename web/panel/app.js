@@ -9,6 +9,9 @@
     var addVisualTypeEl = document.getElementById("add-visual-type");
     var statusEl = document.getElementById("status");
     var savePresetNameEl = document.getElementById("save-preset-name");
+    var dockCheckbox = document.getElementById("dock-checkbox");
+    var fullscreenCheckbox = document.getElementById("fullscreen-checkbox");
+    var sourceButton = document.getElementById("source-button");
 
     var layerRowElements = new Map();
 
@@ -224,6 +227,40 @@
             renderPresetList(data.files);
         } else if (data.kind === "status") {
             showStatus(data.ok, data.message);
+        } else if (data.kind === "window_state") {
+            renderWindowState(data);
+        }
+    });
+
+    function renderWindowState(data) {
+        dockCheckbox.checked = data.docked;
+        fullscreenCheckbox.checked = data.fullscreen;
+        sourceButton.textContent = data.loopback ? "Loopback" : "File";
+    }
+
+    dockCheckbox.addEventListener("change", function () {
+        post("set_docked", { docked: dockCheckbox.checked });
+    });
+
+    fullscreenCheckbox.addEventListener("change", function () {
+        post("set_fullscreen", { fullscreen: fullscreenCheckbox.checked });
+    });
+
+    sourceButton.addEventListener("click", function () {
+        post("switch_source", {});
+    });
+
+    document.addEventListener("keydown", function (e) {
+        var tag = document.activeElement ? document.activeElement.tagName : "";
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+        if (e.key === "F11") {
+            e.preventDefault();
+            post("set_fullscreen", { fullscreen: !fullscreenCheckbox.checked });
+        } else if (e.key.toLowerCase() === "k") {
+            post("set_docked", { docked: !dockCheckbox.checked });
+        } else if (e.key.toLowerCase() === "l") {
+            post("switch_source", {});
         }
     });
 

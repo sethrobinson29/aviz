@@ -14,11 +14,12 @@ lissajous/flow field/fractal visuals, the layer compositor (stacking,
 opacity, blend modes, tint, palette override), layer duplication + frequency
 mapping (`freq_band`, `reactivity_source`, `enabled`), layer preset
 save/load, and WASAPI loopback capture with mid-session source switching are
-implemented — see "Features" below. The WebView2 control panel window,
-security defaults, and the dispatch queue foundation (milestone 8's first
-slice) are also up; the actual layer-stack UI content (add/remove/reorder
-controls, per-layer inspector, theme selector) is not built yet — the panel
-currently shows a placeholder page. Build order follows
+implemented — see "Features" below. The WebView2 control panel is now a real
+layer-management UI (add/remove/duplicate/drag-reorder, generic per-layer
+controls, preset save/load) with security defaults, docked/detached window
+management, and synced fullscreen/dock/source-switch controls (panel UI,
+hotkey, and hotkeys-from-either-window all agree) — theme selection is the
+one remaining milestone 8 item. Build order follows
 `visualizer-design-spec.md` §8.
 
 ## Stack
@@ -27,7 +28,7 @@ currently shows a placeholder page. Build order follows
 - [miniaudio](https://github.com/mackron/miniaudio) — audio I/O, file decoding, and loopback capture
 - [pffft](https://github.com/marton78/pffft) — real-valued FFT for feature extraction
 - [raylib](https://github.com/raysan5/raylib) — rendering
-- WebView2 (HTML/CSS/JS) — control panel UI (window + dispatch queue built; full layer-stack UI content not yet)
+- WebView2 (HTML/CSS/JS) — control panel UI
 
 ## Platform
 
@@ -173,18 +174,45 @@ run directly from `tsan/`.
   uncapped past 1.0, by design) and, pre-clamp, sets the snap-up magnitude
   of an onset-driven pulse (Waveform's line-thickness pulse, Spectrum's
   per-band white-flash pulse).
-- **Control panel window (milestone 8, first slice)**: a `UIHost` interface
-  (`src/ui_host/ui_host.h`) with a WebView2 implementation, opening alongside
-  the raylib visualizer window with no shared-surface compositing, on its
-  own dedicated thread. Security defaults ship with it from this first
-  version, not as a follow-up: scoped local file access (served via
-  `SetVirtualHostNameToFolderMapping` against `web/panel/` rather than a
-  `file://` URL), restricted navigation (anything outside the panel's own
-  virtual host is cancelled), a page-level Content Security Policy, and
-  DevTools disabled in release builds. WebView2 callbacks never call
-  `Compositor` directly — they push onto a mutex-guarded `PanelDispatchQueue`
-  that the render thread drains once per frame. This slice proves that
-  round trip with one minimal message type (`add_layer`, sent from a plain
-  button in the still-placeholder panel page) rather than the full
-  state-bridge message set. `F11` toggles raylib fullscreen and hides/shows
-  the panel window to match.
+- **Control panel window**: a `UIHost` interface (`src/ui_host/ui_host.h`)
+  with a WebView2 implementation, opening alongside the raylib visualizer
+  window with no shared-surface compositing, on its own dedicated thread.
+  Security defaults ship with it, not as a follow-up: scoped local file
+  access (served via `SetVirtualHostNameToFolderMapping` against
+  `web/panel/` rather than a `file://` URL), restricted navigation (anything
+  outside the panel's own virtual host is cancelled), a page-level Content
+  Security Policy, and DevTools disabled in release builds. WebView2
+  callbacks never call `Compositor` (or any window-mode-changing function)
+  directly — they push onto a mutex-guarded `PanelDispatchQueue` that the
+  render thread drains once per frame and applies via `panel_message_apply`,
+  the same path for every message type.
+- **Layer management from the panel**: add (choose visual type)/remove/
+  duplicate/drag-to-reorder, plus every generic per-layer control (opacity,
+  blend mode, `freq_band`, `reactivity_source`, `sensitivity`, `enabled`)
+  and preset list/load/save — all reusing the existing tested
+  `layer_preset`/`preset_file_io` schema and validation, now exposed through
+  real UI instead of the debug tool's fixed-filename `S`/`O` keys.
+  `preset_file_io::is_safe_preset_filename` validates user-typed filenames
+  against path traversal, separators, and unexpected extensions, since the
+  panel is the first place a user-typed filename reaches the filesystem.
+- **Docked/detached window layout**: at launch (and whenever redocking) the
+  visualizer and panel windows are positioned as one adjacent, centered
+  block (`window_layout_config.h`'s pure `compute_docked_layout`); detaching
+  is a pure state flip that stops enforcing that layout, for the
+  panel-on-one-display / visualizer-fullscreen-on-another workflow.
+  Dragging either window while nominally docked is treated as an explicit
+  detach (caught via `WM_EXITSIZEMOVE`, which only fires for genuine
+  interactive drags, never the app's own programmatic repositioning) rather
+  than letting them silently drift out of sync.
+- **Fullscreen, dock, and audio source are synced three ways**: the panel's
+  checkboxes/button, the existing hotkeys (`F11`/`K`/`L`), and — new — those
+  same hotkeys now also work while the panel window has focus (a JS
+  `keydown` listener re-sends the identical panel message the UI control
+  would send, no new native surface). Fullscreen uses raylib's
+  `ToggleBorderlessWindowed()`, not `ToggleFullscreen()`'s exclusive
+  display-mode switch, specifically to avoid the signal
+  renegotiation/mode-switch artifacts some displays show under real
+  exclusive fullscreen. `AudioSourceController` is the single source of
+  truth for file/loopback state, shared by the `L` hotkey and the panel's
+  source-switch button — no second switching mechanism alongside
+  `ProducerHost::switch_to`.

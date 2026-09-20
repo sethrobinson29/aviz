@@ -115,7 +115,11 @@ include(GoogleTest)
 add_executable(aviz
   src/main.cpp
   src/app/app.cpp
+  src/app/audio_source_controller.cpp
   src/app/layer_generator.cpp
+  src/app/window_layout_config.cpp
+  src/app/window_layout_controller.cpp
+  src/app/window_mode_state.cpp
   src/audio/miniaudio_backend.cpp
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
@@ -152,8 +156,8 @@ endif()
 # UIHost interface being designed swappable even though only Windows is
 # implemented now.
 if(WIN32)
-  target_sources(aviz PRIVATE src/ui_host/ui_host_webview2.cpp)
-  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi)
+  target_sources(aviz PRIVATE src/ui_host/ui_host_webview2.cpp src/app/raylib_window_watcher.cpp)
+  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32)
 endif()
 
 add_custom_command(TARGET aviz POST_BUILD

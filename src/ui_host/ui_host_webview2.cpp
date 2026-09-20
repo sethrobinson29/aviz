@@ -30,12 +30,18 @@ constexpr wchar_t kWindowClassName[] = L"AvizControlPanel";
 constexpr wchar_t kVirtualHostName[] = L"aviz.local";
 constexpr wchar_t kStartPage[] = L"https://aviz.local/index.html";
 constexpr wchar_t kTrustedPrefix[] = L"https://aviz.local/";
-constexpr int kDefaultWidth = 420;
-constexpr int kDefaultHeight = 720;
 
 constexpr UINT kMsgShowPanel = WM_APP + 1;
 constexpr UINT kMsgHidePanel = WM_APP + 2;
 constexpr UINT kMsgSendToPanel = WM_APP + 3;
+constexpr UINT kMsgSetBounds = WM_APP + 4;
+
+struct BoundsPayload {
+    int x;
+    int y;
+    int width;
+    int height;
+};
 
 std::wstring utf8_to_wide(const std::string& text) {
     if (text.empty()) {
@@ -74,7 +80,9 @@ bool is_trusted_uri(const wchar_t* uri) {
 
 class WebView2UIHost final : public UIHost {
 public:
-    explicit WebView2UIHost(std::string content_dir) : content_dir_(std::move(content_dir)) {
+    WebView2UIHost(std::string content_dir, int initial_x, int initial_y, int initial_width, int initial_height)
+        : content_dir_(std::move(content_dir)),
+          initial_bounds_{initial_x, initial_y, initial_width, initial_height} {
         std::unique_lock<std::mutex> lock(startup_mutex_);
         thread_ = std::thread(&WebView2UIHost::thread_main, this);
         startup_cv_.wait(lock, [this] { return hwnd_ != nullptr || startup_failed_; });
@@ -103,6 +111,16 @@ public:
 
     bool is_visible() const override { return visible_.load(); }
 
+    void set_bounds(int x, int y, int width, int height) override {
+        if (hwnd_ == nullptr) {
+            return;
+        }
+        auto* payload = new BoundsPayload{x, y, width, height};
+        if (!PostMessageW(hwnd_, kMsgSetBounds, 0, reinterpret_cast<LPARAM>(payload))) {
+            delete payload;
+        }
+    }
+
     std::vector<PanelMessage> drain_pending_messages() override { return queue_.drain(); }
 
     void send_to_panel(const std::string& json_text) override {
@@ -130,8 +148,8 @@ private:
         RegisterClassW(&wc);
 
         HWND hwnd = CreateWindowExW(0, kWindowClassName, L"aviz control panel", WS_OVERLAPPEDWINDOW,
-                                     CW_USEDEFAULT, CW_USEDEFAULT, kDefaultWidth, kDefaultHeight, nullptr,
-                                     nullptr, GetModuleHandleW(nullptr), this);
+                                     initial_bounds_.x, initial_bounds_.y, initial_bounds_.width,
+                                     initial_bounds_.height, nullptr, nullptr, GetModuleHandleW(nullptr), this);
         if (hwnd == nullptr) {
             CoUninitialize();
             fail_startup();
@@ -297,6 +315,15 @@ private:
                 }
                 visible_.store(false);
                 return 0;
+            case kMsgSetBounds: {
+                std::unique_ptr<BoundsPayload> payload(reinterpret_cast<BoundsPayload*>(lparam));
+                SetWindowPos(hwnd, nullptr, payload->x, payload->y, payload->width, payload->height,
+                             SWP_NOZORDER | SWP_NOACTIVATE);
+                return 0;
+            }
+            case WM_EXITSIZEMOVE:
+                queue_.push(PanelMessage{SetDockedMessage{false}});
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
             case kMsgSendToPanel: {
                 std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));
                 if (webview_) {
@@ -325,6 +352,7 @@ private:
 
     PanelDispatchQueue queue_;
     std::string content_dir_;
+    BoundsPayload initial_bounds_;
     std::thread thread_;
 
     std::mutex startup_mutex_;
@@ -339,6 +367,7 @@ private:
     ComPtr<ICoreWebView2> webview_;
 };
 
-std::unique_ptr<UIHost> create_ui_host(const std::string& content_dir) {
-    return std::make_unique<WebView2UIHost>(content_dir);
+std::unique_ptr<UIHost> create_ui_host(const std::string& content_dir, int initial_x, int initial_y,
+                                        int initial_width, int initial_height) {
+    return std::make_unique<WebView2UIHost>(content_dir, initial_x, initial_y, initial_width, initial_height);
 }

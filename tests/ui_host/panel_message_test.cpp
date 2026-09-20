@@ -234,3 +234,48 @@ TEST(PanelMessageParseTest, IgnoresUnknownExtraFields) {
         panel_message::parse(R"({"type":"add_layer","visual_type":"Waveform","extra":123,"nested":{"a":1}})");
     expect_type<AddLayerMessage>(message);
 }
+
+TEST(PanelMessageParseTest, ParsesSetDockedTrue) {
+    auto message = panel_message::parse(R"({"type":"set_docked","docked":true})");
+    SetDockedMessage typed = expect_type<SetDockedMessage>(message);
+    EXPECT_TRUE(typed.docked);
+}
+
+TEST(PanelMessageParseTest, ParsesSetDockedFalse) {
+    auto message = panel_message::parse(R"({"type":"set_docked","docked":false})");
+    SetDockedMessage typed = expect_type<SetDockedMessage>(message);
+    EXPECT_FALSE(typed.docked);
+}
+
+TEST(PanelMessageParseTest, SetDockedRejectsNonBooleanValue) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_docked","docked":1})").has_value());
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_docked","docked":"true"})").has_value());
+}
+
+TEST(PanelMessageParseTest, SetDockedRejectsMissingField) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_docked"})").has_value());
+}
+
+TEST(PanelMessageParseTest, ParsesSetFullscreenTrue) {
+    auto message = panel_message::parse(R"({"type":"set_fullscreen","fullscreen":true})");
+    SetFullscreenMessage typed = expect_type<SetFullscreenMessage>(message);
+    EXPECT_TRUE(typed.fullscreen);
+}
+
+TEST(PanelMessageParseTest, SetFullscreenRejectsNonBooleanValue) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_fullscreen","fullscreen":"yes"})").has_value());
+}
+
+TEST(PanelMessageParseTest, SetFullscreenRejectsMissingField) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_fullscreen"})").has_value());
+}
+
+TEST(PanelMessageParseTest, ParsesSwitchSource) {
+    auto message = panel_message::parse(R"({"type":"switch_source"})");
+    expect_type<SwitchSourceMessage>(message);
+}
+
+TEST(PanelMessageParseTest, SwitchSourceIgnoresExtraFields) {
+    auto message = panel_message::parse(R"({"type":"switch_source","unexpected":true})");
+    expect_type<SwitchSourceMessage>(message);
+}

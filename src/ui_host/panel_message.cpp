@@ -154,6 +154,15 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     if (type == "save_preset") {
         return SavePresetMessage{require_preset_filename(doc)};
     }
+    if (type == "set_docked") {
+        return SetDockedMessage{require_bool(doc, "docked")};
+    }
+    if (type == "set_fullscreen") {
+        return SetFullscreenMessage{require_bool(doc, "fullscreen")};
+    }
+    if (type == "switch_source") {
+        return SwitchSourceMessage{};
+    }
     throw std::invalid_argument("unknown message type \"" + type + "\"");
 }
 

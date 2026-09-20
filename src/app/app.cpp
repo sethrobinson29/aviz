@@ -10,12 +10,15 @@
 #include <string>
 #include <vector>
 
+#include "app/audio_source_controller.h"
 #include "app/layer_generator.h"
+#include "app/raylib_window_watcher.h"
+#include "app/window_layout_config.h"
+#include "app/window_layout_controller.h"
 #include "audio/audio_config.h"
 #include "audio/audio_features.h"
 #include "audio/feature_worker.h"
 #include "audio/file_producer.h"
-#include "audio/loopback_producer.h"
 #include "audio/producer_host.h"
 #include "audio/ring_buffer.h"
 #include "compositor/compositor.h"
@@ -33,8 +36,6 @@
 #include "visuals/radial/radial_visual.h"
 
 namespace {
-constexpr int kWindowWidth = 1280;
-constexpr int kWindowHeight = 720;
 constexpr int kTargetFps = 60;
 
 const char* kDebugPresetFilename = "debug-preset.json";
@@ -201,23 +202,29 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
 
         worker.start();
         ProducerHost producer_host(ring, std::move(initial_producer));
-        bool using_loopback = false;
+        AudioSourceController audio_source_controller(producer_host, original_audio_path);
 
 #ifdef AVIZ_VERBOSE_RAYLIB_LOG
         SetTraceLogLevel(LOG_INFO);
 #else
         SetTraceLogLevel(LOG_WARNING);
 #endif
-        InitWindow(kWindowWidth, kWindowHeight, "aviz");
+        InitWindow(window_layout::kVisualizerWidth, window_layout::kVisualizerHeight, "aviz");
         SetTargetFPS(kTargetFps);
 
-        std::unique_ptr<UIHost> ui_host = create_ui_host(resolve_absolute_panel_content_dir());
-        bool fullscreen = false;
+        const DockedLayout initial_layout = window_layout::compute_docked_layout(
+            GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor()));
+        SetWindowPosition(initial_layout.visualizer.x, initial_layout.visualizer.y);
+
+        std::unique_ptr<UIHost> ui_host =
+            create_ui_host(resolve_absolute_panel_content_dir(), initial_layout.panel.x, initial_layout.panel.y,
+                            initial_layout.panel.width, initial_layout.panel.height);
 
         std::printf(
             "debug compositor controls (independent of the control panel window -- see "
             "milestone-4-debug-controls.md):\n"
-            "  F11       toggle fullscreen (hides/restores the control panel window)\n"
+            "  F11       toggle fullscreen (hides/restores the control panel window; syncs panel)\n"
+            "  K         toggle docked/detached window layout (syncs panel)\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
             "  1/2/3/4/5/6/7 set selected layer's visual type to "
             "waveform/spectrum/radial/particles/lissajous/flowfield/fractal\n"
@@ -236,19 +243,28 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             "  h         toggle selected FlowField layer's onset ripple (no-op on other types)\n"
             "  j         toggle selected FlowField layer's burst-on-onset (no-op on other types)\n"
             "  p         cycle selected layer's palette override (off/warm-cool/sunset)\n"
-            "  L         toggle audio source between file playback and loopback capture\n"
+            "  L         toggle audio source between file playback and loopback capture (syncs panel)\n"
             "  S         save the layer stack to presets/%s\n"
             "  O         load the layer stack from presets/%s\n",
             kDebugPresetFilename, kDebugPresetFilename);
 
         {
             Compositor compositor;
-            compositor.resize(kWindowWidth, kWindowHeight);
+            compositor.resize(initial_layout.visualizer.width, initial_layout.visualizer.height);
+            WindowLayoutController window_layout_controller(compositor, *ui_host);
+            RaylibWindowWatcher raylib_window_watcher(GetWindowHandle(), [&]() {
+                window_layout_controller.set_docked(false);
+                panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                        audio_source_controller);
+            });
             populate_startup_layers(compositor, generate_layer_count);
             std::size_t selected = 0;
             compositor_math::reassign_layer_tints(compositor.layers());
             int last_display_lines = 0;
             refresh_display(format_layers_block(compositor, selected), last_display_lines);
+
+            panel_message_apply::PanelApplyContext apply_ctx{compositor, *ui_host, window_layout_controller,
+                                                               audio_source_controller};
 
             while (!WindowShouldClose()) {
                 std::vector<Layer>& layers = compositor.layers();
@@ -438,36 +454,28 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     }
                     refresh_display(status + format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_L)) {
-                    try {
-                        if (using_loopback) {
-                            auto next = std::make_unique<FileProducer>(original_audio_path);
-                            std::printf("switched to file: %s (%u ch, %u Hz)\n",
-                                        original_audio_path.c_str(), next->native_channels(),
-                                        next->native_sample_rate());
-                            producer_host.switch_to(std::move(next));
-                            using_loopback = false;
-                        } else {
-                            auto next = std::make_unique<LoopbackProducer>();
-                            std::printf("switched to loopback capture (%u ch, %u Hz)\n",
-                                        next->native_channels(), next->native_sample_rate());
-                            producer_host.switch_to(std::move(next));
-                            using_loopback = true;
-                        }
-                    } catch (const std::exception& e) {
-                        std::fprintf(stderr, "error switching audio source: %s\n", e.what());
-                    }
-                } else if (IsKeyPressed(KEY_F11)) {
-                    ToggleFullscreen();
-                    fullscreen = !fullscreen;
-                    if (fullscreen) {
-                        ui_host->hide();
+                    AudioSourceController::SwitchResult result = audio_source_controller.toggle();
+                    if (result.success) {
+                        std::printf("switched to %s (%u ch, %u Hz)\n",
+                                    audio_source_controller.is_loopback() ? "loopback capture" : "file playback",
+                                    result.channels, result.sample_rate);
                     } else {
-                        ui_host->show();
+                        std::fprintf(stderr, "error switching audio source: %s\n", result.error.c_str());
                     }
+                    panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                            audio_source_controller);
+                } else if (IsKeyPressed(KEY_F11)) {
+                    window_layout_controller.toggle_fullscreen();
+                    panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                            audio_source_controller);
+                } else if (IsKeyPressed(KEY_K)) {
+                    window_layout_controller.toggle_dock();
+                    panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                            audio_source_controller);
                 }
 
                 for (const PanelMessage& message : ui_host->drain_pending_messages()) {
-                    panel_message_apply::apply(message, compositor, *ui_host);
+                    panel_message_apply::apply(message, apply_ctx);
                 }
 
                 compositor.render(snapshot.current());

@@ -67,11 +67,22 @@ struct SavePresetMessage {
     std::string filename;
 };
 
+struct SetDockedMessage {
+    bool docked;
+};
+
+struct SetFullscreenMessage {
+    bool fullscreen;
+};
+
+struct SwitchSourceMessage {};
+
 using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
-                 LoadPresetMessage, SavePresetMessage>;
+                 LoadPresetMessage, SavePresetMessage, SetDockedMessage, SetFullscreenMessage,
+                 SwitchSourceMessage>;
 
 namespace panel_message {
 
