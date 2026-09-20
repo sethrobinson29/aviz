@@ -32,6 +32,11 @@ ReactivitySource next_reactivity_source(ReactivitySource current,
 ReactivitySource prev_reactivity_source(ReactivitySource current,
                                          std::optional<std::size_t> freq_band);
 
+inline constexpr float kLayerPaletteSaturation = 0.75f;
+inline constexpr float kLayerPaletteValue = 0.95f;
+Color layer_palette_color(std::size_t index);
+void reassign_layer_tints(std::vector<Layer>& layers);
+
 struct BlendFactors {
     int raylib_mode;
     int src_factor;

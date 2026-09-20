@@ -240,6 +240,40 @@ TEST(CompositorLayerIdTest, ManyAddDuplicateAndRemoveCyclesNeverProduceADuplicat
     }
 }
 
+TEST(CompositorIndexOfLayerTest, FindsExistingLayerById) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Waveform);
+    std::size_t second = compositor.add_layer(VisualType::Spectrum).value();
+    std::uint64_t second_id = compositor.layers()[second].layer_id;
+
+    EXPECT_EQ(compositor.index_of_layer(second_id), std::optional<std::size_t>(second));
+}
+
+TEST(CompositorIndexOfLayerTest, ReturnsNulloptForUnknownId) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Waveform);
+
+    EXPECT_EQ(compositor.index_of_layer(99999), std::nullopt);
+}
+
+TEST(CompositorIndexOfLayerTest, ReturnsNulloptForInvalidLayerId) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Waveform);
+
+    EXPECT_EQ(compositor.index_of_layer(kInvalidLayerId), std::nullopt);
+}
+
+TEST(CompositorIndexOfLayerTest, TracksCurrentIndexAfterReorder) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Waveform);
+    std::size_t second = compositor.add_layer(VisualType::Spectrum).value();
+    std::uint64_t second_id = compositor.layers()[second].layer_id;
+
+    compositor.move_layer(second, 0);
+
+    EXPECT_EQ(compositor.index_of_layer(second_id), std::optional<std::size_t>(0));
+}
+
 TEST(CompositorReplaceLayersTest, SucceedsAndReplacesStackContents) {
     Compositor compositor;
     compositor.add_layer(VisualType::Spectrum);

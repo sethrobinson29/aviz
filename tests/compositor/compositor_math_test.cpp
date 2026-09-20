@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "compositor/compositor.h"
 #include "raylib.h"
 #include "rlgl.h"
 
@@ -194,4 +195,49 @@ TEST(NextLayerIdAfterLoadTest, SaturatesInsteadOfWrappingPastUint64MaxOnAHandEdi
     layers.push_back(make_test_layer(std::numeric_limits<std::uint64_t>::max()));
     EXPECT_EQ(compositor_math::next_layer_id_after_load(layers),
               std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(LayerPaletteColorTest, IsDeterministicForTheSameIndex) {
+    Color a = compositor_math::layer_palette_color(3);
+    Color b = compositor_math::layer_palette_color(3);
+    EXPECT_EQ(a.r, b.r);
+    EXPECT_EQ(a.g, b.g);
+    EXPECT_EQ(a.b, b.b);
+}
+
+TEST(LayerPaletteColorTest, DiffersAcrossDistinctIndices) {
+    Color a = compositor_math::layer_palette_color(0);
+    Color b = compositor_math::layer_palette_color(Compositor::kMaxLayers / 2);
+    EXPECT_FALSE(a.r == b.r && a.g == b.g && a.b == b.b);
+}
+
+TEST(LayerPaletteColorTest, IsNeverWhite) {
+    for (std::size_t i = 0; i < Compositor::kMaxLayers; ++i) {
+        Color c = compositor_math::layer_palette_color(i);
+        EXPECT_FALSE(c.r == 255 && c.g == 255 && c.b == 255) << "index " << i << " produced white";
+    }
+}
+
+TEST(ReassignLayerTintsTest, AssignsADistinctNonWhiteTintPerLayer) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(3));
+    ASSERT_EQ(layers[0].tint_color.r, WHITE.r);
+
+    compositor_math::reassign_layer_tints(layers);
+
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        Color expected = compositor_math::layer_palette_color(i);
+        EXPECT_EQ(layers[i].tint_color.r, expected.r);
+        EXPECT_EQ(layers[i].tint_color.g, expected.g);
+        EXPECT_EQ(layers[i].tint_color.b, expected.b);
+    }
+    EXPECT_NE(layers[0].tint_color.g, layers[1].tint_color.g);
+}
+
+TEST(ReassignLayerTintsTest, HandlesEmptyVector) {
+    std::vector<Layer> layers;
+    compositor_math::reassign_layer_tints(layers);
+    EXPECT_TRUE(layers.empty());
 }

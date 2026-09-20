@@ -36,8 +36,10 @@ music-visualizer/
 │   │                     # feature extraction (FFT, banding, onset/envelope)
 │   ├── compositor/       # layer stack, blend modes, offscreen texture management,
 │   │                      # layer preset serialization (layer_preset.h/.cpp) and file I/O
-│   │                      # (preset_file_io.h/.cpp)
-│   ├── visuals/           # one subdirectory per visual module
+│   │                      # (preset_file_io.h/.cpp), layer_types.h (VisualType, LayerBlendMode —
+│   │                      # deliberately raylib-free, see spec §5)
+│   ├── visuals/           # one subdirectory per visual module, plus reactivity_source.h
+│   │   │                   # (ReactivitySource — deliberately raylib-free, see spec §5)
 │   │   ├── waveform/
 │   │   ├── spectrum/
 │   │   └── ...

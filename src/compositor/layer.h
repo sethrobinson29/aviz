@@ -5,13 +5,10 @@
 #include <memory>
 #include <optional>
 
+#include "compositor/layer_types.h"
 #include "raylib.h"
 #include "visuals/palette.h"
 #include "visuals/visual_module.h"
-
-enum class VisualType { Waveform, Spectrum, Radial, Particles, Lissajous, FlowField, Fractal };
-
-enum class LayerBlendMode { Normal, Additive, Multiply, Screen };
 
 inline constexpr std::uint64_t kInvalidLayerId = 0;
 

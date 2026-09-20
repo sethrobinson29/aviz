@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cwchar>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -34,6 +35,7 @@ constexpr int kDefaultHeight = 720;
 
 constexpr UINT kMsgShowPanel = WM_APP + 1;
 constexpr UINT kMsgHidePanel = WM_APP + 2;
+constexpr UINT kMsgSendToPanel = WM_APP + 3;
 
 std::wstring utf8_to_wide(const std::string& text) {
     if (text.empty()) {
@@ -102,6 +104,16 @@ public:
     bool is_visible() const override { return visible_.load(); }
 
     std::vector<PanelMessage> drain_pending_messages() override { return queue_.drain(); }
+
+    void send_to_panel(const std::string& json_text) override {
+        if (hwnd_ == nullptr) {
+            return;
+        }
+        auto* payload = new std::wstring(utf8_to_wide(json_text));
+        if (!PostMessageW(hwnd_, kMsgSendToPanel, 0, reinterpret_cast<LPARAM>(payload))) {
+            delete payload;
+        }
+    }
 
 private:
     void thread_main() {
@@ -285,6 +297,13 @@ private:
                 }
                 visible_.store(false);
                 return 0;
+            case kMsgSendToPanel: {
+                std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));
+                if (webview_) {
+                    webview_->PostWebMessageAsString(payload->c_str());
+                }
+                return 0;
+            }
             case WM_SIZE: {
                 if (controller_) {
                     RECT bounds;

@@ -8,6 +8,7 @@ namespace preset_file_io {
 inline constexpr const char* kPresetsDirectoryName = "presets";
 
 std::string preset_path(const std::string& filename);
+bool is_safe_preset_filename(const std::string& filename);
 
 struct ReadResult {
     bool success = false;

@@ -79,6 +79,15 @@ bool Compositor::replace_layers_if_ids_valid(std::vector<Layer> layers) {
     return true;
 }
 
+std::optional<std::size_t> Compositor::index_of_layer(std::uint64_t layer_id) const {
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        if (layers_[i].layer_id == layer_id) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
 void Compositor::set_layer_visual_type(std::size_t index, VisualType type) {
     if (index >= layers_.size()) {
         return;

@@ -94,22 +94,31 @@ target_link_libraries(app_tests PRIVATE GTest::gtest_main GTest::gmock raylib)
 gtest_discover_tests(app_tests)
 
 # C++-side state bridge logic only (panel_message parsing/validation, the
-# dispatch queue, and the queue-to-Compositor round trip) -- the WebView2
-# window itself (src/ui_host/ui_host_webview2.cpp) is not covered here per
-# STRUCTURE.md's note that web/panel/ and the live WebView2 host are
-# human-review territory, same as visual/audio correctness. Links Compositor
-# (GL-free here, same add_layer-without-resize() pattern as compositor_tests)
-# to prove drained messages actually apply, not just that the queue holds
-# them.
+# dispatch queue, the queue-to-Compositor round trip, and panel_message_apply
+# -- the full message-to-Compositor/preset_file_io application layer) -- the
+# WebView2 window itself (src/ui_host/ui_host_webview2.cpp) and web/panel/
+# are not covered here per STRUCTURE.md's note that those are human-review
+# territory, same as visual/audio correctness. panel_message_apply_test.cpp
+# uses a hand-rolled FakeUIHost (ui_host/fake_ui_host.h) in place of the real
+# WebView2 host to capture what would have been pushed to the panel. Links
+# Compositor (GL-free here, same add_layer-without-resize() pattern as
+# compositor_tests) to prove messages actually apply, not just that the
+# queue holds them. preset_file_io/layer_preset are real, not mocked, so
+# preset save/load tests touch the real presets/ directory relative to this
+# binary's working directory, same convention as preset_file_io_test.cpp.
 add_executable(ui_host_tests
   ui_host/panel_message_test.cpp
   ui_host/panel_dispatch_queue_test.cpp
   ui_host/panel_dispatch_round_trip_test.cpp
+  ui_host/panel_message_apply_test.cpp
   ../src/ui_host/panel_message.cpp
   ../src/ui_host/panel_dispatch_queue.cpp
+  ../src/ui_host/panel_message_apply.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/compositor_math.cpp
   ../src/compositor/layer.cpp
+  ../src/compositor/layer_preset.cpp
+  ../src/compositor/preset_file_io.cpp
   ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp

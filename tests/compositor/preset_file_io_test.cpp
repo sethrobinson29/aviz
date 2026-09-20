@@ -77,6 +77,47 @@ TEST_F(PresetFileIoTest, ReadOnFileWithinAMissingDirectoryReturnsClearFailure) {
     EXPECT_FALSE(result.error.empty());
 }
 
+TEST(IsSafePresetFilenameTest, AcceptsOrdinaryJsonFilename) {
+    EXPECT_TRUE(preset_file_io::is_safe_preset_filename("my-preset.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsEmpty) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename(""));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsDotAndDotDot) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("."));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename(".."));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsPathTraversal) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("../secrets.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("..\\secrets.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsForwardAndBackSlashes) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("sub/dir.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("sub\\dir.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("/etc/passwd.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("C:\\Windows\\x.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsMissingJsonExtension) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("preset"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("preset.txt"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename(".json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsControlCharacters) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename(std::string("bad\0name.json", 13)));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("bad\nname.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("bad\tname.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsOverlyLongFilename) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename(std::string(196, 'a') + ".json"));
+}
+
 TEST(PresetPathTest, JoinsPresetsDirectoryAndFilename) {
     const std::string joined = preset_file_io::preset_path("debug.json");
     EXPECT_EQ(std::filesystem::path(joined),

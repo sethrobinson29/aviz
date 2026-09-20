@@ -24,6 +24,7 @@
 #include "compositor/layer_preset.h"
 #include "compositor/preset_file_io.h"
 #include "raylib.h"
+#include "ui_host/panel_message_apply.h"
 #include "ui_host/ui_host.h"
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
@@ -36,9 +37,6 @@ constexpr int kWindowWidth = 1280;
 constexpr int kWindowHeight = 720;
 constexpr int kTargetFps = 60;
 
-constexpr float kLayerPaletteSaturation = 0.75f;
-constexpr float kLayerPaletteValue = 0.95f;
-
 const char* kDebugPresetFilename = "debug-preset.json";
 
 std::string resolve_absolute_panel_content_dir() {
@@ -46,11 +44,6 @@ std::string resolve_absolute_panel_content_dir() {
     std::string candidate = std::string(app_dir) + "web/panel";
     std::string resolved = DirectoryExists(candidate.c_str()) ? candidate : std::string("web/panel");
     return std::filesystem::absolute(resolved).string();
-}
-
-Color layer_palette_color(std::size_t index) {
-    float hue = (360.0f * static_cast<float>(index)) / static_cast<float>(Compositor::kMaxLayers);
-    return ColorFromHSV(hue, kLayerPaletteSaturation, kLayerPaletteValue);
 }
 
 const char* blend_mode_name(LayerBlendMode mode) {
@@ -127,13 +120,6 @@ LayerBlendMode next_blend_mode(LayerBlendMode mode) {
             return LayerBlendMode::Normal;
     }
     return LayerBlendMode::Normal;
-}
-
-void reassign_tints(Compositor& compositor) {
-    std::vector<Layer>& layers = compositor.layers();
-    for (std::size_t i = 0; i < layers.size(); ++i) {
-        layers[i].tint_color = layer_palette_color(i);
-    }
 }
 
 std::string format_layer_cap_error(const Compositor& compositor) {
@@ -229,8 +215,8 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
         bool fullscreen = false;
 
         std::printf(
-            "compositor controls (full layer-stack control panel UI not built yet -- milestone 8's first "
-            "slice only, see milestone-4-debug-controls.md):\n"
+            "debug compositor controls (independent of the control panel window -- see "
+            "milestone-4-debug-controls.md):\n"
             "  F11       toggle fullscreen (hides/restores the control panel window)\n"
             "  A         add a waveform layer (default freq_band/reactivity/enabled)\n"
             "  1/2/3/4/5/6/7 set selected layer's visual type to "
@@ -260,7 +246,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
             compositor.resize(kWindowWidth, kWindowHeight);
             populate_startup_layers(compositor, generate_layer_count);
             std::size_t selected = 0;
-            reassign_tints(compositor);
+            compositor_math::reassign_layer_tints(compositor.layers());
             int last_display_lines = 0;
             refresh_display(format_layers_block(compositor, selected), last_display_lines);
 
@@ -272,7 +258,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     if (!compositor.add_layer(VisualType::Waveform).has_value()) {
                         block = format_layer_cap_error(compositor);
                     } else {
-                        reassign_tints(compositor);
+                        compositor_math::reassign_layer_tints(compositor.layers());
                     }
                     block += format_layers_block(compositor, selected);
                     refresh_display(block, last_display_lines);
@@ -281,7 +267,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                     if (!compositor.duplicate_layer(selected).has_value()) {
                         block = format_layer_cap_error(compositor);
                     } else {
-                        reassign_tints(compositor);
+                        compositor_math::reassign_layer_tints(compositor.layers());
                     }
                     block += format_layers_block(compositor, selected);
                     refresh_display(block, last_display_lines);
@@ -309,7 +295,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                 } else if ((IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE)) && !layers.empty()) {
                     compositor.remove_layer(selected);
                     selected = layers.empty() ? 0 : std::min(selected, layers.size() - 1);
-                    reassign_tints(compositor);
+                    compositor_math::reassign_layer_tints(compositor.layers());
                     refresh_display(format_layers_block(compositor, selected), last_display_lines);
                 } else if (IsKeyPressed(KEY_UP) && selected > 0) {
                     --selected;
@@ -481,16 +467,7 @@ int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
                 }
 
                 for (const PanelMessage& message : ui_host->drain_pending_messages()) {
-                    if (message.type == PanelMessageType::AddLayer) {
-                        std::string block;
-                        if (!compositor.add_layer(VisualType::Waveform).has_value()) {
-                            block = format_layer_cap_error(compositor);
-                        } else {
-                            reassign_tints(compositor);
-                        }
-                        block += format_layers_block(compositor, selected);
-                        refresh_display(block, last_display_lines);
-                    }
+                    panel_message_apply::apply(message, compositor, *ui_host);
                 }
 
                 compositor.render(snapshot.current());

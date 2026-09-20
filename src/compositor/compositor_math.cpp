@@ -3,12 +3,24 @@
 #include <limits>
 #include <unordered_set>
 
+#include "compositor/compositor.h"
 #include "raylib.h"
 #include "rlgl.h"
 
 namespace compositor_math {
 
 float clamp_opacity(float opacity) { return std::clamp(opacity, 0.0f, 1.0f); }
+
+Color layer_palette_color(std::size_t index) {
+    float hue = (360.0f * static_cast<float>(index)) / static_cast<float>(Compositor::kMaxLayers);
+    return ColorFromHSV(hue, kLayerPaletteSaturation, kLayerPaletteValue);
+}
+
+void reassign_layer_tints(std::vector<Layer>& layers) {
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        layers[i].tint_color = layer_palette_color(i);
+    }
+}
 
 bool has_duplicate_layer_ids(const std::vector<Layer>& layers) {
     std::unordered_set<std::uint64_t> seen;

@@ -4,14 +4,35 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';" />
-<title>aviz control panel (placeholder)</title>
+<title>aviz control panel</title>
 <link rel="stylesheet" href="app.css" />
 </head>
 <body>
 <main>
   <h1>aviz control panel</h1>
-  <p>Milestone 8 placeholder window. The real layer-stack UI is a later pass.</p>
-  <button id="add-layer-test">Send test message: add layer</button>
+
+  <section id="presets-section">
+    <h2>Layer presets</h2>
+    <div class="row">
+      <select id="preset-select"></select>
+      <button id="load-preset-button" type="button">Load</button>
+      <button id="refresh-presets-button" type="button">Refresh</button>
+    </div>
+    <div class="row">
+      <input id="save-preset-name" type="text" placeholder="filename.json" />
+      <button id="save-preset-button" type="button">Save as</button>
+    </div>
+  </section>
+
+  <section id="layers-section">
+    <h2>Layers</h2>
+    <div class="row">
+      <select id="add-visual-type"></select>
+      <button id="add-layer-button" type="button">Add layer</button>
+    </div>
+    <ul id="layer-list"></ul>
+  </section>
+
   <p id="status"></p>
 </main>
 <script src="app.js"></script>

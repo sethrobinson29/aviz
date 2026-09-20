@@ -4,11 +4,33 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <string_view>
 
 namespace preset_file_io {
 
 std::string preset_path(const std::string& filename) {
     return (std::filesystem::path(kPresetsDirectoryName) / filename).string();
+}
+
+bool is_safe_preset_filename(const std::string& filename) {
+    constexpr std::size_t kMaxLength = 200;
+    constexpr std::string_view kExtension = ".json";
+
+    if (filename.empty() || filename.size() > kMaxLength) {
+        return false;
+    }
+    if (filename == "." || filename == "..") {
+        return false;
+    }
+    for (unsigned char c : filename) {
+        if (c < 0x20 || c == '/' || c == '\\') {
+            return false;
+        }
+    }
+    if (filename.size() <= kExtension.size()) {
+        return false;
+    }
+    return filename.compare(filename.size() - kExtension.size(), kExtension.size(), kExtension) == 0;
 }
 
 ReadResult read_file(const std::string& path) {

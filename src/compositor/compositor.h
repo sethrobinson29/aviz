@@ -25,6 +25,8 @@ public:
 
     bool replace_layers_if_ids_valid(std::vector<Layer> layers);
 
+    std::optional<std::size_t> index_of_layer(std::uint64_t layer_id) const;
+
     void render(const AudioFeatures& features);
     RenderTexture2D& output() { return output_; }
 
