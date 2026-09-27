@@ -8,23 +8,34 @@
 
 class ProducerHost {
 public:
-    ProducerHost(AudioRingBuffer& ring, std::unique_ptr<AudioProducer> initial)
+    explicit ProducerHost(AudioRingBuffer& ring, std::unique_ptr<AudioProducer> initial = nullptr)
         : ring_(ring), current_(std::move(initial)) {
-        current_->start(ring_);
+        if (current_) {
+            current_->start(ring_);
+        }
     }
 
-    ~ProducerHost() { current_->stop(); }
+    ~ProducerHost() {
+        if (current_) {
+            current_->stop();
+        }
+    }
 
     ProducerHost(const ProducerHost&) = delete;
     ProducerHost& operator=(const ProducerHost&) = delete;
 
     void switch_to(std::unique_ptr<AudioProducer> next) {
-        current_->stop();
+        if (current_) {
+            current_->stop();
+        }
         current_ = std::move(next);
-        current_->start(ring_);
+        if (current_) {
+            current_->start(ring_);
+        }
     }
 
-    AudioProducer& current() const { return *current_; }
+    bool has_producer() const { return current_ != nullptr; }
+    AudioProducer* current() const { return current_.get(); }
 
 private:
     AudioRingBuffer& ring_;

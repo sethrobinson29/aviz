@@ -279,3 +279,35 @@ TEST(PanelMessageParseTest, SwitchSourceIgnoresExtraFields) {
     auto message = panel_message::parse(R"({"type":"switch_source","unexpected":true})");
     expect_type<SwitchSourceMessage>(message);
 }
+
+TEST(PanelMessageParseTest, ParsesImportFile) {
+    auto message = panel_message::parse(R"({"type":"import_file","path":"C:\\music\\track.wav"})");
+    ImportFileMessage typed = expect_type<ImportFileMessage>(message);
+    EXPECT_EQ(typed.path, "C:\\music\\track.wav");
+}
+
+TEST(PanelMessageParseTest, ImportFileAcceptsMp3AndFlacExtensions) {
+    expect_type<ImportFileMessage>(panel_message::parse(R"({"type":"import_file","path":"track.mp3"})"));
+    expect_type<ImportFileMessage>(panel_message::parse(R"({"type":"import_file","path":"track.flac"})"));
+}
+
+TEST(PanelMessageParseTest, ImportFileRejectsUnsupportedExtension) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":"track.exe"})").has_value());
+}
+
+TEST(PanelMessageParseTest, ImportFileRejectsEmptyPath) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":""})").has_value());
+}
+
+TEST(PanelMessageParseTest, ImportFileRejectsMissingPath) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file"})").has_value());
+}
+
+TEST(PanelMessageParseTest, ImportFileRejectsNonStringPath) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":123})").has_value());
+}
+
+TEST(PanelMessageParseTest, ParsesEnableLoopback) {
+    auto message = panel_message::parse(R"({"type":"enable_loopback"})");
+    expect_type<EnableLoopbackMessage>(message);
+}

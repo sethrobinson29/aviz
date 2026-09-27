@@ -18,7 +18,6 @@
 #include "audio/audio_config.h"
 #include "audio/audio_features.h"
 #include "audio/feature_worker.h"
-#include "audio/file_producer.h"
 #include "audio/producer_host.h"
 #include "audio/ring_buffer.h"
 #include "compositor/compositor.h"
@@ -188,21 +187,15 @@ void populate_startup_layers(Compositor& compositor, std::optional<int> generate
 }
 }
 
-int run_app(const char* audio_path, std::optional<int> generate_layer_count) {
+int run_app(std::optional<int> generate_layer_count) {
     try {
-        const std::string original_audio_path = audio_path;
-
-        auto initial_producer = std::make_unique<FileProducer>(original_audio_path);
-        std::printf("playing %s (%u ch, %u Hz)\n", audio_path, initial_producer->native_channels(),
-                    initial_producer->native_sample_rate());
-
         AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
         AudioFeaturesSnapshot snapshot;
         FeatureWorker worker(ring, snapshot, audio_config::kPipelineSampleRate);
 
         worker.start();
-        ProducerHost producer_host(ring, std::move(initial_producer));
-        AudioSourceController audio_source_controller(producer_host, original_audio_path);
+        ProducerHost producer_host(ring);
+        AudioSourceController audio_source_controller(producer_host);
 
 #ifdef AVIZ_VERBOSE_RAYLIB_LOG
         SetTraceLogLevel(LOG_INFO);

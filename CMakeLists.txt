@@ -124,6 +124,7 @@ add_executable(aviz
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
   src/audio/feature_worker.cpp
+  src/audio/audio_file_validation.cpp
   src/audio/file_producer.cpp
   src/audio/loopback_producer.cpp
   src/audio/pipeline_format_converter.cpp
@@ -157,7 +158,7 @@ endif()
 # implemented now.
 if(WIN32)
   target_sources(aviz PRIVATE src/ui_host/ui_host_webview2.cpp src/app/raylib_window_watcher.cpp)
-  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32)
+  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32 Comdlg32)
 endif()
 
 add_custom_command(TARGET aviz POST_BUILD

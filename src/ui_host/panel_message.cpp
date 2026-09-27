@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "audio/audio_config.h"
+#include "audio/audio_file_validation.h"
 #include "compositor/preset_file_io.h"
 
 namespace {
@@ -96,6 +97,14 @@ std::string require_preset_filename(const nlohmann::json& j) {
     return filename;
 }
 
+std::string require_audio_file_path(const nlohmann::json& j) {
+    const std::string path = require_string(j, "path");
+    if (!audio_file_validation::is_plausible_audio_file_path(path)) {
+        throw std::invalid_argument("path is not a plausible audio file path");
+    }
+    return path;
+}
+
 std::optional<std::size_t> parse_freq_band(const nlohmann::json& j) {
     const nlohmann::json& field = j.at("freq_band");
     if (field.is_null()) {
@@ -162,6 +171,12 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     }
     if (type == "switch_source") {
         return SwitchSourceMessage{};
+    }
+    if (type == "import_file") {
+        return ImportFileMessage{require_audio_file_path(doc)};
+    }
+    if (type == "enable_loopback") {
+        return EnableLoopbackMessage{};
     }
     throw std::invalid_argument("unknown message type \"" + type + "\"");
 }

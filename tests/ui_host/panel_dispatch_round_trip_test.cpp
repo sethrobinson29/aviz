@@ -73,11 +73,18 @@ TEST_F(PanelDispatchRoundTripTest, MixedMessageTypesApplyInPushOrder) {
     EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Spectrum);
 }
 
-TEST_F(PanelDispatchRoundTripTest, SetDockedAndSwitchSourceMessagesRouteThroughTheQueueToo) {
+TEST_F(PanelDispatchRoundTripTest, SetDockedAndEnableLoopbackMessagesRouteThroughTheQueueToo) {
     queue_.push(PanelMessage{SetDockedMessage{false}});
-    queue_.push(PanelMessage{SwitchSourceMessage{}});
+    queue_.push(PanelMessage{EnableLoopbackMessage{}});
     apply_drained_messages();
 
     EXPECT_EQ(window_layout_.mode(), WindowMode::Detached);
     EXPECT_TRUE(audio_source_.is_loopback());
+}
+
+TEST_F(PanelDispatchRoundTripTest, ImportFileMessageRoutesThroughTheQueue) {
+    queue_.push(PanelMessage{ImportFileMessage{"nonexistent-round-trip.wav"}});
+    apply_drained_messages();
+
+    EXPECT_EQ(audio_source_.kind(), AudioSourceKind::None);
 }

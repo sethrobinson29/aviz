@@ -51,6 +51,15 @@ button:hover {
     background: #35353d;
 }
 
+button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+button:disabled:hover {
+    background: #2a2a31;
+}
+
 #layer-list {
     list-style: none;
     margin: 0;

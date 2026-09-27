@@ -1,9 +1,12 @@
 #include "ui_host/panel_message_apply.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -240,13 +243,100 @@ TEST_F(PanelMessageApplyTest, SetFullscreenToCurrentValueIsASafeNoOp) {
     EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["fullscreen"], false);
 }
 
-TEST_F(PanelMessageApplyTest, SwitchSourceTogglesAudioSourceAndPushesWindowState) {
-    ASSERT_FALSE(audio_source_.is_loopback());
+TEST_F(PanelMessageApplyTest, SwitchSourceWithNoSourceSelectedFailsAndPushesFailureStatus) {
+    ASSERT_FALSE(audio_source_.has_source());
+
+    apply(PanelMessage{SwitchSourceMessage{}});
+
+    EXPECT_FALSE(audio_source_.has_source());
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+    EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["source"], "none");
+}
+
+TEST_F(PanelMessageApplyTest, EnableLoopbackSwitchesToLoopbackAndPushesWindowState) {
+    apply(PanelMessage{EnableLoopbackMessage{}});
+
+    EXPECT_TRUE(audio_source_.is_loopback());
+    EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["source"], "loopback");
+}
+
+TEST_F(PanelMessageApplyTest, SwitchSourceAfterEnablingLoopbackFailsWithNoFileToSwitchBackTo) {
+    apply(PanelMessage{EnableLoopbackMessage{}});
+    ASSERT_TRUE(audio_source_.is_loopback());
 
     apply(PanelMessage{SwitchSourceMessage{}});
 
     EXPECT_TRUE(audio_source_.is_loopback());
-    EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["loopback"], true);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+namespace {
+
+void write_u32le(std::vector<std::uint8_t>& out, std::uint32_t v) {
+    out.push_back(static_cast<std::uint8_t>(v));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
+    out.push_back(static_cast<std::uint8_t>(v >> 16));
+    out.push_back(static_cast<std::uint8_t>(v >> 24));
+}
+
+void write_u16le(std::vector<std::uint8_t>& out, std::uint16_t v) {
+    out.push_back(static_cast<std::uint8_t>(v));
+    out.push_back(static_cast<std::uint8_t>(v >> 8));
+}
+
+std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_t channels,
+                                          std::uint32_t num_frames) {
+    std::uint32_t data_bytes = num_frames * channels * 2;
+    std::vector<std::uint8_t> out;
+    out.insert(out.end(), {'R', 'I', 'F', 'F'});
+    write_u32le(out, 36 + data_bytes);
+    out.insert(out.end(), {'W', 'A', 'V', 'E'});
+    out.insert(out.end(), {'f', 'm', 't', ' '});
+    write_u32le(out, 16);
+    write_u16le(out, 1);
+    write_u16le(out, channels);
+    write_u32le(out, sample_rate);
+    write_u32le(out, sample_rate * channels * 2);
+    write_u16le(out, static_cast<std::uint16_t>(channels * 2));
+    write_u16le(out, 16);
+    out.insert(out.end(), {'d', 'a', 't', 'a'});
+    write_u32le(out, data_bytes);
+    out.resize(out.size() + data_bytes, 0);
+    return out;
+}
+
+}
+
+class PanelMessageApplyImportFileTest : public PanelMessageApplyTest {
+protected:
+    void SetUp() override {
+        wav_path_ = std::filesystem::temp_directory_path() / "aviz_panel_apply_import_test.wav";
+        std::vector<std::uint8_t> bytes = make_valid_wav(44100, 2, 1000);
+        std::ofstream f(wav_path_, std::ios::binary);
+        f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    }
+
+    void TearDown() override {
+        producer_host_.switch_to(nullptr);
+        std::filesystem::remove(wav_path_);
+    }
+
+    std::filesystem::path wav_path_;
+};
+
+TEST_F(PanelMessageApplyImportFileTest, ImportFileSwitchesToFileAndPushesSuccessStatus) {
+    apply(PanelMessage{ImportFileMessage{wav_path_.string()}});
+
+    EXPECT_EQ(audio_source_.kind(), AudioSourceKind::File);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
+    EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["source"], "file");
+}
+
+TEST_F(PanelMessageApplyImportFileTest, ImportFileOnMissingFileSendsFailureStatusAndLeavesSourceUnchanged) {
+    apply(PanelMessage{ImportFileMessage{"nonexistent.wav"}});
+
+    EXPECT_EQ(audio_source_.kind(), AudioSourceKind::None);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }
 
 class PanelMessageApplyPresetTest : public PanelMessageApplyTest {
@@ -275,7 +365,7 @@ TEST_F(PanelMessageApplyPresetTest, LoadPresetReplacesLayerStackAndSendsSuccessS
     FakeUIHost writer_host;
     AudioRingBuffer writer_ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
     ProducerHost writer_producer_host(writer_ring, std::make_unique<::testing::NiceMock<MockProducer>>());
-    AudioSourceController writer_audio_source(writer_producer_host, "unused.wav");
+    AudioSourceController writer_audio_source(writer_producer_host);
     WindowLayoutController writer_window_layout(writer, writer_host);
     panel_message_apply::PanelApplyContext writer_ctx{writer, writer_host, writer_window_layout,
                                                         writer_audio_source};

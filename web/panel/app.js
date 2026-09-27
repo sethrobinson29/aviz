@@ -12,6 +12,10 @@
     var dockCheckbox = document.getElementById("dock-checkbox");
     var fullscreenCheckbox = document.getElementById("fullscreen-checkbox");
     var sourceButton = document.getElementById("source-button");
+    var importFileButton = document.getElementById("import-file-button");
+    var enableLoopbackButton = document.getElementById("enable-loopback-button");
+
+    var SOURCE_BUTTON_LABELS = { none: "No Source", file: "File", loopback: "Loopback" };
 
     var layerRowElements = new Map();
 
@@ -235,7 +239,9 @@
     function renderWindowState(data) {
         dockCheckbox.checked = data.docked;
         fullscreenCheckbox.checked = data.fullscreen;
-        sourceButton.textContent = data.loopback ? "Loopback" : "File";
+        sourceButton.textContent = SOURCE_BUTTON_LABELS[data.source] || SOURCE_BUTTON_LABELS.none;
+        sourceButton.disabled = data.source === "none";
+        enableLoopbackButton.disabled = data.source === "loopback";
     }
 
     dockCheckbox.addEventListener("change", function () {
@@ -247,7 +253,17 @@
     });
 
     sourceButton.addEventListener("click", function () {
+        if (sourceButton.disabled) return;
         post("switch_source", {});
+    });
+
+    importFileButton.addEventListener("click", function () {
+        post("open_file_dialog", {});
+    });
+
+    enableLoopbackButton.addEventListener("click", function () {
+        if (enableLoopbackButton.disabled) return;
+        post("enable_loopback", {});
     });
 
     document.addEventListener("keydown", function (e) {
@@ -260,7 +276,7 @@
         } else if (e.key.toLowerCase() === "k") {
             post("set_docked", { docked: !dockCheckbox.checked });
         } else if (e.key.toLowerCase() === "l") {
-            post("switch_source", {});
+            if (!sourceButton.disabled) post("switch_source", {});
         }
     });
 

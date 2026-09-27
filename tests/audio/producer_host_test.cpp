@@ -35,6 +35,35 @@ TEST(ProducerHostTest, SwitchToStopsOldProducerBeforeStartingNew) {
     host.switch_to(std::move(next));
 }
 
+TEST(ProducerHostTest, ConstructsWithNoInitialProducerWithoutCrashing) {
+    AudioRingBuffer ring(64, 2);
+
+    ProducerHost host(ring);
+
+    EXPECT_FALSE(host.has_producer());
+    EXPECT_EQ(host.current(), nullptr);
+}
+
+TEST(ProducerHostTest, DestructorWithNoProducerEverActivatedDoesNotCrash) {
+    AudioRingBuffer ring(64, 2);
+
+    { ProducerHost host(ring); }
+}
+
+TEST(ProducerHostTest, SwitchToFromNoProducerStartsTheNewProducerWithoutCrashing) {
+    AudioRingBuffer ring(64, 2);
+    ProducerHost host(ring);
+
+    auto next = std::make_unique<::testing::NiceMock<MockProducer>>();
+    MockProducer* next_ptr = next.get();
+    EXPECT_CALL(*next_ptr, start(::testing::Ref(ring))).Times(1);
+
+    host.switch_to(std::move(next));
+
+    EXPECT_TRUE(host.has_producer());
+    EXPECT_EQ(host.current(), next_ptr);
+}
+
 TEST(ProducerHostTest, DestructorStopsCurrentProducer) {
     AudioRingBuffer ring(64, 2);
     auto initial = std::make_unique<MockProducer>();

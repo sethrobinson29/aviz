@@ -20,7 +20,7 @@ protected:
     PanelApplyTestFixture()
         : ring_(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels),
           producer_host_(ring_, std::make_unique<::testing::NiceMock<MockProducer>>()),
-          audio_source_(producer_host_, "unused.wav"),
+          audio_source_(producer_host_),
           window_layout_(compositor_, ui_host_),
           ctx_{compositor_, ui_host_, window_layout_, audio_source_} {}
 

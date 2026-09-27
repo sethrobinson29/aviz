@@ -11,6 +11,7 @@ add_executable(audio_tests
   audio/loopback_producer_test.cpp
   audio/producer_host_test.cpp
   audio/pipeline_format_test.cpp
+  audio/audio_file_validation_test.cpp
   ../src/audio/ring_buffer.cpp
   ../src/audio/feature_extractor.cpp
   ../src/audio/file_producer.cpp
@@ -18,6 +19,7 @@ add_executable(audio_tests
   ../src/audio/pipeline_format_converter.cpp
   ../src/audio/feature_worker.cpp
   ../src/audio/miniaudio_backend.cpp
+  ../src/audio/audio_file_validation.cpp
 )
 target_include_directories(audio_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(audio_tests PRIVATE GTest::gtest_main GTest::gmock PFFFT miniaudio)
@@ -107,6 +109,7 @@ add_executable(app_tests
   ../src/audio/loopback_producer.cpp
   ../src/audio/pipeline_format_converter.cpp
   ../src/audio/miniaudio_backend.cpp
+  ../src/audio/audio_file_validation.cpp
 )
 target_include_directories(app_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(app_tests PRIVATE GTest::gtest_main GTest::gmock raylib miniaudio)
@@ -153,6 +156,7 @@ add_executable(ui_host_tests
   ../src/audio/loopback_producer.cpp
   ../src/audio/pipeline_format_converter.cpp
   ../src/audio/miniaudio_backend.cpp
+  ../src/audio/audio_file_validation.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/compositor_math.cpp
   ../src/compositor/layer.cpp

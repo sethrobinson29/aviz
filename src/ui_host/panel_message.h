@@ -77,12 +77,18 @@ struct SetFullscreenMessage {
 
 struct SwitchSourceMessage {};
 
+struct ImportFileMessage {
+    std::string path;
+};
+
+struct EnableLoopbackMessage {};
+
 using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
                  LoadPresetMessage, SavePresetMessage, SetDockedMessage, SetFullscreenMessage,
-                 SwitchSourceMessage>;
+                 SwitchSourceMessage, ImportFileMessage, EnableLoopbackMessage>;
 
 namespace panel_message {
 

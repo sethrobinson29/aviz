@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <commdlg.h>
 #include <wrl.h>
 #include <wrl/client.h>
 
@@ -17,6 +18,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "ui_host/panel_dispatch_queue.h"
 #include "ui_host/panel_message.h"
@@ -74,6 +77,30 @@ bool is_trusted_uri(const wchar_t* uri) {
         return false;
     }
     return std::wcsncmp(uri, kTrustedPrefix, std::wcslen(kTrustedPrefix)) == 0;
+}
+
+bool is_open_file_dialog_request(const std::string& json_text) {
+    try {
+        nlohmann::json doc = nlohmann::json::parse(json_text);
+        return doc.is_object() && doc.value("type", std::string()) == "open_file_dialog";
+    } catch (const nlohmann::json::exception&) {
+        return false;
+    }
+}
+
+std::optional<std::string> show_open_audio_file_dialog(HWND owner) {
+    wchar_t file_buffer[MAX_PATH] = L"";
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = owner;
+    ofn.lpstrFilter = L"Audio Files\0*.wav;*.mp3;*.flac\0All Files\0*.*\0";
+    ofn.lpstrFile = file_buffer;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&ofn)) {
+        return std::nullopt;
+    }
+    return wide_to_utf8(file_buffer);
 }
 
 }
@@ -271,9 +298,16 @@ private:
                         std::string utf8 = wide_to_utf8(raw);
                         CoTaskMemFree(raw);
 
-                        std::optional<PanelMessage> message = panel_message::parse(utf8);
-                        if (message.has_value()) {
-                            queue_.push(*message);
+                        if (is_open_file_dialog_request(utf8)) {
+                            std::optional<std::string> path = show_open_audio_file_dialog(hwnd_);
+                            if (path.has_value()) {
+                                queue_.push(PanelMessage{ImportFileMessage{*path}});
+                            }
+                        } else {
+                            std::optional<PanelMessage> message = panel_message::parse(utf8);
+                            if (message.has_value()) {
+                                queue_.push(*message);
+                            }
                         }
                     }
                     return S_OK;

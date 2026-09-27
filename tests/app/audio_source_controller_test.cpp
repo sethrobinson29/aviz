@@ -72,18 +72,72 @@ protected:
 
 }
 
-TEST_F(AudioSourceControllerTest, StartsInFileModeNotLoopback) {
+TEST_F(AudioSourceControllerTest, StartsWithNoSourceSelected) {
     AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
-    ProducerHost host(ring, std::make_unique<FileProducer>(wav_path_.string()));
-    AudioSourceController controller(host, wav_path_.string());
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
 
+    EXPECT_EQ(controller.kind(), AudioSourceKind::None);
+    EXPECT_FALSE(controller.has_source());
     EXPECT_FALSE(controller.is_loopback());
 }
 
-TEST_F(AudioSourceControllerTest, ToggleSwitchesToLoopbackThenBackToFile) {
+TEST_F(AudioSourceControllerTest, ToggleWithNoSourceSelectedFailsAndLeavesStateUnchanged) {
     AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
-    ProducerHost host(ring, std::make_unique<FileProducer>(wav_path_.string()));
-    AudioSourceController controller(host, wav_path_.string());
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+
+    AudioSourceController::SwitchResult result = controller.toggle();
+
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.error.empty());
+    EXPECT_EQ(controller.kind(), AudioSourceKind::None);
+    EXPECT_FALSE(host.has_producer());
+}
+
+TEST_F(AudioSourceControllerTest, ImportFileFromNoSourceSwitchesToFile) {
+    AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+
+    AudioSourceController::SwitchResult result = controller.import_file(wav_path_.string());
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(controller.kind(), AudioSourceKind::File);
+    EXPECT_EQ(result.channels, 2u);
+    EXPECT_EQ(result.sample_rate, 44100u);
+    EXPECT_TRUE(host.has_producer());
+}
+
+TEST_F(AudioSourceControllerTest, ImportFileRejectsUnsupportedExtensionWithoutTouchingProducerHost) {
+    AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+
+    AudioSourceController::SwitchResult result = controller.import_file("track.exe");
+
+    EXPECT_FALSE(result.success);
+    EXPECT_EQ(controller.kind(), AudioSourceKind::None);
+    EXPECT_FALSE(host.has_producer());
+}
+
+TEST_F(AudioSourceControllerTest, EnableLoopbackFromNoSourceSwitchesToLoopback) {
+    AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+
+    AudioSourceController::SwitchResult result = controller.enable_loopback();
+
+    ASSERT_TRUE(result.success) << result.error;
+    EXPECT_EQ(controller.kind(), AudioSourceKind::Loopback);
+    EXPECT_TRUE(controller.is_loopback());
+}
+
+TEST_F(AudioSourceControllerTest, ToggleAfterImportSwitchesToLoopbackThenBackToFile) {
+    AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+    ASSERT_TRUE(controller.import_file(wav_path_.string()).success);
 
     AudioSourceController::SwitchResult to_loopback = controller.toggle();
     ASSERT_TRUE(to_loopback.success) << to_loopback.error;
@@ -98,10 +152,23 @@ TEST_F(AudioSourceControllerTest, ToggleSwitchesToLoopbackThenBackToFile) {
     EXPECT_EQ(back_to_file.sample_rate, 44100u);
 }
 
+TEST_F(AudioSourceControllerTest, ToggleFromLoopbackWithNoFileEverImportedFails) {
+    AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+    ASSERT_TRUE(controller.enable_loopback().success);
+
+    AudioSourceController::SwitchResult result = controller.toggle();
+
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(controller.is_loopback());
+}
+
 TEST_F(AudioSourceControllerTest, RepeatedRapidTogglesLeaveStateConsistentWithTheActualProducer) {
     AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
-    ProducerHost host(ring, std::make_unique<FileProducer>(wav_path_.string()));
-    AudioSourceController controller(host, wav_path_.string());
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+    ASSERT_TRUE(controller.import_file(wav_path_.string()).success);
 
     for (int i = 0; i < 20; ++i) {
         AudioSourceController::SwitchResult result = controller.toggle();
@@ -110,16 +177,17 @@ TEST_F(AudioSourceControllerTest, RepeatedRapidTogglesLeaveStateConsistentWithTh
     }
 }
 
-TEST_F(AudioSourceControllerTest, FailedSwitchToAMissingFileReportsErrorAndPreservesLoopbackState) {
+TEST_F(AudioSourceControllerTest, FailedToggleToAMissingFileReportsErrorAndPreservesLoopbackState) {
     AudioRingBuffer ring(audio_config::kRingBufferCapacityFrames, audio_config::kPipelineChannels);
-    ProducerHost host(ring, std::make_unique<FileProducer>(wav_path_.string()));
-    AudioSourceController controller(host, "this_file_does_not_exist.wav");
-
-    AudioSourceController::SwitchResult to_loopback = controller.toggle();
-    ASSERT_TRUE(to_loopback.success) << to_loopback.error;
+    ProducerHost host(ring);
+    AudioSourceController controller(host);
+    ASSERT_TRUE(controller.import_file(wav_path_.string()).success);
+    ASSERT_TRUE(controller.toggle().success);
     ASSERT_TRUE(controller.is_loopback());
+    std::filesystem::remove(wav_path_);
 
     AudioSourceController::SwitchResult back_to_file = controller.toggle();
+
     EXPECT_FALSE(back_to_file.success);
     EXPECT_FALSE(back_to_file.error.empty());
     EXPECT_TRUE(controller.is_loopback());

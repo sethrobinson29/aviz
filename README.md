@@ -19,8 +19,11 @@ layer-management UI (add/remove/duplicate/drag-reorder, generic per-layer
 controls, preset save/load) with security defaults, docked/detached window
 management, and synced fullscreen/dock/source-switch controls (panel UI,
 hotkey, and hotkeys-from-either-window all agree) — theme selection is the
-one remaining milestone 8 item. Build order follows
-`visualizer-design-spec.md` §8.
+one remaining milestone 8 item. **No launch argument selects an audio
+source anymore**: `aviz.exe` starts with no active producer at all, and an
+audio source (import a local file, or explicitly enable loopback capture)
+is chosen from the control panel after launch — see "Features" below.
+Build order follows `visualizer-design-spec.md` §8.
 
 ## Stack
 
@@ -213,6 +216,18 @@ run directly from `tsan/`.
   display-mode switch, specifically to avoid the signal
   renegotiation/mode-switch artifacts some displays show under real
   exclusive fullscreen. `AudioSourceController` is the single source of
-  truth for file/loopback state, shared by the `L` hotkey and the panel's
-  source-switch button — no second switching mechanism alongside
-  `ProducerHost::switch_to`.
+  truth for the current audio source (none/file/loopback), shared by the
+  `L` hotkey and the panel's source-switch button — no second switching
+  mechanism alongside `ProducerHost::switch_to`.
+- **No default audio source at launch.** `aviz.exe` takes no audio-file
+  argument anymore and starts with no active `AudioProducer` at all
+  (`ProducerHost` supports this "nothing active yet" state as a first-class
+  case, not an edge case bolted onto the existing stop-then-start switching
+  logic). The panel's **Import File…** button opens a native Windows file
+  picker and switches to the chosen file; **Enable Loopback** explicitly
+  switches to WASAPI capture. Both go through the same dispatch-queue path
+  as every other panel action — the file dialog itself runs on the WebView2
+  thread, but only ever enqueues the resulting path for the render thread to
+  apply, never calling `ProducerHost`/`AudioSourceController` directly. The
+  panel's source-switch button shows "No Source" and is disabled until a
+  source is first chosen; it then toggles between the two as before.

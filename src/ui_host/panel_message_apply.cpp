@@ -192,6 +192,24 @@ void apply_one(const SwitchSourceMessage&, PanelApplyContext& ctx) {
     push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
 }
 
+void apply_one(const ImportFileMessage& msg, PanelApplyContext& ctx) {
+    AudioSourceController::SwitchResult result = ctx.audio_source.import_file(msg.path);
+    if (result.success) {
+        push_status(ctx.ui_host, true, "playing " + msg.path);
+    } else {
+        push_status(ctx.ui_host, false, "failed importing audio file: " + result.error);
+    }
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const EnableLoopbackMessage&, PanelApplyContext& ctx) {
+    AudioSourceController::SwitchResult result = ctx.audio_source.enable_loopback();
+    if (!result.success) {
+        push_status(ctx.ui_host, false, "failed enabling loopback: " + result.error);
+    }
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
 }
 
 void apply(const PanelMessage& message, PanelApplyContext& ctx) {
@@ -204,7 +222,13 @@ void push_window_state(UIHost& ui_host, const WindowLayoutController& window_lay
     msg["kind"] = "window_state";
     msg["docked"] = window_layout.mode() == WindowMode::Docked;
     msg["fullscreen"] = window_layout.is_fullscreen();
-    msg["loopback"] = audio_source.is_loopback();
+    const char* source = "none";
+    if (audio_source.kind() == AudioSourceKind::File) {
+        source = "file";
+    } else if (audio_source.kind() == AudioSourceKind::Loopback) {
+        source = "loopback";
+    }
+    msg["source"] = source;
     ui_host.send_to_panel(msg.dump());
 }
 
