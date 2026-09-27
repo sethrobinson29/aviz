@@ -6,6 +6,7 @@
 #include "compositor/layer.h"
 #include "ui_host/panel_apply_test_fixture.h"
 #include "ui_host/panel_message_apply.h"
+#include "visuals/particles/particles_visual.h"
 
 namespace {
 
@@ -80,6 +81,18 @@ TEST_F(PanelDispatchRoundTripTest, SetDockedAndEnableLoopbackMessagesRouteThroug
 
     EXPECT_EQ(window_layout_.mode(), WindowMode::Detached);
     EXPECT_TRUE(audio_source_.is_loopback());
+}
+
+TEST_F(PanelDispatchRoundTripTest, SetVisualParamMessageRoutesThroughTheQueue) {
+    std::uint64_t id = compositor_.add_layer(VisualType::Particles).has_value()
+                            ? compositor_.layers()[0].layer_id
+                            : 0;
+
+    queue_.push(PanelMessage{SetVisualParamMessage{id, "spawn_rate_per_frame", 7.0f}});
+    apply_drained_messages();
+
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_FLOAT_EQ(particles.params().spawn_rate_per_frame, 7.0f);
 }
 
 TEST_F(PanelDispatchRoundTripTest, ImportFileMessageRoutesThroughTheQueue) {

@@ -23,6 +23,8 @@
 #include "compositor/preset_file_io.h"
 #include "ui_host/fake_ui_host.h"
 #include "ui_host/panel_apply_test_fixture.h"
+#include "visuals/particles/particles_visual.h"
+#include "visuals/visual_config.h"
 
 namespace {
 
@@ -208,6 +210,44 @@ TEST_F(PanelMessageApplyTest, SetSensitivityClampsOutOfRangeValue) {
     apply(PanelMessage{SetLayerSensitivityMessage{id, 99.0f}});
 
     EXPECT_FLOAT_EQ(compositor_.layers()[0].sensitivity, 4.0f);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamUpdatesParticlesSpawnRatePerFrame) {
+    compositor_.add_layer(VisualType::Particles);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(PanelMessage{SetVisualParamMessage{id, "spawn_rate_per_frame", 6.0f}});
+
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_FLOAT_EQ(particles.params().spawn_rate_per_frame, 6.0f);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamClampsParticlesLifetimeFrames) {
+    compositor_.add_layer(VisualType::Particles);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(PanelMessage{SetVisualParamMessage{id, "lifetime_frames", 999999.0f}});
+
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_EQ(particles.params().lifetime_frames, visual_config::kParticlesLifetimeFramesMax);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamWithUnknownNameSendsFailureStatus) {
+    compositor_.add_layer(VisualType::Particles);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(PanelMessage{SetVisualParamMessage{id, "not_a_real_param", 1.0f}});
+
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamWithUnknownLayerIdIsANoOp) {
+    compositor_.add_layer(VisualType::Particles);
+
+    apply(PanelMessage{SetVisualParamMessage{424242, "spawn_rate_per_frame", 1.0f}});
+
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_FLOAT_EQ(particles.params().spawn_rate_per_frame, 2.0f);
 }
 
 TEST_F(PanelMessageApplyTest, UnknownLayerIdIsANoOpForEverySetter) {

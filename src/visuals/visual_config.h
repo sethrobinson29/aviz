@@ -20,6 +20,14 @@ inline constexpr float kParticleAngleJitterRadians = 0.35f;
 
 inline constexpr int kParticleDefaultLifetimeFrames = 150;
 
+inline constexpr float kParticlesSpawnRatePerFrameMin = 0.0f;
+
+inline constexpr float kParticlesSpawnRatePerFrameMax = 20.0f;
+
+inline constexpr int kParticlesLifetimeFramesMin = 10;
+
+inline constexpr int kParticlesLifetimeFramesMax = 600;
+
 inline constexpr int kFlowFieldGridCols = 32;
 
 inline constexpr int kFlowFieldGridRows = 18;

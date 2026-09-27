@@ -1,6 +1,7 @@
 #include "ui_host/panel_message.h"
 
 #include <array>
+#include <cctype>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -97,6 +98,19 @@ std::string require_preset_filename(const nlohmann::json& j) {
     return filename;
 }
 
+std::string require_param_name(const nlohmann::json& j) {
+    const std::string name = require_string(j, "param_name");
+    if (name.empty()) {
+        throw std::invalid_argument("param_name must not be empty");
+    }
+    for (unsigned char c : name) {
+        if (!std::isalnum(c) && c != '_') {
+            throw std::invalid_argument("param_name contains an unexpected character");
+        }
+    }
+    return name;
+}
+
 std::string require_audio_file_path(const nlohmann::json& j) {
     const std::string path = require_string(j, "path");
     if (!audio_file_validation::is_plausible_audio_file_path(path)) {
@@ -156,6 +170,9 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     }
     if (type == "set_sensitivity") {
         return SetLayerSensitivityMessage{require_layer_id(doc), require_float(doc, "sensitivity")};
+    }
+    if (type == "set_visual_param") {
+        return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc), require_float(doc, "value")};
     }
     if (type == "load_preset") {
         return LoadPresetMessage{require_preset_filename(doc)};

@@ -86,6 +86,20 @@ TEST(ClampInnerRadiusFractionTest, ClampsToUnitRange) {
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1.5f), 1.0f);
 }
 
+TEST(ClampSpawnRatePerFrameTest, ClampsToConfiguredRange) {
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(5.0f), 5.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(-1.0f),
+                    visual_config::kParticlesSpawnRatePerFrameMin);
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(1000.0f),
+                    visual_config::kParticlesSpawnRatePerFrameMax);
+}
+
+TEST(ClampLifetimeFramesTest, ClampsToConfiguredRange) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(200), 200);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(0), visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(10000), visual_config::kParticlesLifetimeFramesMax);
+}
+
 TEST(ParticlesAccumulateSpawnCountTest, CarriesFractionalRemainderAcrossFrames) {
     float accumulator = 0.0f;
     EXPECT_EQ(particles_math::accumulate_spawn_count(accumulator, 0.3f), 0);

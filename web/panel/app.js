@@ -117,6 +117,36 @@
         });
         controls.appendChild(labeledControl("Sensitivity", sensitivityInput));
 
+        if (layer.visual_type === "Particles") {
+            var spawnRateInput = document.createElement("input");
+            spawnRateInput.type = "range";
+            spawnRateInput.min = "0";
+            spawnRateInput.max = "20";
+            spawnRateInput.step = "0.1";
+            spawnRateInput.addEventListener("input", function () {
+                post("set_visual_param", {
+                    layer_id: layer.layer_id,
+                    param_name: "spawn_rate_per_frame",
+                    value: parseFloat(spawnRateInput.value)
+                });
+            });
+            controls.appendChild(labeledControl("Spawn Rate", spawnRateInput));
+
+            var drawDistanceInput = document.createElement("input");
+            drawDistanceInput.type = "range";
+            drawDistanceInput.min = "10";
+            drawDistanceInput.max = "600";
+            drawDistanceInput.step = "10";
+            drawDistanceInput.addEventListener("input", function () {
+                post("set_visual_param", {
+                    layer_id: layer.layer_id,
+                    param_name: "lifetime_frames",
+                    value: parseFloat(drawDistanceInput.value)
+                });
+            });
+            controls.appendChild(labeledControl("Draw Distance", drawDistanceInput));
+        }
+
         var dupBtn = document.createElement("button");
         dupBtn.type = "button";
         dupBtn.textContent = "Duplicate";
@@ -144,6 +174,10 @@
             reactivity: reactivitySelect,
             sensitivity: sensitivityInput
         };
+        if (layer.visual_type === "Particles") {
+            li._els.spawnRate = spawnRateInput;
+            li._els.drawDistance = drawDistanceInput;
+        }
 
         return li;
     }
@@ -156,6 +190,8 @@
         if (active !== els.enabled) els.enabled.checked = layer.enabled;
         if (active !== els.opacity) els.opacity.value = layer.opacity;
         if (active !== els.blend) els.blend.value = layer.blend_mode;
+        if (els.spawnRate && active !== els.spawnRate) els.spawnRate.value = layer.params.spawn_rate_per_frame;
+        if (els.drawDistance && active !== els.drawDistance) els.drawDistance.value = layer.params.lifetime_frames;
         var bandValue = layer.freq_band === null ? "Global" : String(layer.freq_band);
         if (active !== els.band) els.band.value = bandValue;
         if (active !== els.reactivity) els.reactivity.value = layer.reactivity_source;

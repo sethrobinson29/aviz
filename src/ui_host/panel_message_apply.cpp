@@ -11,6 +11,7 @@
 #include "compositor/layer.h"
 #include "compositor/layer_preset.h"
 #include "compositor/preset_file_io.h"
+#include "compositor/visual_param.h"
 
 namespace panel_message_apply {
 
@@ -130,6 +131,17 @@ void apply_one(const SetLayerSensitivityMessage& msg, PanelApplyContext& ctx) {
     std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
     if (index.has_value()) {
         ctx.compositor.layers()[*index].sensitivity = compositor_math::clamp_sensitivity(msg.sensitivity);
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        if (!visual_param::set(ctx.compositor.layers()[*index], msg.param_name, msg.value)) {
+            push_status(ctx.ui_host, false,
+                        "unknown visual param \"" + msg.param_name + "\" for this layer's visual type");
+        }
     }
     push_layer_stack(ctx.compositor, ctx.ui_host);
 }

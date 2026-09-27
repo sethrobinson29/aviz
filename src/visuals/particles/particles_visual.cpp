@@ -34,6 +34,16 @@ float clamp_inner_radius_fraction(float inner) {
     return std::clamp(inner, 0.0f, 1.0f);
 }
 
+float clamp_spawn_rate_per_frame(float rate) {
+    return std::clamp(rate, visual_config::kParticlesSpawnRatePerFrameMin,
+                       visual_config::kParticlesSpawnRatePerFrameMax);
+}
+
+int clamp_lifetime_frames(int frames) {
+    return std::clamp(frames, visual_config::kParticlesLifetimeFramesMin,
+                       visual_config::kParticlesLifetimeFramesMax);
+}
+
 int accumulate_spawn_count(float& accumulator, float rate_per_frame) {
     accumulator += rate_per_frame;
     const float count = std::floor(accumulator);

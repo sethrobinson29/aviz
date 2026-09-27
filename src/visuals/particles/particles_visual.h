@@ -31,6 +31,10 @@ Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius);
 
 float clamp_inner_radius_fraction(float inner);
 
+float clamp_spawn_rate_per_frame(float rate);
+
+int clamp_lifetime_frames(int frames);
+
 int accumulate_spawn_count(float& accumulator, float rate_per_frame);
 
 float amplitude_spawn_ratio(float energy, float reference, bool idle);

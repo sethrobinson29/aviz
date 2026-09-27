@@ -59,6 +59,12 @@ struct SetLayerSensitivityMessage {
     float sensitivity;
 };
 
+struct SetVisualParamMessage {
+    std::uint64_t layer_id;
+    std::string param_name;
+    float value;
+};
+
 struct LoadPresetMessage {
     std::string filename;
 };
@@ -87,8 +93,8 @@ using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
-                 LoadPresetMessage, SavePresetMessage, SetDockedMessage, SetFullscreenMessage,
-                 SwitchSourceMessage, ImportFileMessage, EnableLoopbackMessage>;
+                 SetVisualParamMessage, LoadPresetMessage, SavePresetMessage, SetDockedMessage,
+                 SetFullscreenMessage, SwitchSourceMessage, ImportFileMessage, EnableLoopbackMessage>;
 
 namespace panel_message {
 

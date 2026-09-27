@@ -195,6 +195,42 @@ TEST(PanelMessageParseTest, ParsesSetSensitivity) {
     EXPECT_FLOAT_EQ(typed.sensitivity, 2.5f);
 }
 
+TEST(PanelMessageParseTest, ParsesSetVisualParam) {
+    auto message =
+        panel_message::parse(R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame","value":5.0})");
+    SetVisualParamMessage typed = expect_type<SetVisualParamMessage>(message);
+    EXPECT_EQ(typed.layer_id, 1u);
+    EXPECT_EQ(typed.param_name, "spawn_rate_per_frame");
+    EXPECT_FLOAT_EQ(typed.value, 5.0f);
+}
+
+TEST(PanelMessageParseTest, SetVisualParamRejectsEmptyParamName) {
+    EXPECT_FALSE(
+        panel_message::parse(R"({"type":"set_visual_param","layer_id":1,"param_name":"","value":1.0})")
+            .has_value());
+}
+
+TEST(PanelMessageParseTest, SetVisualParamRejectsParamNameWithUnexpectedCharacters) {
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"foo.bar","value":1.0})")
+                     .has_value());
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"foo bar","value":1.0})")
+                     .has_value());
+}
+
+TEST(PanelMessageParseTest, SetVisualParamRejectsMissingValue) {
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame"})")
+                     .has_value());
+}
+
+TEST(PanelMessageParseTest, SetVisualParamRejectsNonStringParamName) {
+    EXPECT_FALSE(
+        panel_message::parse(R"({"type":"set_visual_param","layer_id":1,"param_name":5,"value":1.0})")
+            .has_value());
+}
+
 TEST(PanelMessageParseTest, ParsesLoadPreset) {
     auto message = panel_message::parse(R"({"type":"load_preset","filename":"my-preset.json"})");
     LoadPresetMessage typed = expect_type<LoadPresetMessage>(message);

@@ -65,11 +65,13 @@ add_executable(compositor_tests
   compositor/layer_test.cpp
   compositor/layer_preset_test.cpp
   compositor/preset_file_io_test.cpp
+  compositor/visual_param_test.cpp
   ../src/compositor/compositor_math.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/layer.cpp
   ../src/compositor/layer_preset.cpp
   ../src/compositor/preset_file_io.cpp
+  ../src/compositor/visual_param.cpp
   ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp
@@ -162,6 +164,7 @@ add_executable(ui_host_tests
   ../src/compositor/layer.cpp
   ../src/compositor/layer_preset.cpp
   ../src/compositor/preset_file_io.cpp
+  ../src/compositor/visual_param.cpp
   ../src/visuals/palette.cpp
   ../src/visuals/waveform/waveform_visual.cpp
   ../src/visuals/spectrum/spectrum_visual.cpp

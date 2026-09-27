@@ -141,6 +141,7 @@ add_executable(aviz
   src/compositor/compositor_math.cpp
   src/compositor/layer_preset.cpp
   src/compositor/preset_file_io.cpp
+  src/compositor/visual_param.cpp
   src/ui_host/panel_message.cpp
   src/ui_host/panel_dispatch_queue.cpp
   src/ui_host/panel_message_apply.cpp
