@@ -259,7 +259,7 @@ int run_app(std::optional<int> generate_layer_count) {
             panel_message_apply::PanelApplyContext apply_ctx{compositor, *ui_host, window_layout_controller,
                                                                audio_source_controller};
 
-            while (!WindowShouldClose()) {
+            while (!WindowShouldClose() && !ui_host->should_close()) {
                 std::vector<Layer>& layers = compositor.layers();
 
                 if (IsKeyPressed(KEY_A)) {

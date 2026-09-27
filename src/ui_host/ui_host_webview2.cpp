@@ -138,6 +138,8 @@ public:
 
     bool is_visible() const override { return visible_.load(); }
 
+    bool should_close() const override { return should_close_.load(); }
+
     void set_bounds(int x, int y, int width, int height) override {
         if (hwnd_ == nullptr) {
             return;
@@ -377,6 +379,7 @@ private:
                 DestroyWindow(hwnd);
                 return 0;
             case WM_DESTROY:
+                should_close_.store(true);
                 PostQuitMessage(0);
                 return 0;
             default:
@@ -395,6 +398,7 @@ private:
 
     HWND hwnd_ = nullptr;
     std::atomic<bool> visible_{false};
+    std::atomic<bool> should_close_{false};
 
     ComPtr<ICoreWebView2Environment> environment_;
     ComPtr<ICoreWebView2Controller> controller_;

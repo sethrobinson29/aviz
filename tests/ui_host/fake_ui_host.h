@@ -13,6 +13,7 @@ public:
     void show() override { visible_ = true; }
     void hide() override { visible_ = false; }
     bool is_visible() const override { return visible_; }
+    bool should_close() const override { return should_close_; }
     void set_bounds(int x, int y, int width, int height) override {
         last_bounds = WindowRect{x, y, width, height};
     }
@@ -22,6 +23,7 @@ public:
 
     std::vector<std::string> sent_messages;
     std::optional<WindowRect> last_bounds;
+    bool should_close_ = false;
 
 private:
     bool visible_ = true;
