@@ -18,6 +18,8 @@ inline constexpr float kParticleBaseSpeedPxPerFrame = 4.0f;
 
 inline constexpr float kParticleAngleJitterRadians = 0.35f;
 
+inline constexpr int kParticleSpriteSizePx = 16;
+
 inline constexpr int kParticleDefaultLifetimeFrames = 150;
 
 inline constexpr float kParticlesSpawnRatePerFrameMin = 0.0f;

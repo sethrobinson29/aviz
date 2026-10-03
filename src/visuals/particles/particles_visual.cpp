@@ -119,14 +119,23 @@ ParticlesVisual::ParticlesVisual(ParticlesParams params) : params_(params) {}
 ParticlesVisual::~ParticlesVisual() {
     if (width_ > 0 && height_ > 0) {
         UnloadRenderTexture(texture_);
+        UnloadTexture(sprite_);
     }
 }
 
 void ParticlesVisual::resize(int width, int height) {
     if (width_ > 0 && height_ > 0) {
         UnloadRenderTexture(texture_);
+        UnloadTexture(sprite_);
     }
     texture_ = LoadRenderTexture(width, height);
+
+    const int sprite_size = visual_config::kParticleSpriteSizePx;
+    Image sprite_image = GenImageColor(sprite_size, sprite_size, Color{255, 255, 255, 0});
+    ImageDrawCircle(&sprite_image, sprite_size / 2, sprite_size / 2, sprite_size / 2 - 1, WHITE);
+    sprite_ = LoadTextureFromImage(sprite_image);
+    UnloadImage(sprite_image);
+    SetTextureFilter(sprite_, TEXTURE_FILTER_BILINEAR);
     width_ = width;
     height_ = height;
 }
@@ -175,6 +184,10 @@ void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivit
     particles_math::step_pool(pool_, static_cast<float>(width_), static_cast<float>(height_),
                                params_.radius);
 
+    const Rectangle sprite_source{0.0f, 0.0f, static_cast<float>(sprite_.width),
+                                  static_cast<float>(sprite_.height)};
+    const float diameter = params_.radius * 2.0f;
+
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     for (const particles_math::Particle& p : pool_) {
@@ -183,8 +196,10 @@ void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivit
         }
         const Color base =
             particles_math::base_color(params_.particle_color, palette_override, p.age_frames, p.lifetime_frames);
-        DrawCircleV(p.position, params_.radius,
-                    particles_math::faded_color(base, p.age_frames, p.lifetime_frames));
+        DrawTexturePro(sprite_, sprite_source,
+                       Rectangle{p.position.x - params_.radius, p.position.y - params_.radius, diameter, diameter},
+                       Vector2{0.0f, 0.0f}, 0.0f,
+                       particles_math::faded_color(base, p.age_frames, p.lifetime_frames));
     }
     EndTextureMode();
 }

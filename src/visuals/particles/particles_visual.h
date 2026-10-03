@@ -77,6 +77,7 @@ public:
 private:
     ParticlesParams params_;
     RenderTexture2D texture_{};
+    Texture2D sprite_{};
     int width_ = 0;
     int height_ = 0;
     particles_math::Pool pool_{};
