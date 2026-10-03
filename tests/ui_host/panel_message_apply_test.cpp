@@ -23,6 +23,7 @@
 #include "compositor/preset_file_io.h"
 #include "ui_host/fake_ui_host.h"
 #include "ui_host/panel_apply_test_fixture.h"
+#include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/visual_config.h"
 
@@ -238,6 +239,38 @@ TEST_F(PanelMessageApplyTest, SetVisualParamWithUnknownNameSendsFailureStatus) {
 
     apply(PanelMessage{SetVisualParamMessage{id, "not_a_real_param", 1.0f}});
 
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamBoolReachesPanelAsJsonBooleanNotNumber) {
+    compositor_.add_layer(VisualType::FlowField);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(PanelMessage{SetVisualParamMessage{id, "ripple_on_onset_enabled", false}});
+
+    auto& flow = dynamic_cast<FlowFieldVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_FALSE(flow.params().ripple_on_onset_enabled);
+    nlohmann::json params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    ASSERT_TRUE(params["ripple_on_onset_enabled"].is_boolean());
+    EXPECT_EQ(params["ripple_on_onset_enabled"], false);
+    ASSERT_TRUE(params["burst_on_onset_enabled"].is_boolean());
+    EXPECT_EQ(params["burst_on_onset_enabled"], true);
+}
+
+TEST_F(PanelMessageApplyTest, SetVisualParamWithWrongValueTypeSendsFailureStatusAndLeavesParamUnchanged) {
+    compositor_.add_layer(VisualType::FlowField);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(PanelMessage{SetVisualParamMessage{id, "ripple_on_onset_enabled", 0.0f}});
+
+    auto& flow = dynamic_cast<FlowFieldVisual&>(*compositor_.layers()[0].visual);
+    EXPECT_TRUE(flow.params().ripple_on_onset_enabled);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+
+    ui_host_.sent_messages.clear();
+    apply(PanelMessage{SetVisualParamMessage{id, "spawn_rate_per_frame", true}});
+
+    EXPECT_FLOAT_EQ(flow.params().spawn_rate_per_frame, visual_config::kFlowFieldDefaultSpawnRatePerFrame);
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }
 

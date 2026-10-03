@@ -189,6 +189,9 @@ TEST(LayerPresetRoundTripTest, FlowFieldParamsRoundTrip) {
     params.spawn_rate_per_frame = 0.4f;
     params.ripple_on_onset_enabled = false;
     params.burst_on_onset_enabled = false;
+    params.turbulence_frequency = 0.03f;
+    params.evolution_per_frame = 0.02f;
+    params.grid_cols = 16;
     std::vector<Layer> layers;
     Layer layer{VisualType::FlowField, std::make_unique<FlowFieldVisual>(params)};
     layer.layer_id = 1;
@@ -202,6 +205,51 @@ TEST(LayerPresetRoundTripTest, FlowFieldParamsRoundTrip) {
     EXPECT_FALSE(visual->params().ripple_on_onset_enabled);
     EXPECT_FALSE(visual->params().burst_on_onset_enabled);
     EXPECT_EQ(visual->params().lifetime_frames, 500);
+    EXPECT_FLOAT_EQ(visual->params().turbulence_frequency, 0.03f);
+    EXPECT_FLOAT_EQ(visual->params().evolution_per_frame, 0.02f);
+    EXPECT_EQ(visual->params().grid_cols, 16);
+}
+
+namespace {
+
+nlohmann::json serialized_single_flow_field_doc() {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::FlowField, std::make_unique<FlowFieldVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+}
+
+TEST(LayerPresetAdversarialTest, RejectsFlowFieldParamsMissingAnyFieldShapeField) {
+    for (const char* key : {"turbulence_frequency", "evolution_per_frame", "grid_cols"}) {
+        nlohmann::json doc = serialized_single_flow_field_doc();
+        doc["layers"][0]["params"].erase(key);
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << key;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, RejectsFlowFieldGridColsOfWrongType) {
+    nlohmann::json doc = serialized_single_flow_field_doc();
+    doc["layers"][0]["params"]["grid_cols"] = "32";
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, ClampsOutOfRangeFlowFieldFieldShapeValuesOnLoad) {
+    nlohmann::json doc = serialized_single_flow_field_doc();
+    doc["layers"][0]["params"]["grid_cols"] = 100000;
+    doc["layers"][0]["params"]["turbulence_frequency"] = 50.0;
+    doc["layers"][0]["params"]["evolution_per_frame"] = -4.0;
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+    ASSERT_TRUE(loaded.has_value());
+    auto* visual = dynamic_cast<FlowFieldVisual*>((*loaded)[0].visual.get());
+    ASSERT_NE(visual, nullptr);
+    EXPECT_EQ(visual->params().grid_cols, visual_config::kFlowFieldGridColsMax);
+    EXPECT_FLOAT_EQ(visual->params().turbulence_frequency, visual_config::kFlowFieldTurbulenceFrequencyMax);
+    EXPECT_FLOAT_EQ(visual->params().evolution_per_frame, visual_config::kFlowFieldEvolutionPerFrameMin);
 }
 
 TEST(LayerPresetRoundTripTest, FractalParamsRoundTrip) {
@@ -379,4 +427,71 @@ TEST(LayerPresetAdversarialTest, RejectsPaletteOverrideThatIsNotObjectOrNull) {
     layer["palette_override"] = "not-a-palette";
     nlohmann::json layers = nlohmann::json::array({layer});
     EXPECT_EQ(layer_preset::deserialize(wrap_doc(layers)), std::nullopt);
+}
+
+namespace {
+
+nlohmann::json serialized_single_particles_doc() {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Particles, std::make_unique<ParticlesVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+}
+
+TEST(LayerPresetAdversarialTest, ExtremeFloatLifetimeFramesLoadsClampedForParticles) {
+    nlohmann::json doc = serialized_single_particles_doc();
+
+    doc["layers"][0]["params"]["lifetime_frames"] = 1e30;
+    std::optional<std::vector<Layer>> high = layer_preset::deserialize(doc.dump());
+    ASSERT_TRUE(high.has_value());
+    EXPECT_EQ(dynamic_cast<ParticlesVisual&>(*(*high)[0].visual).params().lifetime_frames,
+              visual_config::kParticlesLifetimeFramesMax);
+
+    doc["layers"][0]["params"]["lifetime_frames"] = -1e30;
+    std::optional<std::vector<Layer>> low = layer_preset::deserialize(doc.dump());
+    ASSERT_TRUE(low.has_value());
+    EXPECT_EQ(dynamic_cast<ParticlesVisual&>(*(*low)[0].visual).params().lifetime_frames,
+              visual_config::kParticlesLifetimeFramesMin);
+}
+
+TEST(LayerPresetAdversarialTest, ExtremeFloatLifetimeFramesAndGridColsLoadClampedForFlowField) {
+    nlohmann::json doc = serialized_single_flow_field_doc();
+
+    doc["layers"][0]["params"]["lifetime_frames"] = 1e30;
+    doc["layers"][0]["params"]["grid_cols"] = 1e30;
+    std::optional<std::vector<Layer>> high = layer_preset::deserialize(doc.dump());
+    ASSERT_TRUE(high.has_value());
+    const FlowFieldParams& high_params = dynamic_cast<FlowFieldVisual&>(*(*high)[0].visual).params();
+    EXPECT_EQ(high_params.lifetime_frames, visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(high_params.grid_cols, visual_config::kFlowFieldGridColsMax);
+
+    doc["layers"][0]["params"]["lifetime_frames"] = -1e30;
+    doc["layers"][0]["params"]["grid_cols"] = -1e30;
+    std::optional<std::vector<Layer>> low = layer_preset::deserialize(doc.dump());
+    ASSERT_TRUE(low.has_value());
+    const FlowFieldParams& low_params = dynamic_cast<FlowFieldVisual&>(*(*low)[0].visual).params();
+    EXPECT_EQ(low_params.lifetime_frames, visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(low_params.grid_cols, visual_config::kFlowFieldGridColsMin);
+}
+
+TEST(LayerPresetAdversarialTest, IntegerBeyondIntRangeLoadsClampedForLifetimeFramesAndGridCols) {
+    nlohmann::json doc = serialized_single_flow_field_doc();
+    doc["layers"][0]["params"]["lifetime_frames"] = 99999999999999LL;
+    doc["layers"][0]["params"]["grid_cols"] = 99999999999999LL;
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+    ASSERT_TRUE(loaded.has_value());
+    const FlowFieldParams& params = dynamic_cast<FlowFieldVisual&>(*(*loaded)[0].visual).params();
+    EXPECT_EQ(params.lifetime_frames, visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(params.grid_cols, visual_config::kFlowFieldGridColsMax);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsNonNumericLifetimeFrames) {
+    nlohmann::json doc = serialized_single_particles_doc();
+    doc["layers"][0]["params"]["lifetime_frames"] = "150";
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
 }

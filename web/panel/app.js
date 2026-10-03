@@ -117,34 +117,50 @@
         });
         controls.appendChild(labeledControl("Sensitivity", sensitivityInput));
 
-        if (layer.visual_type === "Particles") {
-            var spawnRateInput = document.createElement("input");
-            spawnRateInput.type = "range";
-            spawnRateInput.min = "0";
-            spawnRateInput.max = "20";
-            spawnRateInput.step = "0.1";
-            spawnRateInput.addEventListener("input", function () {
-                post("set_visual_param", {
-                    layer_id: layer.layer_id,
-                    param_name: "spawn_rate_per_frame",
-                    value: parseFloat(spawnRateInput.value)
-                });
-            });
-            controls.appendChild(labeledControl("Spawn Rate", spawnRateInput));
+        var visualParamInputs = [];
 
-            var drawDistanceInput = document.createElement("input");
-            drawDistanceInput.type = "range";
-            drawDistanceInput.min = "10";
-            drawDistanceInput.max = "600";
-            drawDistanceInput.step = "10";
-            drawDistanceInput.addEventListener("input", function () {
+        function addVisualParamSlider(labelText, paramName, min, max, step) {
+            var input = document.createElement("input");
+            input.type = "range";
+            input.min = min;
+            input.max = max;
+            input.step = step;
+            input.addEventListener("input", function () {
                 post("set_visual_param", {
                     layer_id: layer.layer_id,
-                    param_name: "lifetime_frames",
-                    value: parseFloat(drawDistanceInput.value)
+                    param_name: paramName,
+                    value: parseFloat(input.value)
                 });
             });
-            controls.appendChild(labeledControl("Draw Distance", drawDistanceInput));
+            controls.appendChild(labeledControl(labelText, input));
+            visualParamInputs.push({ input: input, paramName: paramName });
+        }
+
+        function addVisualParamCheckbox(labelText, paramName) {
+            var input = document.createElement("input");
+            input.type = "checkbox";
+            input.addEventListener("change", function () {
+                post("set_visual_param", {
+                    layer_id: layer.layer_id,
+                    param_name: paramName,
+                    value: input.checked
+                });
+            });
+            controls.appendChild(labeledControl(labelText, input));
+            visualParamInputs.push({ input: input, paramName: paramName });
+        }
+
+        if (layer.visual_type === "Particles") {
+            addVisualParamSlider("Spawn Rate", "spawn_rate_per_frame", "0", "20", "0.1");
+            addVisualParamSlider("Draw Distance", "lifetime_frames", "10", "600", "10");
+        } else if (layer.visual_type === "FlowField") {
+            addVisualParamSlider("Spawn Rate", "spawn_rate_per_frame", "0", "5", "0.05");
+            addVisualParamSlider("Trail Life", "lifetime_frames", "10", "600", "10");
+            addVisualParamSlider("Turbulence", "turbulence_frequency", "0.002", "0.05", "0.001");
+            addVisualParamSlider("Evolution Speed", "evolution_per_frame", "0", "0.05", "0.001");
+            addVisualParamSlider("Grid Resolution", "grid_cols", "8", "32", "1");
+            addVisualParamCheckbox("Ripple on Onset", "ripple_on_onset_enabled");
+            addVisualParamCheckbox("Burst on Onset", "burst_on_onset_enabled");
         }
 
         var dupBtn = document.createElement("button");
@@ -172,12 +188,9 @@
             blend: blendSelect,
             band: bandSelect,
             reactivity: reactivitySelect,
-            sensitivity: sensitivityInput
+            sensitivity: sensitivityInput,
+            visualParams: visualParamInputs
         };
-        if (layer.visual_type === "Particles") {
-            li._els.spawnRate = spawnRateInput;
-            li._els.drawDistance = drawDistanceInput;
-        }
 
         return li;
     }
@@ -190,8 +203,15 @@
         if (active !== els.enabled) els.enabled.checked = layer.enabled;
         if (active !== els.opacity) els.opacity.value = layer.opacity;
         if (active !== els.blend) els.blend.value = layer.blend_mode;
-        if (els.spawnRate && active !== els.spawnRate) els.spawnRate.value = layer.params.spawn_rate_per_frame;
-        if (els.drawDistance && active !== els.drawDistance) els.drawDistance.value = layer.params.lifetime_frames;
+        els.visualParams.forEach(function (entry) {
+            if (active === entry.input) return;
+            var current = layer.params[entry.paramName];
+            if (entry.input.type === "checkbox") {
+                entry.input.checked = current === true;
+            } else {
+                entry.input.value = current;
+            }
+        });
         var bandValue = layer.freq_band === null ? "Global" : String(layer.freq_band);
         if (active !== els.band) els.band.value = bandValue;
         if (active !== els.reactivity) els.reactivity.value = layer.reactivity_source;

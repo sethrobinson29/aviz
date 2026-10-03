@@ -44,6 +44,16 @@ int clamp_lifetime_frames(int frames) {
                        visual_config::kParticlesLifetimeFramesMax);
 }
 
+int clamp_lifetime_frames_from_number(double frames) {
+    if (!(frames >= static_cast<double>(visual_config::kParticlesLifetimeFramesMin))) {
+        return visual_config::kParticlesLifetimeFramesMin;
+    }
+    if (frames >= static_cast<double>(visual_config::kParticlesLifetimeFramesMax)) {
+        return visual_config::kParticlesLifetimeFramesMax;
+    }
+    return static_cast<int>(frames);
+}
+
 int accumulate_spawn_count(float& accumulator, float rate_per_frame) {
     accumulator += rate_per_frame;
     const float count = std::floor(accumulator);

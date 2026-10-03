@@ -36,9 +36,21 @@ inline constexpr int kFlowFieldGridRows = 18;
 
 inline constexpr int kFlowFieldMaxGridCells = kFlowFieldGridCols * kFlowFieldGridRows;
 
+inline constexpr int kFlowFieldGridColsMin = 8;
+
+inline constexpr int kFlowFieldGridColsMax = kFlowFieldGridCols;
+
 inline constexpr float kFlowFieldBaseTurbulenceFrequency = 0.01f;
 
 inline constexpr float kFlowFieldBaseEvolutionPerFrame = 0.01f;
+
+inline constexpr float kFlowFieldTurbulenceFrequencyMin = 0.002f;
+
+inline constexpr float kFlowFieldTurbulenceFrequencyMax = 0.05f;
+
+inline constexpr float kFlowFieldEvolutionPerFrameMin = 0.0f;
+
+inline constexpr float kFlowFieldEvolutionPerFrameMax = 0.05f;
 
 inline constexpr float kFlowFieldSteerFactor = 0.15f;
 
@@ -49,6 +61,10 @@ inline constexpr int kFlowFieldDefaultLifetimeFrames = 400;
 inline constexpr float kFlowFieldDefaultSpawnRatePerFrame = 0.75f;
 
 inline constexpr int kFlowFieldDefaultBurstCount = 16;
+
+inline constexpr float kFlowFieldSpawnRatePerFrameMin = 0.0f;
+
+inline constexpr float kFlowFieldSpawnRatePerFrameMax = 5.0f;
 
 inline constexpr int kMaxFlowFieldRipples = 4;
 

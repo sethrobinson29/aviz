@@ -201,7 +201,38 @@ TEST(PanelMessageParseTest, ParsesSetVisualParam) {
     SetVisualParamMessage typed = expect_type<SetVisualParamMessage>(message);
     EXPECT_EQ(typed.layer_id, 1u);
     EXPECT_EQ(typed.param_name, "spawn_rate_per_frame");
-    EXPECT_FLOAT_EQ(typed.value, 5.0f);
+    ASSERT_TRUE(std::holds_alternative<float>(typed.value));
+    EXPECT_FLOAT_EQ(std::get<float>(typed.value), 5.0f);
+}
+
+TEST(PanelMessageParseTest, SetVisualParamParsesJsonBooleanAsBoolNotFloat) {
+    auto message = panel_message::parse(
+        R"({"type":"set_visual_param","layer_id":1,"param_name":"ripple_on_onset_enabled","value":false})");
+    SetVisualParamMessage typed = expect_type<SetVisualParamMessage>(message);
+    ASSERT_TRUE(std::holds_alternative<bool>(typed.value));
+    EXPECT_FALSE(std::get<bool>(typed.value));
+}
+
+TEST(PanelMessageParseTest, SetVisualParamParsesJsonNumberOneAsFloatNotBool) {
+    auto message = panel_message::parse(
+        R"({"type":"set_visual_param","layer_id":1,"param_name":"ripple_on_onset_enabled","value":1})");
+    SetVisualParamMessage typed = expect_type<SetVisualParamMessage>(message);
+    EXPECT_TRUE(std::holds_alternative<float>(typed.value));
+}
+
+TEST(PanelMessageParseTest, SetVisualParamRejectsStringNullArrayAndObjectValues) {
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"x","value":"true"})")
+                     .has_value());
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"x","value":null})")
+                     .has_value());
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"x","value":[1]})")
+                     .has_value());
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_visual_param","layer_id":1,"param_name":"x","value":{"v":1}})")
+                     .has_value());
 }
 
 TEST(PanelMessageParseTest, SetVisualParamRejectsEmptyParamName) {

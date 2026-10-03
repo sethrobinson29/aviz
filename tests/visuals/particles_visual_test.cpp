@@ -3,6 +3,8 @@
 #include <cmath>
 #include <random>
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 #include "audio/audio_config.h"
@@ -313,4 +315,21 @@ TEST(ParticlesBaseColorTest, ZeroLifetimeNormalizesToZero) {
     Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
     Color c = particles_math::base_color(WHITE, palette, 0, 0);
     EXPECT_EQ(c.r, 0);
+}
+
+TEST(ParticlesClampLifetimeFromNumberTest, ExtremeAndNonFiniteValuesClampWithoutReachingTheIntCast) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(1e30),
+              visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(-1e30),
+              visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(std::numeric_limits<double>::infinity()),
+              visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(-std::numeric_limits<double>::infinity()),
+              visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(std::numeric_limits<double>::quiet_NaN()),
+              visual_config::kParticlesLifetimeFramesMin);
+}
+
+TEST(ParticlesClampLifetimeFromNumberTest, InRangeValueTruncatesToInt) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(150.9), 150);
 }

@@ -140,7 +140,8 @@ void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
     if (index.has_value()) {
         if (!visual_param::set(ctx.compositor.layers()[*index], msg.param_name, msg.value)) {
             push_status(ctx.ui_host, false,
-                        "unknown visual param \"" + msg.param_name + "\" for this layer's visual type");
+                        "visual param \"" + msg.param_name +
+                            "\" rejected: unknown name or wrong value type for this layer's visual type");
         }
     }
     push_layer_stack(ctx.compositor, ctx.ui_host);

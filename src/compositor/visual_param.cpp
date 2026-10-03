@@ -1,17 +1,57 @@
 #include "compositor/visual_param.h"
 
+#include <variant>
+
+#include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/particles/particles_visual.h"
 
 namespace {
 
-bool set_particles_param(ParticlesVisual& visual, const std::string& param_name, float value) {
+bool set_particles_param(ParticlesVisual& visual, const std::string& param_name, const VisualParamValue& value) {
+    const float* number = std::get_if<float>(&value);
+    if (number == nullptr) {
+        return false;
+    }
     if (param_name == "spawn_rate_per_frame") {
-        visual.mutable_params().spawn_rate_per_frame = particles_math::clamp_spawn_rate_per_frame(value);
+        visual.mutable_params().spawn_rate_per_frame = particles_math::clamp_spawn_rate_per_frame(*number);
         return true;
     }
     if (param_name == "lifetime_frames") {
-        visual.mutable_params().lifetime_frames =
-            particles_math::clamp_lifetime_frames(static_cast<int>(value));
+        visual.mutable_params().lifetime_frames = particles_math::clamp_lifetime_frames_from_number(*number);
+        return true;
+    }
+    return false;
+}
+
+bool set_flow_field_param(FlowFieldVisual& visual, const std::string& param_name, const VisualParamValue& value) {
+    const float* number = std::get_if<float>(&value);
+    const bool* flag = std::get_if<bool>(&value);
+    if (param_name == "spawn_rate_per_frame" && number != nullptr) {
+        visual.mutable_params().spawn_rate_per_frame = flow_field_math::clamp_spawn_rate_per_frame(*number);
+        return true;
+    }
+    if (param_name == "lifetime_frames" && number != nullptr) {
+        visual.mutable_params().lifetime_frames = particles_math::clamp_lifetime_frames_from_number(*number);
+        return true;
+    }
+    if (param_name == "turbulence_frequency" && number != nullptr) {
+        visual.mutable_params().turbulence_frequency = flow_field_math::clamp_turbulence_frequency(*number);
+        return true;
+    }
+    if (param_name == "evolution_per_frame" && number != nullptr) {
+        visual.mutable_params().evolution_per_frame = flow_field_math::clamp_evolution_per_frame(*number);
+        return true;
+    }
+    if (param_name == "grid_cols" && number != nullptr) {
+        visual.mutable_params().grid_cols = flow_field_math::clamp_grid_cols_from_number(*number);
+        return true;
+    }
+    if (param_name == "ripple_on_onset_enabled" && flag != nullptr) {
+        visual.mutable_params().ripple_on_onset_enabled = *flag;
+        return true;
+    }
+    if (param_name == "burst_on_onset_enabled" && flag != nullptr) {
+        visual.mutable_params().burst_on_onset_enabled = *flag;
         return true;
     }
     return false;
@@ -21,10 +61,12 @@ bool set_particles_param(ParticlesVisual& visual, const std::string& param_name,
 
 namespace visual_param {
 
-bool set(Layer& layer, const std::string& param_name, float value) {
+bool set(Layer& layer, const std::string& param_name, const VisualParamValue& value) {
     switch (layer.visual_type) {
         case VisualType::Particles:
             return set_particles_param(dynamic_cast<ParticlesVisual&>(*layer.visual), param_name, value);
+        case VisualType::FlowField:
+            return set_flow_field_param(dynamic_cast<FlowFieldVisual&>(*layer.visual), param_name, value);
         default:
             return false;
     }

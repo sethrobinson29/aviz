@@ -35,6 +35,8 @@ float clamp_spawn_rate_per_frame(float rate);
 
 int clamp_lifetime_frames(int frames);
 
+int clamp_lifetime_frames_from_number(double frames);
+
 int accumulate_spawn_count(float& accumulator, float rate_per_frame);
 
 float amplitude_spawn_ratio(float energy, float reference, bool idle);

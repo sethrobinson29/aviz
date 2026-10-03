@@ -74,6 +74,17 @@ float require_float(const nlohmann::json& j, const char* key) {
     return field.get<float>();
 }
 
+VisualParamValue require_visual_param_value(const nlohmann::json& j) {
+    const nlohmann::json& field = j.at("value");
+    if (field.is_boolean()) {
+        return field.get<bool>();
+    }
+    if (field.is_number()) {
+        return field.get<float>();
+    }
+    throw std::invalid_argument("value must be a number or a boolean");
+}
+
 std::uint64_t require_layer_id(const nlohmann::json& j) {
     const nlohmann::json& field = j.at("layer_id");
     if (!field.is_number_unsigned()) {
@@ -172,7 +183,8 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
         return SetLayerSensitivityMessage{require_layer_id(doc), require_float(doc, "sensitivity")};
     }
     if (type == "set_visual_param") {
-        return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc), require_float(doc, "value")};
+        return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc),
+                                     require_visual_param_value(doc)};
     }
     if (type == "load_preset") {
         return LoadPresetMessage{require_preset_filename(doc)};

@@ -182,7 +182,8 @@ ParticlesParams particles_params_from_json(const nlohmann::json& j) {
     ParticlesParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
     p.radius = j.at("radius").get<float>();
-    p.lifetime_frames = j.at("lifetime_frames").get<int>();
+    p.lifetime_frames =
+        particles_math::clamp_lifetime_frames_from_number(j.at("lifetime_frames").get<double>());
     p.burst_count = j.at("burst_count").get<int>();
     p.spawn_rate_per_frame = j.at("spawn_rate_per_frame").get<float>();
     p.inner_radius_fraction = j.at("inner_radius_fraction").get<float>();
@@ -207,18 +208,26 @@ nlohmann::json params_to_json(const FlowFieldParams& p) {
                           {"burst_count", p.burst_count},
                           {"spawn_rate_per_frame", p.spawn_rate_per_frame},
                           {"ripple_on_onset_enabled", p.ripple_on_onset_enabled},
-                          {"burst_on_onset_enabled", p.burst_on_onset_enabled}};
+                          {"burst_on_onset_enabled", p.burst_on_onset_enabled},
+                          {"turbulence_frequency", p.turbulence_frequency},
+                          {"evolution_per_frame", p.evolution_per_frame},
+                          {"grid_cols", p.grid_cols}};
 }
 
 FlowFieldParams flow_field_params_from_json(const nlohmann::json& j) {
     FlowFieldParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
     p.radius = j.at("radius").get<float>();
-    p.lifetime_frames = j.at("lifetime_frames").get<int>();
+    p.lifetime_frames =
+        particles_math::clamp_lifetime_frames_from_number(j.at("lifetime_frames").get<double>());
     p.burst_count = j.at("burst_count").get<int>();
     p.spawn_rate_per_frame = j.at("spawn_rate_per_frame").get<float>();
     p.ripple_on_onset_enabled = j.at("ripple_on_onset_enabled").get<bool>();
     p.burst_on_onset_enabled = j.at("burst_on_onset_enabled").get<bool>();
+    p.turbulence_frequency =
+        flow_field_math::clamp_turbulence_frequency(j.at("turbulence_frequency").get<float>());
+    p.evolution_per_frame = flow_field_math::clamp_evolution_per_frame(j.at("evolution_per_frame").get<float>());
+    p.grid_cols = flow_field_math::clamp_grid_cols_from_number(j.at("grid_cols").get<double>());
     return p;
 }
 

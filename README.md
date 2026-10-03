@@ -198,8 +198,10 @@ run directly from `tsan/`.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames
   against path traversal, separators, and unexpected extensions, since the
   panel is the first place a user-typed filename reaches the filesystem.
-- **Per-visual-type panel controls (first one: Particles).** A generic
-  `set_visual_param` message (`layer_id`, `param_name`, `value`) and
+- **Per-visual-type panel controls (Particles and Flow Field so far).** A
+  generic `set_visual_param` message (`layer_id`, `param_name`, `value` —
+  a JSON number or a JSON boolean; a param's setter rejects the wrong type
+  rather than coercing it) and
   `visual_param::set` dispatch (`src/compositor/visual_param.h`/`.cpp`) let
   the panel expose a visual module's own params as real sliders, not just
   the generic per-layer fields above — the panel already receives every
@@ -210,11 +212,21 @@ run directly from `tsan/`.
   spawn-time velocity, so how long one lives is what determines how far it
   travels before disappearing; there's no separate travel-distance field).
   Both clamp server-side (`particles_math::clamp_spawn_rate_per_frame`/
-  `clamp_lifetime_frames`) regardless of what the slider sends. Other visual
-  modules' params (Radial's radii, FlowField's ripple/burst toggles,
-  Fractal's orbit, etc. — still debug-tool/compile-time-only today) can add
-  their own case to `visual_param::set` the same way, without a new message
-  type per module.
+  `clamp_lifetime_frames`) regardless of what the slider sends. Flow Field
+  gets **Spawn Rate** (`spawn_rate_per_frame`, its own 0–5 range — the pool
+  saturates around 2.6 at the default lifetime, so Particles' 0–20 would be
+  mostly dead travel), **Trail Life** (`lifetime_frames`, 10–600 — Flow Field
+  particles rarely leave the canvas, so lifetime is what caps population and
+  persistence), **Turbulence** (`turbulence_frequency`, 0.002–0.05),
+  **Evolution Speed** (`evolution_per_frame`, 0–0.05), **Grid Resolution**
+  (`grid_cols`, 8–32, rows derived at the default 32:18 ratio), and two real
+  boolean checkboxes, **Ripple on Onset** and **Burst on Onset**. The three
+  field-shape params are new `FlowFieldParams` fields saved in layer presets
+  and required on load, so a preset with a Flow Field layer saved before
+  they existed no longer loads. Other visual modules' params (Radial's
+  radii, Fractal's orbit, etc. — still debug-tool/compile-time-only today)
+  can add their own case to `visual_param::set` the same way, without a new
+  message type per module.
 - **Docked/detached window layout**: at launch (and whenever redocking) the
   visualizer and panel windows are positioned as one adjacent, centered
   block (`window_layout_config.h`'s pure `compute_docked_layout`); detaching

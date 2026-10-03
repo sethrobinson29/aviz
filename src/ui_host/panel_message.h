@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "compositor/layer_types.h"
+#include "compositor/visual_param_value.h"
 #include "visuals/reactivity_source.h"
 
 struct RequestStateMessage {};
@@ -62,7 +63,7 @@ struct SetLayerSensitivityMessage {
 struct SetVisualParamMessage {
     std::uint64_t layer_id;
     std::string param_name;
-    float value;
+    VisualParamValue value;
 };
 
 struct LoadPresetMessage {
