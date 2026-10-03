@@ -11,6 +11,7 @@
 #include "audio/audio_config.h"
 #include "audio/audio_file_validation.h"
 #include "compositor/preset_file_io.h"
+#include "visuals/number_clamp.h"
 
 namespace {
 
@@ -71,7 +72,7 @@ float require_float(const nlohmann::json& j, const char* key) {
     if (!field.is_number()) {
         throw std::invalid_argument(std::string(key) + " must be a number");
     }
-    return field.get<float>();
+    return number_math::clamp_number_to_representable<float>(field.get<double>());
 }
 
 VisualParamValue require_visual_param_value(const nlohmann::json& j) {
@@ -80,7 +81,7 @@ VisualParamValue require_visual_param_value(const nlohmann::json& j) {
         return field.get<bool>();
     }
     if (field.is_number()) {
-        return field.get<float>();
+        return number_math::clamp_number_to_representable<float>(field.get<double>());
     }
     throw std::invalid_argument("value must be a number or a boolean");
 }

@@ -31,6 +31,7 @@ gtest_discover_tests(audio_tests)
 # initialize a window/GL context, since the functions under test don't call
 # into one.
 add_executable(visuals_tests
+  visuals/number_clamp_test.cpp
   visuals/palette_test.cpp
   visuals/waveform_visual_test.cpp
   visuals/spectrum_visual_test.cpp

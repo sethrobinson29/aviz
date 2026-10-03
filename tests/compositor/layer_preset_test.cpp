@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -19,6 +20,7 @@
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 #include "visuals/spectrum/spectrum_visual.h"
+#include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
 
 namespace {
@@ -493,5 +495,69 @@ TEST(LayerPresetAdversarialTest, IntegerBeyondIntRangeLoadsClampedForLifetimeFra
 TEST(LayerPresetAdversarialTest, RejectsNonNumericLifetimeFrames) {
     nlohmann::json doc = serialized_single_particles_doc();
     doc["layers"][0]["params"]["lifetime_frames"] = "150";
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, ExtremeBurstCountLoadsClampedForParticlesAndFlowField) {
+    nlohmann::json particles_doc = serialized_single_particles_doc();
+    particles_doc["layers"][0]["params"]["burst_count"] = 1e30;
+    std::optional<std::vector<Layer>> particles_high = layer_preset::deserialize(particles_doc.dump());
+    ASSERT_TRUE(particles_high.has_value());
+    EXPECT_EQ(dynamic_cast<ParticlesVisual&>(*(*particles_high)[0].visual).params().burst_count,
+              visual_config::kMaxParticles);
+
+    particles_doc["layers"][0]["params"]["burst_count"] = -1e30;
+    std::optional<std::vector<Layer>> particles_low = layer_preset::deserialize(particles_doc.dump());
+    ASSERT_TRUE(particles_low.has_value());
+    EXPECT_EQ(dynamic_cast<ParticlesVisual&>(*(*particles_low)[0].visual).params().burst_count, 0);
+
+    nlohmann::json flow_doc = serialized_single_flow_field_doc();
+    flow_doc["layers"][0]["params"]["burst_count"] = 99999999999999LL;
+    std::optional<std::vector<Layer>> flow_high = layer_preset::deserialize(flow_doc.dump());
+    ASSERT_TRUE(flow_high.has_value());
+    EXPECT_EQ(dynamic_cast<FlowFieldVisual&>(*(*flow_high)[0].visual).params().burst_count,
+              visual_config::kMaxParticles);
+}
+
+TEST(LayerPresetAdversarialTest, FloatFieldsBeyondFloatRangeLoadAsFiniteValues) {
+    nlohmann::json doc = serialized_single_particles_doc();
+    doc["layers"][0]["opacity"] = 1e300;
+    doc["layers"][0]["sensitivity"] = -1e300;
+    doc["layers"][0]["params"]["radius"] = 1e300;
+    doc["layers"][0]["params"]["spawn_rate_per_frame"] = -1e300;
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+    ASSERT_TRUE(loaded.has_value());
+    const Layer& layer = (*loaded)[0];
+    const ParticlesParams& params = dynamic_cast<ParticlesVisual&>(*layer.visual).params();
+    EXPECT_EQ(layer.opacity, std::numeric_limits<float>::max());
+    EXPECT_EQ(layer.sensitivity, std::numeric_limits<float>::lowest());
+    EXPECT_EQ(params.radius, std::numeric_limits<float>::max());
+    EXPECT_EQ(params.spawn_rate_per_frame, std::numeric_limits<float>::lowest());
+}
+
+TEST(LayerPresetAdversarialTest, RejectsBooleanWhereANumberIsRequired) {
+    nlohmann::json doc = serialized_single_particles_doc();
+    doc["layers"][0]["opacity"] = true;
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+
+    doc = serialized_single_particles_doc();
+    doc["layers"][0]["params"]["burst_count"] = true;
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsFractionalOrExtremeSchemaVersion) {
+    nlohmann::json doc = serialized_single_particles_doc();
+    doc["schema_version"] = 1.5;
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+
+    doc["schema_version"] = 1e30;
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsColorByteThatWouldWrapIntoRangeWhenNarrowed) {
+    nlohmann::json doc = serialized_single_particles_doc();
+    doc["layers"][0]["tint_color"]["r"] = 4294967301LL;
     EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
 }

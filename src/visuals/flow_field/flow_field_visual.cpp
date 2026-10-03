@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace flow_field_math {
@@ -77,13 +78,8 @@ int clamp_grid_cols(int cols) {
 }
 
 int clamp_grid_cols_from_number(double cols) {
-    if (!(cols >= static_cast<double>(visual_config::kFlowFieldGridColsMin))) {
-        return visual_config::kFlowFieldGridColsMin;
-    }
-    if (cols >= static_cast<double>(visual_config::kFlowFieldGridColsMax)) {
-        return visual_config::kFlowFieldGridColsMax;
-    }
-    return static_cast<int>(cols);
+    return number_math::clamp_number_to_range<int>(cols, visual_config::kFlowFieldGridColsMin,
+                                                    visual_config::kFlowFieldGridColsMax);
 }
 
 int grid_rows_for_cols(int cols) {

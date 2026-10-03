@@ -333,3 +333,11 @@ TEST(ParticlesClampLifetimeFromNumberTest, ExtremeAndNonFiniteValuesClampWithout
 TEST(ParticlesClampLifetimeFromNumberTest, InRangeValueTruncatesToInt) {
     EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(150.9), 150);
 }
+
+TEST(ParticlesClampBurstCountFromNumberTest, ClampsToZeroThroughPoolCapacity) {
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(24.0), 24);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(-5.0), 0);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(1e30), visual_config::kMaxParticles);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(-1e30), 0);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(std::numeric_limits<double>::quiet_NaN()), 0);
+}

@@ -1,5 +1,6 @@
 #include "ui_host/panel_message.h"
 
+#include <limits>
 #include <optional>
 #include <variant>
 
@@ -377,4 +378,30 @@ TEST(PanelMessageParseTest, ImportFileRejectsNonStringPath) {
 TEST(PanelMessageParseTest, ParsesEnableLoopback) {
     auto message = panel_message::parse(R"({"type":"enable_loopback"})");
     expect_type<EnableLoopbackMessage>(message);
+}
+
+TEST(PanelMessageParseTest, OpacityBeyondFloatRangeParsesToAFiniteFloat) {
+    auto high = panel_message::parse(R"({"type":"set_opacity","layer_id":1,"opacity":1e300})");
+    EXPECT_EQ(expect_type<SetLayerOpacityMessage>(high).opacity, std::numeric_limits<float>::max());
+
+    auto low = panel_message::parse(R"({"type":"set_opacity","layer_id":1,"opacity":-1e300})");
+    EXPECT_EQ(expect_type<SetLayerOpacityMessage>(low).opacity, std::numeric_limits<float>::lowest());
+}
+
+TEST(PanelMessageParseTest, SensitivityBeyondFloatRangeParsesToAFiniteFloat) {
+    auto high = panel_message::parse(R"({"type":"set_sensitivity","layer_id":1,"sensitivity":1e300})");
+    EXPECT_EQ(expect_type<SetLayerSensitivityMessage>(high).sensitivity, std::numeric_limits<float>::max());
+}
+
+TEST(PanelMessageParseTest, VisualParamValueBeyondFloatRangeParsesToAFiniteFloat) {
+    auto high = panel_message::parse(
+        R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame","value":1e300})");
+    SetVisualParamMessage typed = expect_type<SetVisualParamMessage>(high);
+    ASSERT_TRUE(std::holds_alternative<float>(typed.value));
+    EXPECT_EQ(std::get<float>(typed.value), std::numeric_limits<float>::max());
+
+    auto low = panel_message::parse(
+        R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame","value":-1e300})");
+    EXPECT_EQ(std::get<float>(expect_type<SetVisualParamMessage>(low).value),
+              std::numeric_limits<float>::lowest());
 }

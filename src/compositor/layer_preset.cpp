@@ -14,6 +14,7 @@
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
+#include "visuals/number_clamp.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
 #include "visuals/spectrum/spectrum_visual.h"
@@ -69,16 +70,28 @@ Enum string_to_enum(const std::string& text, const std::array<EnumEntry<Enum>, N
     throw std::invalid_argument("unknown enum string \"" + text + "\"");
 }
 
+double require_number_field(const nlohmann::json& j, const char* key) {
+    const nlohmann::json& field = j.at(key);
+    if (!field.is_number()) {
+        throw std::invalid_argument(std::string(key) + " must be a number");
+    }
+    return field.get<double>();
+}
+
+float require_float_field(const nlohmann::json& j, const char* key) {
+    return number_math::clamp_number_to_representable<float>(require_number_field(j, key));
+}
+
 int require_byte_field(const nlohmann::json& j, const char* key) {
     const nlohmann::json& field = j.at(key);
     if (!field.is_number_integer() && !field.is_number_unsigned()) {
         throw std::invalid_argument(std::string(key) + " must be an integer in [0, 255]");
     }
-    const int value = field.get<int>();
-    if (value < 0 || value > 255) {
+    const double value = field.get<double>();
+    if (value < 0.0 || value > 255.0) {
         throw std::invalid_argument(std::string(key) + " must be an integer in [0, 255]");
     }
-    return value;
+    return static_cast<int>(value);
 }
 
 std::uint64_t require_unsigned_field(const nlohmann::json& j, const char* key) {
@@ -113,7 +126,7 @@ Palette palette_from_json(const nlohmann::json& j) {
             throw std::invalid_argument("palette stop must be an object");
         }
         PaletteStop stop;
-        stop.position = stop_json.at("position").get<float>();
+        stop.position = require_float_field(stop_json, "position");
         stop.color = color_from_json(stop_json.at("color"));
         palette.stops.push_back(stop);
     }
@@ -135,7 +148,7 @@ nlohmann::json params_to_json(const WaveformParams& p) {
 WaveformParams waveform_params_from_json(const nlohmann::json& j) {
     WaveformParams p;
     p.line_color = color_from_json(j.at("line_color"));
-    p.line_thickness = j.at("line_thickness").get<float>();
+    p.line_thickness = require_float_field(j, "line_thickness");
     return p;
 }
 
@@ -148,8 +161,8 @@ nlohmann::json params_to_json(const SpectrumParams& p) {
 SpectrumParams spectrum_params_from_json(const nlohmann::json& j) {
     SpectrumParams p;
     p.bar_color = color_from_json(j.at("bar_color"));
-    p.gap_ratio = j.at("gap_ratio").get<float>();
-    p.max_height_fraction = j.at("max_height_fraction").get<float>();
+    p.gap_ratio = require_float_field(j, "gap_ratio");
+    p.max_height_fraction = require_float_field(j, "max_height_fraction");
     return p;
 }
 
@@ -163,9 +176,9 @@ nlohmann::json params_to_json(const RadialParams& p) {
 RadialParams radial_params_from_json(const nlohmann::json& j) {
     RadialParams p;
     p.bar_color = color_from_json(j.at("bar_color"));
-    p.thickness = j.at("thickness").get<float>();
-    p.inner_radius_fraction = j.at("inner_radius_fraction").get<float>();
-    p.max_radius_fraction = j.at("max_radius_fraction").get<float>();
+    p.thickness = require_float_field(j, "thickness");
+    p.inner_radius_fraction = require_float_field(j, "inner_radius_fraction");
+    p.max_radius_fraction = require_float_field(j, "max_radius_fraction");
     return p;
 }
 
@@ -181,12 +194,12 @@ nlohmann::json params_to_json(const ParticlesParams& p) {
 ParticlesParams particles_params_from_json(const nlohmann::json& j) {
     ParticlesParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
-    p.radius = j.at("radius").get<float>();
+    p.radius = require_float_field(j, "radius");
     p.lifetime_frames =
-        particles_math::clamp_lifetime_frames_from_number(j.at("lifetime_frames").get<double>());
-    p.burst_count = j.at("burst_count").get<int>();
-    p.spawn_rate_per_frame = j.at("spawn_rate_per_frame").get<float>();
-    p.inner_radius_fraction = j.at("inner_radius_fraction").get<float>();
+        particles_math::clamp_lifetime_frames_from_number(require_number_field(j, "lifetime_frames"));
+    p.burst_count = particles_math::clamp_burst_count_from_number(require_number_field(j, "burst_count"));
+    p.spawn_rate_per_frame = require_float_field(j, "spawn_rate_per_frame");
+    p.inner_radius_fraction = require_float_field(j, "inner_radius_fraction");
     return p;
 }
 
@@ -197,7 +210,7 @@ nlohmann::json params_to_json(const LissajousParams& p) {
 LissajousParams lissajous_params_from_json(const nlohmann::json& j) {
     LissajousParams p;
     p.line_color = color_from_json(j.at("line_color"));
-    p.line_thickness = j.at("line_thickness").get<float>();
+    p.line_thickness = require_float_field(j, "line_thickness");
     return p;
 }
 
@@ -217,17 +230,17 @@ nlohmann::json params_to_json(const FlowFieldParams& p) {
 FlowFieldParams flow_field_params_from_json(const nlohmann::json& j) {
     FlowFieldParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
-    p.radius = j.at("radius").get<float>();
+    p.radius = require_float_field(j, "radius");
     p.lifetime_frames =
-        particles_math::clamp_lifetime_frames_from_number(j.at("lifetime_frames").get<double>());
-    p.burst_count = j.at("burst_count").get<int>();
-    p.spawn_rate_per_frame = j.at("spawn_rate_per_frame").get<float>();
+        particles_math::clamp_lifetime_frames_from_number(require_number_field(j, "lifetime_frames"));
+    p.burst_count = particles_math::clamp_burst_count_from_number(require_number_field(j, "burst_count"));
+    p.spawn_rate_per_frame = require_float_field(j, "spawn_rate_per_frame");
     p.ripple_on_onset_enabled = j.at("ripple_on_onset_enabled").get<bool>();
     p.burst_on_onset_enabled = j.at("burst_on_onset_enabled").get<bool>();
     p.turbulence_frequency =
-        flow_field_math::clamp_turbulence_frequency(j.at("turbulence_frequency").get<float>());
-    p.evolution_per_frame = flow_field_math::clamp_evolution_per_frame(j.at("evolution_per_frame").get<float>());
-    p.grid_cols = flow_field_math::clamp_grid_cols_from_number(j.at("grid_cols").get<double>());
+        flow_field_math::clamp_turbulence_frequency(require_float_field(j, "turbulence_frequency"));
+    p.evolution_per_frame = flow_field_math::clamp_evolution_per_frame(require_float_field(j, "evolution_per_frame"));
+    p.grid_cols = flow_field_math::clamp_grid_cols_from_number(require_number_field(j, "grid_cols"));
     return p;
 }
 
@@ -247,17 +260,17 @@ nlohmann::json params_to_json(const FractalParams& p) {
 
 FractalParams fractal_params_from_json(const nlohmann::json& j) {
     FractalParams p;
-    p.base_zoom = j.at("base_zoom").get<float>();
-    p.zoom_amplitude_scale = j.at("zoom_amplitude_scale").get<float>();
-    p.julia_base_radius = j.at("julia_base_radius").get<float>();
-    p.julia_radius_amplitude_scale = j.at("julia_radius_amplitude_scale").get<float>();
-    p.julia_angular_speed_radians_per_sec = j.at("julia_angular_speed_radians_per_sec").get<float>();
-    p.julia_orbit_center_x = j.at("julia_orbit_center_x").get<float>();
-    p.julia_orbit_center_y = j.at("julia_orbit_center_y").get<float>();
+    p.base_zoom = require_float_field(j, "base_zoom");
+    p.zoom_amplitude_scale = require_float_field(j, "zoom_amplitude_scale");
+    p.julia_base_radius = require_float_field(j, "julia_base_radius");
+    p.julia_radius_amplitude_scale = require_float_field(j, "julia_radius_amplitude_scale");
+    p.julia_angular_speed_radians_per_sec = require_float_field(j, "julia_angular_speed_radians_per_sec");
+    p.julia_orbit_center_x = require_float_field(j, "julia_orbit_center_x");
+    p.julia_orbit_center_y = require_float_field(j, "julia_orbit_center_y");
     p.julia_orbit_clockwise = j.at("julia_orbit_clockwise").get<bool>();
-    p.color_cycle_speed_hz = j.at("color_cycle_speed_hz").get<float>();
-    p.amplitude_smoothing_tau_ms = j.at("amplitude_smoothing_tau_ms").get<float>();
-    p.boundary_margin_px = j.at("boundary_margin_px").get<float>();
+    p.color_cycle_speed_hz = require_float_field(j, "color_cycle_speed_hz");
+    p.amplitude_smoothing_tau_ms = require_float_field(j, "amplitude_smoothing_tau_ms");
+    p.boundary_margin_px = require_float_field(j, "boundary_margin_px");
     return p;
 }
 
@@ -338,7 +351,7 @@ Layer layer_from_json(const nlohmann::json& j) {
     Layer layer{visual_type, make_visual_from_params_json(visual_type, j.at("params"))};
     layer.layer_id = layer_id;
     layer.enabled = j.at("enabled").get<bool>();
-    layer.opacity = j.at("opacity").get<float>();
+    layer.opacity = require_float_field(j, "opacity");
     layer.blend_mode = string_to_enum<LayerBlendMode>(j.at("blend_mode").get<std::string>(), kBlendModeTable);
     layer.tint_color = color_from_json(j.at("tint_color"));
 
@@ -362,7 +375,7 @@ Layer layer_from_json(const nlohmann::json& j) {
 
     layer.reactivity_source =
         string_to_enum<ReactivitySource>(j.at("reactivity_source").get<std::string>(), kReactivitySourceTable);
-    layer.sensitivity = j.at("sensitivity").get<float>();
+    layer.sensitivity = require_float_field(j, "sensitivity");
 
     return layer;
 }
@@ -388,7 +401,7 @@ std::optional<std::vector<Layer>> deserialize(const std::string& json_text) {
         if (!doc.is_object()) {
             return std::nullopt;
         }
-        if (doc.at("schema_version").get<int>() != kSchemaVersion) {
+        if (require_number_field(doc, "schema_version") != static_cast<double>(kSchemaVersion)) {
             return std::nullopt;
         }
         const nlohmann::json& layers_json = doc.at("layers");

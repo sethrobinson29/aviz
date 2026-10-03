@@ -39,7 +39,10 @@ music-visualizer/
 │   │                      # (preset_file_io.h/.cpp), layer_types.h (VisualType, LayerBlendMode —
 │   │                      # deliberately raylib-free, see spec §5)
 │   ├── visuals/           # one subdirectory per visual module, plus reactivity_source.h
-│   │   │                   # (ReactivitySource — deliberately raylib-free, see spec §5)
+│   │   │                   # (ReactivitySource — deliberately raylib-free, see spec §5) and
+│   │   │                   # number_clamp.h (shared safe-numeric-narrowing primitive, raylib-free,
+│   │   │                   # used by panel message parsing and layer preset deserialization —
+│   │   │                   # see TESTING.md's Security / adversarial input section)
 │   │   ├── waveform/
 │   │   ├── spectrum/
 │   │   └── ...
@@ -100,6 +103,7 @@ music-visualizer/
   - `tests/fixtures/` — synthetic, code-generated signals (exact frequencies, exact impulse timing) used in automated unit tests.
   - `assets/test-audio/` — real recorded files for human "does this sound/look reasonable on real music" spot-checks per `TESTING.md`. Not asserted on programmatically. **Contents are git-ignored**, not committed — the files in use are unreleased personal material, so they stay local rather than entering git history. The directory itself is kept present (via `.gitkeep` or equivalent) so `STRUCTURE.md`'s layout still holds even with no tracked files inside.
 - **`web/panel/` (the WebView2 UI) is not covered by GoogleTest/CTest.** `tests/ui_host/` covers only the C++ side of the state bridge (message format, serialization). No JS test framework has been chosen yet — until one is, panel behavior (theme switching, drag-reorder, layout) is human-review territory, same as visual/audio correctness in `TESTING.md`. Flag this rather than silently picking a JS framework.
+- **A shared, cross-module utility that must stay raylib-free (e.g. `number_clamp.h`) lives in `src/visuals/` alongside `reactivity_source.h`, not in a new top-level `utils/`.** This project deliberately has no top-level `include/` (above), and a `utils/` dump would be the same kind of ungrounded catch-all — `src/visuals/` already holds raylib-free shared headers used outside the directory's own namesake modules, so a new one of the same kind joins them there rather than establishing a second location.
 - **`handoffs/` is reference material, not part of the load-bearing doc set.** Unlike `CLAUDE.md`/`TESTING.md`/`STRUCTURE.md`/the design spec/`DEFINITION_OF_DONE.md`, files here aren't kept in sync automatically and don't get the "flag if stale" treatment — they're point-in-time notes (a design export's quirks, an audit prompt) meant to be read once at the relevant point in the project, not treated as ongoing architecture truth. If something in a handoff conflicts with the core docs, the core docs win.
 
 ## Git conventions

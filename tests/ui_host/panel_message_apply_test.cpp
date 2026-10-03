@@ -473,3 +473,32 @@ TEST_F(PanelMessageApplyPresetTest, LoadPresetOnMalformedFileSendsFailureStatusA
     ASSERT_EQ(compositor_.layers().size(), 1u);
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }
+
+TEST_F(PanelMessageApplyTest, ExtremeJsonNumbersEndUpClampedToEachFieldsOwnRangeEndToEnd) {
+    compositor_.add_layer(VisualType::FlowField);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    const std::string prefix = R"({"layer_id":)" + std::to_string(id) + ",";
+
+    for (const std::string& body :
+         {std::string(R"("type":"set_opacity","opacity":1e300})"),
+          std::string(R"("type":"set_sensitivity","sensitivity":1e300})"),
+          std::string(R"("type":"set_visual_param","param_name":"spawn_rate_per_frame","value":1e300})"),
+          std::string(R"("type":"set_visual_param","param_name":"turbulence_frequency","value":-1e300})"),
+          std::string(R"("type":"set_visual_param","param_name":"evolution_per_frame","value":1e300})"),
+          std::string(R"("type":"set_visual_param","param_name":"grid_cols","value":1e300})"),
+          std::string(R"("type":"set_visual_param","param_name":"lifetime_frames","value":-1e300})")}) {
+        std::optional<PanelMessage> parsed = panel_message::parse(prefix + body);
+        ASSERT_TRUE(parsed.has_value()) << body;
+        apply(*parsed);
+    }
+
+    const Layer& layer = compositor_.layers()[0];
+    const FlowFieldParams& params = dynamic_cast<FlowFieldVisual&>(*layer.visual).params();
+    EXPECT_FLOAT_EQ(layer.opacity, 1.0f);
+    EXPECT_FLOAT_EQ(layer.sensitivity, compositor_math::kSensitivityMax);
+    EXPECT_FLOAT_EQ(params.spawn_rate_per_frame, visual_config::kFlowFieldSpawnRatePerFrameMax);
+    EXPECT_FLOAT_EQ(params.turbulence_frequency, visual_config::kFlowFieldTurbulenceFrequencyMin);
+    EXPECT_FLOAT_EQ(params.evolution_per_frame, visual_config::kFlowFieldEvolutionPerFrameMax);
+    EXPECT_EQ(params.grid_cols, visual_config::kFlowFieldGridColsMax);
+    EXPECT_EQ(params.lifetime_frames, visual_config::kParticlesLifetimeFramesMin);
+}

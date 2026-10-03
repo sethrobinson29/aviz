@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace particles_math {
@@ -45,13 +46,12 @@ int clamp_lifetime_frames(int frames) {
 }
 
 int clamp_lifetime_frames_from_number(double frames) {
-    if (!(frames >= static_cast<double>(visual_config::kParticlesLifetimeFramesMin))) {
-        return visual_config::kParticlesLifetimeFramesMin;
-    }
-    if (frames >= static_cast<double>(visual_config::kParticlesLifetimeFramesMax)) {
-        return visual_config::kParticlesLifetimeFramesMax;
-    }
-    return static_cast<int>(frames);
+    return number_math::clamp_number_to_range<int>(frames, visual_config::kParticlesLifetimeFramesMin,
+                                                    visual_config::kParticlesLifetimeFramesMax);
+}
+
+int clamp_burst_count_from_number(double count) {
+    return number_math::clamp_number_to_range<int>(count, 0, visual_config::kMaxParticles);
 }
 
 int accumulate_spawn_count(float& accumulator, float rate_per_frame) {
