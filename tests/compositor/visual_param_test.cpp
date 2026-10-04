@@ -1,9 +1,12 @@
 #include "compositor/visual_param.h"
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 #include "compositor/compositor.h"
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
@@ -244,4 +247,64 @@ TEST(VisualParamSetTest, ExtremeFloatGridColsClampsForFlowField) {
 
     EXPECT_TRUE(visual_param::set(compositor.layers()[0], "grid_cols", -1e30f));
     EXPECT_EQ(flow.params().grid_cols, visual_config::kFlowFieldGridColsMin);
+}
+
+TEST(VisualParamSetTest, SetsLissajousCompressionExponent) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Lissajous);
+    auto& lissajous = dynamic_cast<LissajousVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent", 0.8f));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, 0.8f);
+}
+
+TEST(VisualParamSetTest, ClampsLissajousCompressionExponentIncludingExtremeAndNonFiniteValues) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Lissajous);
+    auto& lissajous = dynamic_cast<LissajousVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent", 0.0f));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent", 1e30f));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMax);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent", -1e30f));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent",
+                                  std::numeric_limits<float>::infinity()));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMax);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "compression_exponent",
+                                  std::numeric_limits<float>::quiet_NaN()));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
+}
+
+TEST(VisualParamSetTest, BoolValueSentToLissajousCompressionExponentIsRejectedNotCoerced) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Lissajous);
+    auto& lissajous = dynamic_cast<LissajousVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "compression_exponent", true));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, lissajous_math::kAmplitudeCompressionExponent);
+}
+
+TEST(VisualParamSetTest, UnknownOrOtherModulesParamNameIsRejectedOnLissajous) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Lissajous);
+    auto& lissajous = dynamic_cast<LissajousVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "not_a_real_param", 0.8f));
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "spawn_rate_per_frame", 0.8f));
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, lissajous_math::kAmplitudeCompressionExponent);
+}
+
+TEST(VisualParamSetTest, LissajousParamNameIsRejectedOnOtherVisualTypes) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+    compositor.add_layer(VisualType::FlowField);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "compression_exponent", 0.8f));
+    EXPECT_FALSE(visual_param::set(compositor.layers()[1], "compression_exponent", 0.8f));
 }

@@ -198,7 +198,7 @@ run directly from `tsan/`.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames
   against path traversal, separators, and unexpected extensions, since the
   panel is the first place a user-typed filename reaches the filesystem.
-- **Per-visual-type panel controls (Particles and Flow Field so far).** A
+- **Per-visual-type panel controls (Particles, Flow Field, and Lissajous so far).** A
   generic `set_visual_param` message (`layer_id`, `param_name`, `value` —
   a JSON number or a JSON boolean; a param's setter rejects the wrong type
   rather than coercing it) and
@@ -223,7 +223,13 @@ run directly from `tsan/`.
   boolean checkboxes, **Ripple on Onset** and **Burst on Onset**. The three
   field-shape params are new `FlowFieldParams` fields saved in layer presets
   and required on load, so a preset with a Flow Field layer saved before
-  they existed no longer loads. Other visual modules' params (Radial's
+  they existed no longer loads. Lissajous gets **Curve Exponent**
+  (`compression_exponent`, 0.2–1.0, default 0.5): each raw stereo sample is
+  drawn at `sign(x)·|x|^exponent`, so 1.0 is a linear plot (quiet passages
+  collapse toward center) and lower values boost quiet samples more (the
+  figure stays open). It is a new `LissajousParams` field saved in layer
+  presets and required on load, so a preset with a Lissajous layer saved
+  before it existed no longer loads. Other visual modules' params (Radial's
   radii, Fractal's orbit, etc. — still debug-tool/compile-time-only today)
   can add their own case to `visual_param::set` the same way, without a new
   message type per module.

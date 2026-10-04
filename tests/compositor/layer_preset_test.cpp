@@ -561,3 +561,65 @@ TEST(LayerPresetAdversarialTest, RejectsColorByteThatWouldWrapIntoRangeWhenNarro
     doc["layers"][0]["tint_color"]["r"] = 4294967301LL;
     EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
 }
+
+namespace {
+
+nlohmann::json serialized_single_lissajous_doc() {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Lissajous, std::make_unique<LissajousVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+}
+
+TEST(LayerPresetRoundTripTest, LissajousParamsRoundTrip) {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Lissajous, std::make_unique<LissajousVisual>(LissajousParams{GREEN, 4.0f, 0.8f})};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(layer_preset::serialize(layers));
+
+    ASSERT_TRUE(loaded.has_value());
+    auto* visual = dynamic_cast<LissajousVisual*>((*loaded)[0].visual.get());
+    ASSERT_NE(visual, nullptr);
+    EXPECT_EQ(visual->params().line_color.g, GREEN.g);
+    EXPECT_FLOAT_EQ(visual->params().line_thickness, 4.0f);
+    EXPECT_FLOAT_EQ(visual->params().compression_exponent, 0.8f);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsLissajousParamsMissingCompressionExponent) {
+    nlohmann::json doc = serialized_single_lissajous_doc();
+    doc["layers"][0]["params"].erase("compression_exponent");
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsLissajousCompressionExponentOfWrongType) {
+    for (const nlohmann::json& bad : {nlohmann::json("0.5"), nlohmann::json(true), nlohmann::json(nullptr)}) {
+        nlohmann::json doc = serialized_single_lissajous_doc();
+        doc["layers"][0]["params"]["compression_exponent"] = bad;
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << bad.dump();
+    }
+}
+
+TEST(LayerPresetAdversarialTest, OutOfRangeAndExtremeLissajousCompressionExponentLoadsClamped) {
+    const std::pair<double, float> cases[] = {
+        {0.0, visual_config::kLissajousCompressionExponentMin},
+        {-2.0, visual_config::kLissajousCompressionExponentMin},
+        {-1e300, visual_config::kLissajousCompressionExponentMin},
+        {5.0, visual_config::kLissajousCompressionExponentMax},
+        {1e300, visual_config::kLissajousCompressionExponentMax},
+    };
+    for (const auto& [input, expected] : cases) {
+        nlohmann::json doc = serialized_single_lissajous_doc();
+        doc["layers"][0]["params"]["compression_exponent"] = input;
+
+        std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+        ASSERT_TRUE(loaded.has_value()) << input;
+        EXPECT_FLOAT_EQ(dynamic_cast<LissajousVisual&>(*(*loaded)[0].visual).params().compression_exponent, expected)
+            << input;
+    }
+}

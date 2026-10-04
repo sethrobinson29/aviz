@@ -24,6 +24,7 @@
 #include "ui_host/fake_ui_host.h"
 #include "ui_host/panel_apply_test_fixture.h"
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/visual_config.h"
 
@@ -501,4 +502,37 @@ TEST_F(PanelMessageApplyTest, ExtremeJsonNumbersEndUpClampedToEachFieldsOwnRange
     EXPECT_FLOAT_EQ(params.evolution_per_frame, visual_config::kFlowFieldEvolutionPerFrameMax);
     EXPECT_EQ(params.grid_cols, visual_config::kFlowFieldGridColsMax);
     EXPECT_EQ(params.lifetime_frames, visual_config::kParticlesLifetimeFramesMin);
+}
+
+TEST_F(PanelMessageApplyTest, LissajousCompressionExponentFromPanelJsonIsAppliedClampedAndPushedBack) {
+    compositor_.add_layer(VisualType::Lissajous);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    const std::string prefix =
+        R"({"type":"set_visual_param","param_name":"compression_exponent","layer_id":)" + std::to_string(id) +
+        R"(,"value":)";
+    auto& lissajous = dynamic_cast<LissajousVisual&>(*compositor_.layers()[0].visual);
+
+    std::optional<PanelMessage> in_range = panel_message::parse(prefix + "0.75}");
+    ASSERT_TRUE(in_range.has_value());
+    apply(*in_range);
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, 0.75f);
+    nlohmann::json params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    EXPECT_FLOAT_EQ(params["compression_exponent"].get<float>(), 0.75f);
+
+    std::optional<PanelMessage> high = panel_message::parse(prefix + "1e300}");
+    ASSERT_TRUE(high.has_value());
+    apply(*high);
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMax);
+
+    std::optional<PanelMessage> low = panel_message::parse(prefix + "-1e300}");
+    ASSERT_TRUE(low.has_value());
+    apply(*low);
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
+
+    ui_host_.sent_messages.clear();
+    std::optional<PanelMessage> wrong_type = panel_message::parse(prefix + "true}");
+    ASSERT_TRUE(wrong_type.has_value());
+    apply(*wrong_type);
+    EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }

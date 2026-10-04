@@ -161,6 +161,8 @@
             addVisualParamSlider("Grid Resolution", "grid_cols", "8", "32", "1");
             addVisualParamCheckbox("Ripple on Onset", "ripple_on_onset_enabled");
             addVisualParamCheckbox("Burst on Onset", "burst_on_onset_enabled");
+        } else if (layer.visual_type === "Lissajous") {
+            addVisualParamSlider("Curve Exponent", "compression_exponent", "0.2", "1", "0.05");
         }
 
         var dupBtn = document.createElement("button");

@@ -12,6 +12,8 @@ namespace lissajous_math {
 
 inline constexpr float kAmplitudeCompressionExponent = 0.5f;
 
+float clamp_compression_exponent(double exponent);
+
 float compress_sample(float sample, float exponent);
 
 std::vector<Vector2> to_points(const float* left, const float* right, std::size_t count,
@@ -23,6 +25,7 @@ std::vector<Vector2> to_points(const float* left, const float* right, std::size_
 struct LissajousParams {
     Color line_color = WHITE;
     float line_thickness = 2.0f;
+    float compression_exponent = lissajous_math::kAmplitudeCompressionExponent;
 };
 
 class LissajousVisual : public VisualModule {

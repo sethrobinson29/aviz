@@ -204,13 +204,17 @@ ParticlesParams particles_params_from_json(const nlohmann::json& j) {
 }
 
 nlohmann::json params_to_json(const LissajousParams& p) {
-    return nlohmann::json{{"line_color", color_to_json(p.line_color)}, {"line_thickness", p.line_thickness}};
+    return nlohmann::json{{"line_color", color_to_json(p.line_color)},
+                          {"line_thickness", p.line_thickness},
+                          {"compression_exponent", p.compression_exponent}};
 }
 
 LissajousParams lissajous_params_from_json(const nlohmann::json& j) {
     LissajousParams p;
     p.line_color = color_from_json(j.at("line_color"));
     p.line_thickness = require_float_field(j, "line_thickness");
+    p.compression_exponent =
+        lissajous_math::clamp_compression_exponent(require_number_field(j, "compression_exponent"));
     return p;
 }
 

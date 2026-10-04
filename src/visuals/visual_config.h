@@ -100,4 +100,8 @@ inline constexpr float kFractalBoundaryMarginPx = 18.0f;
 
 inline constexpr int kFractalPaletteGradientWidth = 256;
 
+inline constexpr float kLissajousCompressionExponentMin = 0.2f;
+
+inline constexpr float kLissajousCompressionExponentMax = 1.0f;
+
 }

@@ -3,6 +3,7 @@
 #include <variant>
 
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 
 namespace {
@@ -57,6 +58,15 @@ bool set_flow_field_param(FlowFieldVisual& visual, const std::string& param_name
     return false;
 }
 
+bool set_lissajous_param(LissajousVisual& visual, const std::string& param_name, const VisualParamValue& value) {
+    const float* number = std::get_if<float>(&value);
+    if (param_name == "compression_exponent" && number != nullptr) {
+        visual.mutable_params().compression_exponent = lissajous_math::clamp_compression_exponent(*number);
+        return true;
+    }
+    return false;
+}
+
 }
 
 namespace visual_param {
@@ -67,6 +77,8 @@ bool set(Layer& layer, const std::string& param_name, const VisualParamValue& va
             return set_particles_param(dynamic_cast<ParticlesVisual&>(*layer.visual), param_name, value);
         case VisualType::FlowField:
             return set_flow_field_param(dynamic_cast<FlowFieldVisual&>(*layer.visual), param_name, value);
+        case VisualType::Lissajous:
+            return set_lissajous_param(dynamic_cast<LissajousVisual&>(*layer.visual), param_name, value);
         default:
             return false;
     }
