@@ -26,6 +26,7 @@
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
+#include "visuals/radial/radial_visual.h"
 #include "visuals/visual_config.h"
 
 namespace {
@@ -535,4 +536,60 @@ TEST_F(PanelMessageApplyTest, LissajousCompressionExponentFromPanelJsonIsApplied
     apply(*wrong_type);
     EXPECT_FLOAT_EQ(lissajous.params().compression_exponent, visual_config::kLissajousCompressionExponentMin);
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyTest, RadialRadiusFractionsFromPanelJsonStopAtTheGapAndPushTheClampedValueBack) {
+    compositor_.add_layer(VisualType::Radial);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor_.layers()[0].visual);
+    auto send = [&](const std::string& param_name, const std::string& value) {
+        std::optional<PanelMessage> parsed = panel_message::parse(
+            R"({"type":"set_visual_param","layer_id":)" + std::to_string(id) + R"(,"param_name":")" + param_name +
+            R"(","value":)" + value + "}");
+        ASSERT_TRUE(parsed.has_value()) << param_name << " " << value;
+        ui_host_.sent_messages.clear();
+        apply(*parsed);
+    };
+
+    send("inner_radius_fraction", "1e300");
+    EXPECT_NEAR(radial.params().inner_radius_fraction, 0.9f - radial_math::kMinRadiusGapFraction, 1e-6f);
+    EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 0.9f);
+    nlohmann::json params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    EXPECT_NEAR(params["inner_radius_fraction"].get<float>(), 0.9f - radial_math::kMinRadiusGapFraction, 1e-6f);
+    EXPECT_FLOAT_EQ(params["max_radius_fraction"].get<float>(), 0.9f);
+
+    send("inner_radius_fraction", "0.2");
+    send("max_radius_fraction", "-1e300");
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.2f);
+    EXPECT_NEAR(radial.params().max_radius_fraction, 0.2f + radial_math::kMinRadiusGapFraction, 1e-6f);
+
+    send("max_radius_fraction", "true");
+    EXPECT_NEAR(radial.params().max_radius_fraction, 0.2f + radial_math::kMinRadiusGapFraction, 1e-6f);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyTest, ParticlesInnerRadiusFractionFromPanelJsonIsAppliedClampedAndPushedBack) {
+    compositor_.add_layer(VisualType::Particles);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    const std::string prefix =
+        R"({"type":"set_visual_param","param_name":"inner_radius_fraction","layer_id":)" + std::to_string(id) +
+        R"(,"value":)";
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor_.layers()[0].visual);
+
+    std::optional<PanelMessage> in_range = panel_message::parse(prefix + "0.25}");
+    ASSERT_TRUE(in_range.has_value());
+    apply(*in_range);
+    EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.25f);
+    nlohmann::json params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    EXPECT_FLOAT_EQ(params["inner_radius_fraction"].get<float>(), 0.25f);
+
+    std::optional<PanelMessage> high = panel_message::parse(prefix + "1e300}");
+    ASSERT_TRUE(high.has_value());
+    apply(*high);
+    EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 1.0f);
+
+    std::optional<PanelMessage> low = panel_message::parse(prefix + "-1e300}");
+    ASSERT_TRUE(low.has_value());
+    apply(*low);
+    EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.0f);
 }

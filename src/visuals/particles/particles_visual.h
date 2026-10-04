@@ -29,7 +29,7 @@ bool band_in_range(std::optional<std::size_t> freq_band, std::size_t band_count)
 
 Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius);
 
-float clamp_inner_radius_fraction(float inner);
+float clamp_inner_radius_fraction(double inner);
 
 float clamp_spawn_rate_per_frame(float rate);
 

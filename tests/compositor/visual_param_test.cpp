@@ -8,6 +8,7 @@
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
+#include "visuals/radial/radial_visual.h"
 #include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
 
@@ -307,4 +308,139 @@ TEST(VisualParamSetTest, LissajousParamNameIsRejectedOnOtherVisualTypes) {
 
     EXPECT_FALSE(visual_param::set(compositor.layers()[0], "compression_exponent", 0.8f));
     EXPECT_FALSE(visual_param::set(compositor.layers()[1], "compression_exponent", 0.8f));
+}
+
+TEST(VisualParamSetTest, SetsRadialInnerAndOuterRadiusFractionsIndependently) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.4f));
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.4f);
+    EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 0.9f);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "max_radius_fraction", 0.7f));
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.4f);
+    EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 0.7f);
+}
+
+TEST(VisualParamSetTest, RadialInnerRadiusStopsBelowOuterAndLeavesOuterUnmoved) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.95f));
+
+    EXPECT_NEAR(radial.params().inner_radius_fraction, 0.9f - radial_math::kMinRadiusGapFraction, 1e-6f);
+    EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 0.9f);
+}
+
+TEST(VisualParamSetTest, RadialOuterRadiusStopsAboveInnerAndLeavesInnerUnmoved) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "max_radius_fraction", 0.0f));
+
+    EXPECT_NEAR(radial.params().max_radius_fraction, 0.15f + radial_math::kMinRadiusGapFraction, 1e-6f);
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.15f);
+}
+
+TEST(VisualParamSetTest, RadialInnerRadiusCanGoFurtherOnlyAfterOuterIsRaised) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+    visual_param::set(compositor.layers()[0], "max_radius_fraction", 0.5f);
+
+    visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.8f);
+    EXPECT_NEAR(radial.params().inner_radius_fraction, 0.5f - radial_math::kMinRadiusGapFraction, 1e-6f);
+
+    visual_param::set(compositor.layers()[0], "max_radius_fraction", 1.0f);
+    visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.8f);
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.8f);
+}
+
+TEST(VisualParamSetTest, RadialRadiusFractionsClampExtremeAndNonFiniteValuesAndKeepTheGap) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float infinity = std::numeric_limits<float>::infinity();
+
+    for (float extreme : {1e30f, infinity}) {
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "max_radius_fraction", extreme));
+        EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 1.0f);
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", extreme));
+        EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 1.0f - radial_math::kMinRadiusGapFraction);
+    }
+
+    for (float extreme : {-1e30f, -infinity, nan}) {
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", extreme));
+        EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.0f);
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "max_radius_fraction", extreme));
+        EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, radial_math::kMinRadiusGapFraction);
+    }
+}
+
+TEST(VisualParamSetTest, BoolValueSentToRadialRadiusFractionsIsRejectedNotCoerced) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+    auto& radial = dynamic_cast<RadialVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", true));
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "max_radius_fraction", false));
+    EXPECT_FLOAT_EQ(radial.params().inner_radius_fraction, 0.15f);
+    EXPECT_FLOAT_EQ(radial.params().max_radius_fraction, 0.9f);
+}
+
+TEST(VisualParamSetTest, UnknownParamNameIsRejectedOnRadial) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Radial);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "not_a_real_param", 0.5f));
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "compression_exponent", 0.5f));
+}
+
+TEST(VisualParamSetTest, SetsParticlesInnerRadiusFraction) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor.layers()[0].visual);
+
+    EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.35f));
+    EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.35f);
+}
+
+TEST(VisualParamSetTest, ClampsParticlesInnerRadiusFractionIncludingExtremeAndNonFiniteValues) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor.layers()[0].visual);
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float infinity = std::numeric_limits<float>::infinity();
+
+    for (float high : {1.5f, 1e30f, infinity}) {
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", high));
+        EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 1.0f);
+    }
+    for (float low : {-0.5f, -1e30f, -infinity, nan}) {
+        visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.5f);
+        EXPECT_TRUE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", low));
+        EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.0f);
+    }
+}
+
+TEST(VisualParamSetTest, BoolValueSentToParticlesInnerRadiusFractionIsRejectedNotCoerced) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+    auto& particles = dynamic_cast<ParticlesVisual&>(*compositor.layers()[0].visual);
+    visual_param::set(compositor.layers()[0], "inner_radius_fraction", 0.35f);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "inner_radius_fraction", true));
+    EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.35f);
+}
+
+TEST(VisualParamSetTest, RadialOnlyOuterRadiusParamIsRejectedOnParticles) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+
+    EXPECT_FALSE(visual_param::set(compositor.layers()[0], "max_radius_fraction", 0.5f));
 }

@@ -623,3 +623,104 @@ TEST(LayerPresetAdversarialTest, OutOfRangeAndExtremeLissajousCompressionExponen
             << input;
     }
 }
+
+namespace {
+
+nlohmann::json serialized_single_radial_doc() {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Radial, std::make_unique<RadialVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+const RadialParams& load_radial_params(const nlohmann::json& doc, std::optional<std::vector<Layer>>& loaded) {
+    loaded = layer_preset::deserialize(doc.dump());
+    return dynamic_cast<RadialVisual&>(*loaded->at(0).visual).params();
+}
+
+}
+
+TEST(LayerPresetAdversarialTest, ValidRadialRadiusPairLoadsUnchanged) {
+    nlohmann::json doc = serialized_single_radial_doc();
+    doc["layers"][0]["params"]["inner_radius_fraction"] = 0.3;
+    doc["layers"][0]["params"]["max_radius_fraction"] = 0.6;
+
+    std::optional<std::vector<Layer>> loaded;
+    const RadialParams& params = load_radial_params(doc, loaded);
+
+    EXPECT_FLOAT_EQ(params.inner_radius_fraction, 0.3f);
+    EXPECT_FLOAT_EQ(params.max_radius_fraction, 0.6f);
+}
+
+TEST(LayerPresetAdversarialTest, InvertedRadialRadiusPairLoadsWithInnerPulledBelowOuter) {
+    nlohmann::json doc = serialized_single_radial_doc();
+    doc["layers"][0]["params"]["inner_radius_fraction"] = 0.8;
+    doc["layers"][0]["params"]["max_radius_fraction"] = 0.4;
+
+    std::optional<std::vector<Layer>> loaded;
+    const RadialParams& params = load_radial_params(doc, loaded);
+
+    EXPECT_FLOAT_EQ(params.max_radius_fraction, 0.4f);
+    EXPECT_NEAR(params.inner_radius_fraction, 0.4f - radial_math::kMinRadiusGapFraction, 1e-6f);
+}
+
+TEST(LayerPresetAdversarialTest, OutOfRangeAndExtremeRadialRadiusFractionsLoadClampedWithGapKept) {
+    nlohmann::json doc = serialized_single_radial_doc();
+    std::optional<std::vector<Layer>> loaded;
+
+    doc["layers"][0]["params"]["inner_radius_fraction"] = 1e300;
+    doc["layers"][0]["params"]["max_radius_fraction"] = 1e300;
+    const RadialParams& high = load_radial_params(doc, loaded);
+    EXPECT_FLOAT_EQ(high.max_radius_fraction, 1.0f);
+    EXPECT_FLOAT_EQ(high.inner_radius_fraction, 1.0f - radial_math::kMinRadiusGapFraction);
+
+    doc["layers"][0]["params"]["inner_radius_fraction"] = -1e300;
+    doc["layers"][0]["params"]["max_radius_fraction"] = -1e300;
+    const RadialParams& low = load_radial_params(doc, loaded);
+    EXPECT_FLOAT_EQ(low.max_radius_fraction, radial_math::kMinRadiusGapFraction);
+    EXPECT_FLOAT_EQ(low.inner_radius_fraction, 0.0f);
+
+    doc["layers"][0]["params"]["inner_radius_fraction"] = 5.0;
+    doc["layers"][0]["params"]["max_radius_fraction"] = -1.0;
+    const RadialParams& crossed = load_radial_params(doc, loaded);
+    EXPECT_FLOAT_EQ(crossed.max_radius_fraction, radial_math::kMinRadiusGapFraction);
+    EXPECT_FLOAT_EQ(crossed.inner_radius_fraction, 0.0f);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsRadialRadiusFractionsOfWrongTypeOrMissing) {
+    for (const char* key : {"inner_radius_fraction", "max_radius_fraction"}) {
+        for (const nlohmann::json& bad : {nlohmann::json("0.5"), nlohmann::json(true), nlohmann::json(nullptr)}) {
+            nlohmann::json doc = serialized_single_radial_doc();
+            doc["layers"][0]["params"][key] = bad;
+            EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << key << " " << bad.dump();
+        }
+        nlohmann::json doc = serialized_single_radial_doc();
+        doc["layers"][0]["params"].erase(key);
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << key;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, OutOfRangeAndExtremeParticlesInnerRadiusFractionLoadsClamped) {
+    const std::pair<double, float> cases[] = {
+        {0.35, 0.35f}, {-0.5, 0.0f}, {-1e300, 0.0f}, {1.5, 1.0f}, {1e300, 1.0f},
+    };
+    for (const auto& [input, expected] : cases) {
+        nlohmann::json doc = serialized_single_particles_doc();
+        doc["layers"][0]["params"]["inner_radius_fraction"] = input;
+
+        std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+        ASSERT_TRUE(loaded.has_value()) << input;
+        EXPECT_FLOAT_EQ(dynamic_cast<ParticlesVisual&>(*(*loaded)[0].visual).params().inner_radius_fraction, expected)
+            << input;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, RejectsParticlesInnerRadiusFractionOfWrongType) {
+    for (const nlohmann::json& bad : {nlohmann::json("0.5"), nlohmann::json(true), nlohmann::json(nullptr)}) {
+        nlohmann::json doc = serialized_single_particles_doc();
+        doc["layers"][0]["params"]["inner_radius_fraction"] = bad;
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << bad.dump();
+    }
+}

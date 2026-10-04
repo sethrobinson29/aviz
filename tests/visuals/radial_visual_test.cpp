@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 namespace {
@@ -171,4 +173,33 @@ TEST(ClampMaxRadiusFractionTest, RejectsOuterAtOrBelowInnerPlusGap) {
 
 TEST(ClampMaxRadiusFractionTest, CapsAtOneWhenInnerTooCloseToOneForGap) {
     EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(0.5f, 0.98f), 1.0f);
+}
+
+TEST(RadialClampRadiusFractionTest, InnerNonFiniteAndExtremeValuesClampInsteadOfPropagating) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float upper = 0.9f - radial_math::kMinRadiusGapFraction;
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(nan, 0.9f), 0.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(-infinity, 0.9f), 0.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(-1e300, 0.9f), 0.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(infinity, 0.9f), upper);
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(1e300, 0.9f), upper);
+}
+
+TEST(RadialClampRadiusFractionTest, OuterNonFiniteAndExtremeValuesClampInsteadOfPropagating) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float lower = 0.1f + radial_math::kMinRadiusGapFraction;
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(nan, 0.1f), lower);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(-infinity, 0.1f), lower);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(-1e300, 0.1f), lower);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(infinity, 0.1f), 1.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(1e300, 0.1f), 1.0f);
+}
+
+TEST(RadialClampRadiusFractionTest, FullyStretchedAndFullyCollapsedPairsBothKeepTheMinimumGap) {
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(0.0, 1.0f), 0.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(1.0, 0.0f), 1.0f);
+    EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(1.0, 1.0f), 1.0f - radial_math::kMinRadiusGapFraction);
+    EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(0.0, 0.0f), radial_math::kMinRadiusGapFraction);
 }

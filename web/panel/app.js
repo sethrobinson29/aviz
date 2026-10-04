@@ -1,5 +1,10 @@
 (function () {
     var VISUAL_TYPES = ["Waveform", "Spectrum", "Radial", "Particles", "Lissajous", "FlowField", "Fractal"];
+    var RADIAL_MIN_RADIUS_GAP = 0.05;
+
+    function roundToHundredths(value) {
+        return Math.round(value * 100) / 100;
+    }
     var BLEND_MODES = ["Normal", "Additive", "Multiply", "Screen"];
     var REACTIVITY_SOURCES = ["GlobalBeat", "BandOnset", "BandAmplitude"];
     var NUM_BANDS = 16;
@@ -119,13 +124,16 @@
 
         var visualParamInputs = [];
 
-        function addVisualParamSlider(labelText, paramName, min, max, step) {
+        function addVisualParamSlider(labelText, paramName, min, max, step, limit) {
             var input = document.createElement("input");
             input.type = "range";
             input.min = min;
             input.max = max;
             input.step = step;
             input.addEventListener("input", function () {
+                if (limit) {
+                    input.value = limit(parseFloat(input.value));
+                }
                 post("set_visual_param", {
                     layer_id: layer.layer_id,
                     param_name: paramName,
@@ -134,6 +142,7 @@
             });
             controls.appendChild(labeledControl(labelText, input));
             visualParamInputs.push({ input: input, paramName: paramName });
+            return input;
         }
 
         function addVisualParamCheckbox(labelText, paramName) {
@@ -153,6 +162,7 @@
         if (layer.visual_type === "Particles") {
             addVisualParamSlider("Spawn Rate", "spawn_rate_per_frame", "0", "20", "0.1");
             addVisualParamSlider("Draw Distance", "lifetime_frames", "10", "600", "10");
+            addVisualParamSlider("Inner Radius", "inner_radius_fraction", "0", "1", "0.01");
         } else if (layer.visual_type === "FlowField") {
             addVisualParamSlider("Spawn Rate", "spawn_rate_per_frame", "0", "5", "0.05");
             addVisualParamSlider("Trail Life", "lifetime_frames", "10", "600", "10");
@@ -161,6 +171,17 @@
             addVisualParamSlider("Grid Resolution", "grid_cols", "8", "32", "1");
             addVisualParamCheckbox("Ripple on Onset", "ripple_on_onset_enabled");
             addVisualParamCheckbox("Burst on Onset", "burst_on_onset_enabled");
+        } else if (layer.visual_type === "Radial") {
+            var innerRadiusInput = addVisualParamSlider(
+                "Inner Radius", "inner_radius_fraction", "0", "0.95", "0.01",
+                function (value) {
+                    return Math.min(value, roundToHundredths(parseFloat(outerRadiusInput.value) - RADIAL_MIN_RADIUS_GAP));
+                });
+            var outerRadiusInput = addVisualParamSlider(
+                "Outer Radius", "max_radius_fraction", "0.05", "1", "0.01",
+                function (value) {
+                    return Math.max(value, roundToHundredths(parseFloat(innerRadiusInput.value) + RADIAL_MIN_RADIUS_GAP));
+                });
         } else if (layer.visual_type === "Lissajous") {
             addVisualParamSlider("Curve Exponent", "compression_exponent", "0.2", "1", "0.05");
         }

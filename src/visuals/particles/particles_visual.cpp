@@ -31,8 +31,8 @@ Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius) {
     return Vector2{center.x + direction.x * inner_radius, center.y + direction.y * inner_radius};
 }
 
-float clamp_inner_radius_fraction(float inner) {
-    return std::clamp(inner, 0.0f, 1.0f);
+float clamp_inner_radius_fraction(double inner) {
+    return number_math::clamp_number_to_range<float>(inner, 0.0f, 1.0f);
 }
 
 float clamp_spawn_rate_per_frame(float rate) {

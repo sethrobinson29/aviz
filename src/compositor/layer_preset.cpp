@@ -177,8 +177,10 @@ RadialParams radial_params_from_json(const nlohmann::json& j) {
     RadialParams p;
     p.bar_color = color_from_json(j.at("bar_color"));
     p.thickness = require_float_field(j, "thickness");
-    p.inner_radius_fraction = require_float_field(j, "inner_radius_fraction");
-    p.max_radius_fraction = require_float_field(j, "max_radius_fraction");
+    p.max_radius_fraction =
+        radial_math::clamp_max_radius_fraction(require_number_field(j, "max_radius_fraction"), 0.0f);
+    p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
+        require_number_field(j, "inner_radius_fraction"), p.max_radius_fraction);
     return p;
 }
 
@@ -199,7 +201,8 @@ ParticlesParams particles_params_from_json(const nlohmann::json& j) {
         particles_math::clamp_lifetime_frames_from_number(require_number_field(j, "lifetime_frames"));
     p.burst_count = particles_math::clamp_burst_count_from_number(require_number_field(j, "burst_count"));
     p.spawn_rate_per_frame = require_float_field(j, "spawn_rate_per_frame");
-    p.inner_radius_fraction = require_float_field(j, "inner_radius_fraction");
+    p.inner_radius_fraction =
+        particles_math::clamp_inner_radius_fraction(require_number_field(j, "inner_radius_fraction"));
     return p;
 }
 

@@ -198,7 +198,7 @@ run directly from `tsan/`.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames
   against path traversal, separators, and unexpected extensions, since the
   panel is the first place a user-typed filename reaches the filesystem.
-- **Per-visual-type panel controls (Particles, Flow Field, and Lissajous so far).** A
+- **Per-visual-type panel controls (Particles, Flow Field, Lissajous, and Radial so far).** A
   generic `set_visual_param` message (`layer_id`, `param_name`, `value` —
   a JSON number or a JSON boolean; a param's setter rejects the wrong type
   rather than coercing it) and
@@ -211,7 +211,11 @@ run directly from `tsan/`.
   Distance** (`lifetime_frames`, 10–600 frames — particles move at a fixed
   spawn-time velocity, so how long one lives is what determines how far it
   travels before disappearing; there's no separate travel-distance field).
-  Both clamp server-side (`particles_math::clamp_spawn_rate_per_frame`/
+  It also gets **Inner Radius** (`inner_radius_fraction`, 0–1, default 0):
+  how far from center particles spawn, as a fraction of half the shorter
+  canvas dimension. There is no outer radius for Particles — Draw Distance
+  and off-canvas cleanup govern how far they travel.
+  All three clamp server-side (`particles_math::clamp_spawn_rate_per_frame`/
   `clamp_lifetime_frames`) regardless of what the slider sends. Flow Field
   gets **Spawn Rate** (`spawn_rate_per_frame`, its own 0–5 range — the pool
   saturates around 2.6 at the default lifetime, so Particles' 0–20 would be
@@ -229,8 +233,15 @@ run directly from `tsan/`.
   collapse toward center) and lower values boost quiet samples more (the
   figure stays open). It is a new `LissajousParams` field saved in layer
   presets and required on load, so a preset with a Lissajous layer saved
-  before it existed no longer loads. Other visual modules' params (Radial's
-  radii, Fractal's orbit, etc. — still debug-tool/compile-time-only today)
+  before it existed no longer loads. Radial gets **Inner Radius**
+  (`inner_radius_fraction`, 0–0.95, default 0.15) and **Outer Radius**
+  (`max_radius_fraction`, 0.05–1.0, default 0.9), which together set the
+  empty-center size and maximum bar reach. The two must stay at least 0.05
+  apart: the slider being dragged stops at that limit and the other one
+  never moves, enforced server-side against the layer's current values and
+  mirrored in the panel so the thumb stops too. Loading a preset applies
+  the same rule (outer clamped first, then inner against it) instead of
+  trusting the file. Other visual modules' params (Fractal's orbit, etc. — still debug-tool/compile-time-only today)
   can add their own case to `visual_param::set` the same way, without a new
   message type per module.
 - **Docked/detached window layout**: at launch (and whenever redocking) the

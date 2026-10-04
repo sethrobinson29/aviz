@@ -341,3 +341,13 @@ TEST(ParticlesClampBurstCountFromNumberTest, ClampsToZeroThroughPoolCapacity) {
     EXPECT_EQ(particles_math::clamp_burst_count_from_number(-1e30), 0);
     EXPECT_EQ(particles_math::clamp_burst_count_from_number(std::numeric_limits<double>::quiet_NaN()), 0);
 }
+
+TEST(ParticlesClampInnerRadiusFractionTest, NonFiniteAndExtremeValuesClampInsteadOfPropagating) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(nan), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-infinity), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-1e300), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(infinity), 1.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1e300), 1.0f);
+}
