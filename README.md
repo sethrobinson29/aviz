@@ -40,8 +40,11 @@ generator — not through WSL2. See `CLAUDE.md`'s Target Platform section.
 
 ## Building
 
-Requires CMake 3.24+ and Visual Studio 2022 or newer with the "Desktop
-development with C++" workload.
+Requires CMake 3.24+, Visual Studio 2022 or newer with the "Desktop
+development with C++" workload, and the WebView2 Runtime (pre-installed on
+current Windows 10/11; otherwise grab the Evergreen bootstrapper from
+Microsoft — the app currently uses the system-installed runtime, not a
+bundled one, see `CLAUDE.md`).
 
 ```
 cmake -B build -G "Visual Studio 18 2026"
@@ -58,8 +61,12 @@ installation needed.
 ## Testing
 
 ```
-ctest --test-dir build
+ctest --test-dir build -C Release
 ```
+
+(Substitute `Debug` if that's what you built. The Visual Studio generator is
+multi-config, so `-C` is required — without it, ctest silently finds
+nothing to run.)
 
 See `TESTING.md` for what's covered by automated tests versus human review.
 
@@ -109,6 +116,14 @@ run directly from `tsan/`.
   `waveform_l`/`waveform_r` snapshots alongside the existing mono `waveform`
   for this; `FeatureWorker` slides three parallel windows (mono, left,
   right) per hop rather than deriving stereo from the mono mixdown.
+- **Fractal** renders the Mandelbrot/Julia set in real time via a GLSL fragment
+  shader — the only custom shader in the codebase, since a full-canvas
+  per-pixel escape-time computation is far too slow on the CPU at 60fps. An
+  orbiting point sweeps through Julia-constant space at a constant rate; the
+  scoped band's smoothed amplitude drives zoom and orbit radius directly
+  (not the orbit's speed), so the fractal's shape and scale breathe with the
+  music while its motion stays steady. See "Per-visual-type panel controls"
+  below for the full control set and its one known limitation.
 - **Flow field** reuses Particles' pool/spawn/lifetime/cleanup machinery,
   changing only how velocity is determined: each particle steers toward a
   direction sampled from a fixed-resolution grid of hand-rolled 2D value
@@ -139,9 +154,10 @@ run directly from `tsan/`.
   preserved across save/load, so a reference to a specific layer survives a
   reorder — loading validates the id set (no duplicates, none invalid)
   before replacing the in-memory stack, rejecting the whole file rather than
-  partially applying a malformed one. The debug tool's `S`/`O` keys exercise
-  this today (save/load a fixed debug filename); real panel-driven preset
-  management is still milestone 8 work.
+  partially applying a malformed one. Real panel-driven preset management is
+  built (see "Layer management from the panel" below); the debug tool's
+  `S`/`O` keys still exist alongside it (save/load a fixed debug filename),
+  removal deferred until the real UI is fully tested and confirmed.
 - **Palette override** (milestone 7): a per-layer `palette_override`
   gradient (`Layer.palette_override`) that replaces a visual's own flat
   color with a sampled gradient, layered under the existing tint multiply
@@ -216,7 +232,8 @@ run directly from `tsan/`.
   canvas dimension. There is no outer radius for Particles — Draw Distance
   and off-canvas cleanup govern how far they travel.
   All three clamp server-side (`particles_math::clamp_spawn_rate_per_frame`/
-  `clamp_lifetime_frames`) regardless of what the slider sends. Flow Field
+  `clamp_lifetime_frames`/`clamp_inner_radius_fraction`) regardless of what
+  the slider sends. Flow Field
   gets **Spawn Rate** (`spawn_rate_per_frame`, its own 0–5 range — the pool
   saturates around 2.6 at the default lifetime, so Particles' 0–20 would be
   mostly dead travel), **Trail Life** (`lifetime_frames`, 10–600 — Flow Field

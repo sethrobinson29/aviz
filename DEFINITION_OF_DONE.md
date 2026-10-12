@@ -6,12 +6,12 @@ Completion criteria for different kinds of work in this project, and what happen
 
 A new visual module is done when it:
 
-- Consumes `AudioFeatures` per its configured `reactivity_source` and `freq_range` (see design spec §4–5).
+- Consumes `AudioFeatures` per its configured `reactivity_source` and `freq_band` (see design spec §4–5).
 - Exposes its `visual_params` for the compositor/UI to set.
 - Renders to its own offscreen texture per the compositor contract (design spec §5).
 - Has any unit-testable logic beyond rendering (e.g. parameter math, band-response curves) covered per `TESTING.md`.
 
-Partial wiring is not done. If a module renders but ignores `freq_range`, or has params that aren't actually connected, say so explicitly rather than presenting it as complete.
+Partial wiring is not done. If a module renders but ignores `freq_band`, or has params that aren't actually connected, say so explicitly rather than presenting it as complete.
 
 ## Pipeline / architecture change
 
@@ -47,3 +47,5 @@ Two different update policies depending on the document:
 
 - **`README.md` (user-facing)** — update immediately, as part of "done," not deferred to later. It documents current functionality/build steps/controls, not a design decision, so it should always reflect what the app actually does right now. Treat it closer to a build artifact than a design document.
 - **`CLAUDE.md`, `TESTING.md`, `STRUCTURE.md`, `visualizer-design-spec.md`, `DEFINITION_OF_DONE.md` (agent/contributor-facing)** — do not edit automatically, per the existing rule in `CLAUDE.md`. If a change makes one of these stale or inaccurate, flag it explicitly as part of finishing the work, rather than silently leaving it stale or silently correcting it. These encode decisions, not just current state, and an automatic edit risks overwriting a deliberate decision.
+
+**A design doc can describe work that was never committed.** The design spec's Fractal reactivity section was documented as built (a rate-driven orbit, an audio-independent zoom-breathing oscillation) and existed on no branch — the real shipped behavior was simpler and different, and the divergence went unnoticed until an unrelated audit forced a line-by-line check against the actual code. Before building on a documented behavior, confirm it in code first; when documenting a design, say plainly whether it's built yet or still planned, so the next reader doesn't have to guess which.

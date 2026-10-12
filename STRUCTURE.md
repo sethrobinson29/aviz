@@ -1,7 +1,7 @@
 # STRUCTURE.md — Directory & File Layout
 
 ```
-music-visualizer/
+aviz/
 ├── README.md
 ├── CLAUDE.md
 ├── TESTING.md
@@ -37,7 +37,8 @@ music-visualizer/
 │   ├── compositor/       # layer stack, blend modes, offscreen texture management,
 │   │                      # layer preset serialization (layer_preset.h/.cpp) and file I/O
 │   │                      # (preset_file_io.h/.cpp), layer_types.h (VisualType, LayerBlendMode —
-│   │                      # deliberately raylib-free, see spec §5)
+│   │                      # deliberately raylib-free, see spec §5), visual_param.h/.cpp
+│   │                      # (per-module panel param dispatch, see spec §7)
 │   ├── visuals/           # one subdirectory per visual module, plus reactivity_source.h
 │   │   │                   # (ReactivitySource — deliberately raylib-free, see spec §5) and
 │   │   │                   # number_clamp.h (shared safe-numeric-narrowing primitive, raylib-free,
@@ -49,6 +50,7 @@ music-visualizer/
 │   ├── ui_host/            # UIHost interface + WebView2 implementation, state bridge
 │   │                        # (C++ side of the C++/JS boundary — see spec §7)
 │   ├── app/               # top-level orchestration: window/init, main loop, wiring
+│   │                        # (producer_host.h, audio_source_controller, window_layout_config.h)
 │   └── main.cpp
 ├── web/
 │   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI, theme selection)
@@ -59,9 +61,11 @@ music-visualizer/
 │   ├── visuals/             # mirrors src/visuals — per-module logic tests (e.g.
 │   │                         # spectrum_visual_test.cpp, waveform_visual_test.cpp)
 │   ├── ui_host/             # state bridge serialization/message-format tests
+│   ├── app/                # mirrors src/app — producer_host/audio_source_controller/
+│   │                         # window_layout_config tests
 │   └── fixtures/            # synthetic signal generators, known test tones/impulses
 ├── assets/
-│   ├── shaders/            # if/when visuals need custom shaders
+│   ├── shaders/            # custom shaders (mandelbrot.fs, the Fractal module's GLSL shader — see spec §6)
 │   ├── fonts/               # UI text if any
 │   ├── themes/               # built-in theme definitions (palette/gradient/chrome data,
 │   │                          # e.g. Y2K, Frutiger Aero) — consumed by web/panel. Not to be
@@ -73,7 +77,7 @@ music-visualizer/
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
 
-**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to the built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The debug tool's `S`/`O` keybindings write/read a fixed debug filename here (`kDebugPresetFilename`, `src/app/app.cpp`) for testing before the real control panel UI exists.
+**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to the built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The debug tool's `S`/`O` keybindings write/read a fixed debug filename here (`kDebugPresetFilename`, `src/app/app.cpp`) — a leftover from testing before the real control panel UI existed. The debug tool itself is still present (removal deferred until the real UI is fully tested and confirmed), so this path is still live even though the panel's own preset save/load (spec §7) is now the primary one.
 
 ## Build options
 
@@ -90,7 +94,7 @@ music-visualizer/
 - **Out-of-source builds.** Build into a `build/` directory (`cmake -B build`), never in-tree. `build/` is git-ignored.
 - **Pin to a tag or commit, not a tracking branch.** `CMakeLists.txt`'s `GIT_TAG` should reference a specific release tag or commit hash for miniaudio and raylib, not `master`/`main`. This keeps builds reproducible across sessions — an agent picking this up weeks later shouldn't get a different dependency version than what was last verified working.
 - **If a fetched dependency's API has changed** (e.g. after intentionally bumping a pinned version), don't silently patch around the new API to make it compile. Flag the break, describe what changed, and let the actual fix be a reviewed decision rather than an incidental one — this follows the same "flag, don't silently work around" principle used elsewhere in `CLAUDE.md`.
-- **New dependencies** (beyond miniaudio/raylib) go through `CMakeLists.txt` FetchContent by default; only fall back to vendoring in `third_party/` if a dependency genuinely can't be fetched that way, per the existing note above.
+- **New dependencies** (beyond miniaudio, raylib, nlohmann/json, and the WebView2 SDK — all four already fetched via CMake) go through `CMakeLists.txt` FetchContent by default; only fall back to vendoring in `third_party/` if a dependency genuinely can't be fetched that way, per the existing note above.
 - **Testing: GoogleTest + GoogleMock**, pinned to a release tag via FetchContent, same as miniaudio/raylib. Tests are registered with CMake's CTest (`enable_testing()` + `gtest_discover_tests()` or `add_test()`), so the full suite runs via `ctest` from the build directory — no separate test runner to install or learn. See `TESTING.md` for what gets tested and how often.
 - **FFT: pffft** (`marton78/pffft`), pinned to `v1.1.0` via FetchContent, same pin-to-tag discipline as the other dependencies. Chosen over KissFFT for real-valued FFT support and SIMD optimization, which matter on the hot audio-processing path per `CLAUDE.md`'s performance-priority guideline; KissFFT was the documented fallback if pffft had no stable tagged release, which it does, so pffft is the pick. Build configuration: **float precision, SSE enabled, AVX and NEON both off.** Float matches miniaudio's sample format and raylib's GPU-side expectations; double buys precision this project doesn't need at real cost (memory bandwidth, fewer SIMD lanes per register). SSE is a safe baseline present on every x86-64 CPU for 20+ years, so it can be compiled in unconditionally with no runtime feature detection. AVX is left off — not guaranteed present on older CPUs, and enabling it safely would require runtime detection and a fallback path, which is unnecessary complexity at these FFT sizes (1024-point). NEON is ARM-only and irrelevant until the cross-platform push (spec §9) targets Apple Silicon.
 
