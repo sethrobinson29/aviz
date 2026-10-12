@@ -198,7 +198,7 @@ run directly from `tsan/`.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames
   against path traversal, separators, and unexpected extensions, since the
   panel is the first place a user-typed filename reaches the filesystem.
-- **Per-visual-type panel controls (Particles, Flow Field, Lissajous, and Radial so far).** A
+- **Per-visual-type panel controls (Particles, Flow Field, Lissajous, Radial, and Fractal so far).** A
   generic `set_visual_param` message (`layer_id`, `param_name`, `value` —
   a JSON number or a JSON boolean; a param's setter rejects the wrong type
   rather than coercing it) and
@@ -241,9 +241,31 @@ run directly from `tsan/`.
   never moves, enforced server-side against the layer's current values and
   mirrored in the panel so the thumb stops too. Loading a preset applies
   the same rule (outer clamped first, then inner against it) instead of
-  trusting the file. Other visual modules' params (Fractal's orbit, etc. — still debug-tool/compile-time-only today)
-  can add their own case to `visual_param::set` the same way, without a new
-  message type per module.
+  trusting the file. Fractal (the Julia-set shader) gets **Zoom**
+  (`base_zoom`, 1.0–4.0, default 1.0 — never below 1.0, where the view
+  lands on near-empty regions), **Zoom Reactivity** (`zoom_amplitude_scale`,
+  0–2.0, default 0.5 — how much the band's amplitude adds to zoom),
+  **Orbit Radius** (`julia_base_radius`, 0.70–0.85, default 0.7885),
+  **Radius Reactivity** (`julia_radius_amplitude_scale`, 0–0.2, default
+  0.05), **Orbit Speed** (`julia_angular_speed_radians_per_sec`, 0–1.0,
+  default 0.15), **Orbit Center X/Y** (`julia_orbit_center_x`/`_y`,
+  −0.5–0.5, default 0), a **Clockwise Orbit** checkbox
+  (`julia_orbit_clockwise`), and **Color Cycle Speed**
+  (`color_cycle_speed_hz`, 0–0.5, default 0.05; 0 holds the color still).
+  All ranges are untuned starting values, clamped server-side and again on
+  preset load. Orbit speed, direction, and color cycle speed advance an
+  accumulated phase each frame, so changing any of them mid-session carries
+  on from the current position instead of jumping. The generic per-layer
+  `sensitivity` slider now affects Fractal layers too: it scales the band's
+  amplitude before that amplitude drives zoom and orbit radius, saturating
+  at full amplitude. **Known limitation:** Orbit Radius and Orbit Center
+  together decide which Julia sets the orbit passes through, and some
+  combinations give a mostly empty layer for part or all of the orbit — no
+  error, just little to see; move either control back toward its default.
+  Fractal's amplitude smoothing time, boundary fade width, and iteration
+  count are not exposed. Other visual modules' params can add their own
+  case to `visual_param::set` the same way, without a new message type per
+  module.
 - **Docked/detached window layout**: at launch (and whenever redocking) the
   visualizer and panel windows are positioned as one adjacent, centered
   block (`window_layout_config.h`'s pure `compute_docked_layout`); detaching

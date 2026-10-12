@@ -92,9 +92,37 @@ inline constexpr float kFractalJuliaOrbitCenterX = 0.0f;
 
 inline constexpr float kFractalJuliaOrbitCenterY = 0.0f;
 
+inline constexpr float kFractalBaseZoomMin = 1.0f;
+
+inline constexpr float kFractalBaseZoomMax = 4.0f;
+
+inline constexpr float kFractalZoomAmplitudeScaleMin = 0.0f;
+
+inline constexpr float kFractalZoomAmplitudeScaleMax = 2.0f;
+
+inline constexpr float kFractalJuliaBaseRadiusMin = 0.70f;
+
+inline constexpr float kFractalJuliaBaseRadiusMax = 0.85f;
+
+inline constexpr float kFractalJuliaRadiusAmplitudeScaleMin = 0.0f;
+
+inline constexpr float kFractalJuliaRadiusAmplitudeScaleMax = 0.2f;
+
+inline constexpr float kFractalJuliaAngularSpeedRadiansPerSecMin = 0.0f;
+
+inline constexpr float kFractalJuliaAngularSpeedRadiansPerSecMax = 1.0f;
+
+inline constexpr float kFractalJuliaOrbitCenterMin = -0.5f;
+
+inline constexpr float kFractalJuliaOrbitCenterMax = 0.5f;
+
 inline constexpr float kFractalAmplitudeSmoothingTauMs = 2000.0f;
 
 inline constexpr float kFractalColorCycleSpeedHz = 0.05f;
+
+inline constexpr float kFractalColorCycleSpeedHzMin = 0.0f;
+
+inline constexpr float kFractalColorCycleSpeedHzMax = 0.5f;
 
 inline constexpr float kFractalBoundaryMarginPx = 18.0f;
 

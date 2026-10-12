@@ -3,6 +3,7 @@
 #include <variant>
 
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -89,6 +90,52 @@ bool set_lissajous_param(LissajousVisual& visual, const std::string& param_name,
     return false;
 }
 
+bool set_fractal_param(FractalVisual& visual, const std::string& param_name, const VisualParamValue& value) {
+    const float* number = std::get_if<float>(&value);
+    const bool* flag = std::get_if<bool>(&value);
+    FractalParams& params = visual.mutable_params();
+    if (param_name == "julia_orbit_clockwise" && flag != nullptr) {
+        params.julia_orbit_clockwise = *flag;
+        return true;
+    }
+    if (number == nullptr) {
+        return false;
+    }
+    if (param_name == "base_zoom") {
+        params.base_zoom = fractal_math::clamp_base_zoom(*number);
+        return true;
+    }
+    if (param_name == "zoom_amplitude_scale") {
+        params.zoom_amplitude_scale = fractal_math::clamp_zoom_amplitude_scale(*number);
+        return true;
+    }
+    if (param_name == "julia_base_radius") {
+        params.julia_base_radius = fractal_math::clamp_julia_base_radius(*number);
+        return true;
+    }
+    if (param_name == "julia_radius_amplitude_scale") {
+        params.julia_radius_amplitude_scale = fractal_math::clamp_julia_radius_amplitude_scale(*number);
+        return true;
+    }
+    if (param_name == "julia_angular_speed_radians_per_sec") {
+        params.julia_angular_speed_radians_per_sec = fractal_math::clamp_julia_angular_speed(*number);
+        return true;
+    }
+    if (param_name == "julia_orbit_center_x") {
+        params.julia_orbit_center_x = fractal_math::clamp_julia_orbit_center(*number);
+        return true;
+    }
+    if (param_name == "julia_orbit_center_y") {
+        params.julia_orbit_center_y = fractal_math::clamp_julia_orbit_center(*number);
+        return true;
+    }
+    if (param_name == "color_cycle_speed_hz") {
+        params.color_cycle_speed_hz = fractal_math::clamp_color_cycle_speed_hz(*number);
+        return true;
+    }
+    return false;
+}
+
 }
 
 namespace visual_param {
@@ -103,6 +150,8 @@ bool set(Layer& layer, const std::string& param_name, const VisualParamValue& va
             return set_radial_param(dynamic_cast<RadialVisual&>(*layer.visual), param_name, value);
         case VisualType::Lissajous:
             return set_lissajous_param(dynamic_cast<LissajousVisual&>(*layer.visual), param_name, value);
+        case VisualType::Fractal:
+            return set_fractal_param(dynamic_cast<FractalVisual&>(*layer.visual), param_name, value);
         default:
             return false;
     }

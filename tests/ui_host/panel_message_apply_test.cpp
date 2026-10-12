@@ -24,6 +24,7 @@
 #include "ui_host/fake_ui_host.h"
 #include "ui_host/panel_apply_test_fixture.h"
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -592,4 +593,46 @@ TEST_F(PanelMessageApplyTest, ParticlesInnerRadiusFractionFromPanelJsonIsApplied
     ASSERT_TRUE(low.has_value());
     apply(*low);
     EXPECT_FLOAT_EQ(particles.params().inner_radius_fraction, 0.0f);
+}
+
+TEST_F(PanelMessageApplyTest, FractalParamsFromPanelJsonAreAppliedClampedAndPushedBack) {
+    compositor_.add_layer(VisualType::Fractal);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    auto message_for = [id](const std::string& param_name, const std::string& value) {
+        return R"({"type":"set_visual_param","param_name":")" + param_name + R"(","layer_id":)" +
+               std::to_string(id) + R"(,"value":)" + value + "}";
+    };
+    auto& fractal = dynamic_cast<FractalVisual&>(*compositor_.layers()[0].visual);
+
+    std::optional<PanelMessage> in_range = panel_message::parse(message_for("base_zoom", "2.5"));
+    ASSERT_TRUE(in_range.has_value());
+    apply(*in_range);
+    EXPECT_FLOAT_EQ(fractal.params().base_zoom, 2.5f);
+    nlohmann::json params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    EXPECT_FLOAT_EQ(params["base_zoom"].get<float>(), 2.5f);
+
+    std::optional<PanelMessage> high = panel_message::parse(message_for("julia_base_radius", "1e300"));
+    ASSERT_TRUE(high.has_value());
+    apply(*high);
+    EXPECT_FLOAT_EQ(fractal.params().julia_base_radius, visual_config::kFractalJuliaBaseRadiusMax);
+
+    std::optional<PanelMessage> low = panel_message::parse(message_for("base_zoom", "-1e300"));
+    ASSERT_TRUE(low.has_value());
+    apply(*low);
+    EXPECT_FLOAT_EQ(fractal.params().base_zoom, visual_config::kFractalBaseZoomMin);
+
+    std::optional<PanelMessage> toggle = panel_message::parse(message_for("julia_orbit_clockwise", "false"));
+    ASSERT_TRUE(toggle.has_value());
+    apply(*toggle);
+    EXPECT_FALSE(fractal.params().julia_orbit_clockwise);
+    params = sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["params"];
+    EXPECT_TRUE(params["julia_orbit_clockwise"].is_boolean());
+    EXPECT_EQ(params["julia_orbit_clockwise"], false);
+
+    ui_host_.sent_messages.clear();
+    std::optional<PanelMessage> wrong_type = panel_message::parse(message_for("julia_orbit_clockwise", "1"));
+    ASSERT_TRUE(wrong_type.has_value());
+    apply(*wrong_type);
+    EXPECT_FALSE(fractal.params().julia_orbit_clockwise);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }

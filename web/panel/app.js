@@ -184,6 +184,16 @@
                 });
         } else if (layer.visual_type === "Lissajous") {
             addVisualParamSlider("Curve Exponent", "compression_exponent", "0.2", "1", "0.05");
+        } else if (layer.visual_type === "Fractal") {
+            addVisualParamSlider("Zoom", "base_zoom", "1", "4", "0.05");
+            addVisualParamSlider("Zoom Reactivity", "zoom_amplitude_scale", "0", "2", "0.05");
+            addVisualParamSlider("Orbit Radius", "julia_base_radius", "0.7", "0.85", "0.005");
+            addVisualParamSlider("Radius Reactivity", "julia_radius_amplitude_scale", "0", "0.2", "0.005");
+            addVisualParamSlider("Orbit Speed", "julia_angular_speed_radians_per_sec", "0", "1", "0.01");
+            addVisualParamSlider("Orbit Center X", "julia_orbit_center_x", "-0.5", "0.5", "0.01");
+            addVisualParamSlider("Orbit Center Y", "julia_orbit_center_y", "-0.5", "0.5", "0.01");
+            addVisualParamCheckbox("Clockwise Orbit", "julia_orbit_clockwise");
+            addVisualParamSlider("Color Cycle Speed", "color_cycle_speed_hz", "0", "0.5", "0.005");
         }
 
         var dupBtn = document.createElement("button");

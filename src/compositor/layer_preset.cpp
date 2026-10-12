@@ -267,15 +267,21 @@ nlohmann::json params_to_json(const FractalParams& p) {
 
 FractalParams fractal_params_from_json(const nlohmann::json& j) {
     FractalParams p;
-    p.base_zoom = require_float_field(j, "base_zoom");
-    p.zoom_amplitude_scale = require_float_field(j, "zoom_amplitude_scale");
-    p.julia_base_radius = require_float_field(j, "julia_base_radius");
-    p.julia_radius_amplitude_scale = require_float_field(j, "julia_radius_amplitude_scale");
-    p.julia_angular_speed_radians_per_sec = require_float_field(j, "julia_angular_speed_radians_per_sec");
-    p.julia_orbit_center_x = require_float_field(j, "julia_orbit_center_x");
-    p.julia_orbit_center_y = require_float_field(j, "julia_orbit_center_y");
+    p.base_zoom = fractal_math::clamp_base_zoom(require_number_field(j, "base_zoom"));
+    p.zoom_amplitude_scale =
+        fractal_math::clamp_zoom_amplitude_scale(require_number_field(j, "zoom_amplitude_scale"));
+    p.julia_base_radius = fractal_math::clamp_julia_base_radius(require_number_field(j, "julia_base_radius"));
+    p.julia_radius_amplitude_scale = fractal_math::clamp_julia_radius_amplitude_scale(
+        require_number_field(j, "julia_radius_amplitude_scale"));
+    p.julia_angular_speed_radians_per_sec =
+        fractal_math::clamp_julia_angular_speed(require_number_field(j, "julia_angular_speed_radians_per_sec"));
+    p.julia_orbit_center_x =
+        fractal_math::clamp_julia_orbit_center(require_number_field(j, "julia_orbit_center_x"));
+    p.julia_orbit_center_y =
+        fractal_math::clamp_julia_orbit_center(require_number_field(j, "julia_orbit_center_y"));
     p.julia_orbit_clockwise = j.at("julia_orbit_clockwise").get<bool>();
-    p.color_cycle_speed_hz = require_float_field(j, "color_cycle_speed_hz");
+    p.color_cycle_speed_hz =
+        fractal_math::clamp_color_cycle_speed_hz(require_number_field(j, "color_cycle_speed_hz"));
     p.amplitude_smoothing_tau_ms = require_float_field(j, "amplitude_smoothing_tau_ms");
     p.boundary_margin_px = require_float_field(j, "boundary_margin_px");
     return p;

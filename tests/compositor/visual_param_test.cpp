@@ -1,11 +1,13 @@
 #include "compositor/visual_param.h"
 
 #include <limits>
+#include <memory>
 
 #include <gtest/gtest.h>
 
 #include "compositor/compositor.h"
 #include "visuals/flow_field/flow_field_visual.h"
+#include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
 #include "visuals/particles/particles_visual.h"
 #include "visuals/radial/radial_visual.h"
@@ -443,4 +445,140 @@ TEST(VisualParamSetTest, RadialOnlyOuterRadiusParamIsRejectedOnParticles) {
     compositor.add_layer(VisualType::Particles);
 
     EXPECT_FALSE(visual_param::set(compositor.layers()[0], "max_radius_fraction", 0.5f));
+}
+
+namespace {
+
+struct FractalFloatParamCase {
+    const char* name;
+    float FractalParams::* field;
+    float in_range_value;
+    float min;
+    float max;
+};
+
+const FractalFloatParamCase kFractalFloatParamCases[] = {
+    {"base_zoom", &FractalParams::base_zoom, 2.5f, visual_config::kFractalBaseZoomMin,
+     visual_config::kFractalBaseZoomMax},
+    {"zoom_amplitude_scale", &FractalParams::zoom_amplitude_scale, 1.25f,
+     visual_config::kFractalZoomAmplitudeScaleMin, visual_config::kFractalZoomAmplitudeScaleMax},
+    {"julia_base_radius", &FractalParams::julia_base_radius, 0.75f, visual_config::kFractalJuliaBaseRadiusMin,
+     visual_config::kFractalJuliaBaseRadiusMax},
+    {"julia_radius_amplitude_scale", &FractalParams::julia_radius_amplitude_scale, 0.12f,
+     visual_config::kFractalJuliaRadiusAmplitudeScaleMin, visual_config::kFractalJuliaRadiusAmplitudeScaleMax},
+    {"julia_angular_speed_radians_per_sec", &FractalParams::julia_angular_speed_radians_per_sec, 0.6f,
+     visual_config::kFractalJuliaAngularSpeedRadiansPerSecMin,
+     visual_config::kFractalJuliaAngularSpeedRadiansPerSecMax},
+    {"julia_orbit_center_x", &FractalParams::julia_orbit_center_x, 0.2f,
+     visual_config::kFractalJuliaOrbitCenterMin, visual_config::kFractalJuliaOrbitCenterMax},
+    {"julia_orbit_center_y", &FractalParams::julia_orbit_center_y, -0.3f,
+     visual_config::kFractalJuliaOrbitCenterMin, visual_config::kFractalJuliaOrbitCenterMax},
+    {"color_cycle_speed_hz", &FractalParams::color_cycle_speed_hz, 0.3f,
+     visual_config::kFractalColorCycleSpeedHzMin, visual_config::kFractalColorCycleSpeedHzMax},
+};
+
+Layer make_fractal_layer() { return Layer{VisualType::Fractal, std::make_unique<FractalVisual>()}; }
+
+const FractalParams& fractal_params_of(const Layer& layer) {
+    return dynamic_cast<FractalVisual&>(*layer.visual).params();
+}
+
+}
+
+TEST(VisualParamSetTest, SetsEveryExposedFractalFloatParamAndLeavesTheOthersUntouched) {
+    for (const FractalFloatParamCase& c : kFractalFloatParamCases) {
+        Layer layer = make_fractal_layer();
+        const FractalParams defaults;
+
+        EXPECT_TRUE(visual_param::set(layer, c.name, c.in_range_value)) << c.name;
+
+        EXPECT_FLOAT_EQ(fractal_params_of(layer).*(c.field), c.in_range_value) << c.name;
+        for (const FractalFloatParamCase& other : kFractalFloatParamCases) {
+            if (other.field == c.field) {
+                continue;
+            }
+            EXPECT_FLOAT_EQ(fractal_params_of(layer).*(other.field), defaults.*(other.field))
+                << c.name << " changed " << other.name;
+        }
+    }
+}
+
+TEST(VisualParamSetTest, ClampsEveryExposedFractalFloatParamIncludingExtremeAndNonFiniteValues) {
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float infinity = std::numeric_limits<float>::infinity();
+
+    for (const FractalFloatParamCase& c : kFractalFloatParamCases) {
+        Layer layer = make_fractal_layer();
+        for (float high : {c.max + 0.25f, 1e30f, infinity}) {
+            EXPECT_TRUE(visual_param::set(layer, c.name, high)) << c.name;
+            EXPECT_FLOAT_EQ(fractal_params_of(layer).*(c.field), c.max) << c.name << " input " << high;
+        }
+        for (float low : {c.min - 0.25f, -1e30f, -infinity, nan}) {
+            EXPECT_TRUE(visual_param::set(layer, c.name, low)) << c.name;
+            EXPECT_FLOAT_EQ(fractal_params_of(layer).*(c.field), c.min) << c.name << " input " << low;
+        }
+    }
+}
+
+TEST(VisualParamSetTest, FractalBaseZoomCannotBeSetBelowOne) {
+    Layer layer = make_fractal_layer();
+
+    EXPECT_TRUE(visual_param::set(layer, "base_zoom", 0.5f));
+
+    EXPECT_FLOAT_EQ(fractal_params_of(layer).base_zoom, 1.0f);
+}
+
+TEST(VisualParamSetTest, SetsFractalOrbitClockwiseToggleBothWays) {
+    Layer layer = make_fractal_layer();
+    ASSERT_TRUE(fractal_params_of(layer).julia_orbit_clockwise);
+
+    EXPECT_TRUE(visual_param::set(layer, "julia_orbit_clockwise", false));
+    EXPECT_FALSE(fractal_params_of(layer).julia_orbit_clockwise);
+
+    EXPECT_TRUE(visual_param::set(layer, "julia_orbit_clockwise", true));
+    EXPECT_TRUE(fractal_params_of(layer).julia_orbit_clockwise);
+}
+
+TEST(VisualParamSetTest, BoolValueSentToFractalFloatParamsIsRejectedNotCoerced) {
+    for (const FractalFloatParamCase& c : kFractalFloatParamCases) {
+        Layer layer = make_fractal_layer();
+        const FractalParams defaults;
+
+        EXPECT_FALSE(visual_param::set(layer, c.name, true)) << c.name;
+
+        EXPECT_FLOAT_EQ(fractal_params_of(layer).*(c.field), defaults.*(c.field)) << c.name;
+    }
+}
+
+TEST(VisualParamSetTest, FloatValueSentToFractalOrbitClockwiseIsRejectedNotCoerced) {
+    Layer layer = make_fractal_layer();
+
+    EXPECT_FALSE(visual_param::set(layer, "julia_orbit_clockwise", 0.0f));
+
+    EXPECT_TRUE(fractal_params_of(layer).julia_orbit_clockwise);
+}
+
+TEST(VisualParamSetTest, UnexposedAndUnknownParamNamesAreRejectedOnFractal) {
+    Layer layer = make_fractal_layer();
+    const FractalParams defaults;
+
+    EXPECT_FALSE(visual_param::set(layer, "amplitude_smoothing_tau_ms", 500.0f));
+    EXPECT_FALSE(visual_param::set(layer, "boundary_margin_px", 40.0f));
+    EXPECT_FALSE(visual_param::set(layer, "max_iterations", 500.0f));
+    EXPECT_FALSE(visual_param::set(layer, "not_a_real_param", 1.0f));
+    EXPECT_FALSE(visual_param::set(layer, "spawn_rate_per_frame", 1.0f));
+
+    EXPECT_FLOAT_EQ(fractal_params_of(layer).amplitude_smoothing_tau_ms, defaults.amplitude_smoothing_tau_ms);
+    EXPECT_FLOAT_EQ(fractal_params_of(layer).boundary_margin_px, defaults.boundary_margin_px);
+}
+
+TEST(VisualParamSetTest, FractalParamNamesAreRejectedOnOtherVisualTypes) {
+    Compositor compositor;
+    compositor.add_layer(VisualType::Particles);
+    compositor.add_layer(VisualType::Lissajous);
+
+    for (std::size_t i = 0; i < compositor.layers().size(); ++i) {
+        EXPECT_FALSE(visual_param::set(compositor.layers()[i], "base_zoom", 2.0f));
+        EXPECT_FALSE(visual_param::set(compositor.layers()[i], "julia_orbit_clockwise", false));
+    }
 }

@@ -724,3 +724,119 @@ TEST(LayerPresetAdversarialTest, RejectsParticlesInnerRadiusFractionOfWrongType)
         EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << bad.dump();
     }
 }
+
+namespace {
+
+struct FractalPresetFieldCase {
+    const char* key;
+    float FractalParams::* field;
+    float in_range_value;
+    float min;
+    float max;
+};
+
+const FractalPresetFieldCase kFractalPresetFieldCases[] = {
+    {"base_zoom", &FractalParams::base_zoom, 2.5f, visual_config::kFractalBaseZoomMin,
+     visual_config::kFractalBaseZoomMax},
+    {"zoom_amplitude_scale", &FractalParams::zoom_amplitude_scale, 1.25f,
+     visual_config::kFractalZoomAmplitudeScaleMin, visual_config::kFractalZoomAmplitudeScaleMax},
+    {"julia_base_radius", &FractalParams::julia_base_radius, 0.75f, visual_config::kFractalJuliaBaseRadiusMin,
+     visual_config::kFractalJuliaBaseRadiusMax},
+    {"julia_radius_amplitude_scale", &FractalParams::julia_radius_amplitude_scale, 0.12f,
+     visual_config::kFractalJuliaRadiusAmplitudeScaleMin, visual_config::kFractalJuliaRadiusAmplitudeScaleMax},
+    {"julia_angular_speed_radians_per_sec", &FractalParams::julia_angular_speed_radians_per_sec, 0.6f,
+     visual_config::kFractalJuliaAngularSpeedRadiansPerSecMin,
+     visual_config::kFractalJuliaAngularSpeedRadiansPerSecMax},
+    {"julia_orbit_center_x", &FractalParams::julia_orbit_center_x, 0.2f,
+     visual_config::kFractalJuliaOrbitCenterMin, visual_config::kFractalJuliaOrbitCenterMax},
+    {"julia_orbit_center_y", &FractalParams::julia_orbit_center_y, -0.3f,
+     visual_config::kFractalJuliaOrbitCenterMin, visual_config::kFractalJuliaOrbitCenterMax},
+    {"color_cycle_speed_hz", &FractalParams::color_cycle_speed_hz, 0.3f,
+     visual_config::kFractalColorCycleSpeedHzMin, visual_config::kFractalColorCycleSpeedHzMax},
+};
+
+nlohmann::json serialized_single_fractal_doc() {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Fractal, std::make_unique<FractalVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+}
+
+TEST(LayerPresetRoundTripTest, EveryExposedFractalParamRoundTripsWhenInRange) {
+    FractalParams params;
+    for (const FractalPresetFieldCase& c : kFractalPresetFieldCases) {
+        params.*(c.field) = c.in_range_value;
+    }
+    params.julia_orbit_clockwise = false;
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Fractal, std::make_unique<FractalVisual>(params)};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(layer_preset::serialize(layers));
+
+    ASSERT_TRUE(loaded.has_value());
+    const FractalParams& loaded_params = dynamic_cast<FractalVisual&>(*(*loaded)[0].visual).params();
+    for (const FractalPresetFieldCase& c : kFractalPresetFieldCases) {
+        EXPECT_FLOAT_EQ(loaded_params.*(c.field), c.in_range_value) << c.key;
+    }
+    EXPECT_FALSE(loaded_params.julia_orbit_clockwise);
+}
+
+TEST(LayerPresetAdversarialTest, OutOfRangeAndExtremeFractalParamsLoadClamped) {
+    for (const FractalPresetFieldCase& c : kFractalPresetFieldCases) {
+        const std::pair<double, float> cases[] = {
+            {static_cast<double>(c.min) - 0.25, c.min},
+            {-1e300, c.min},
+            {static_cast<double>(c.max) + 0.25, c.max},
+            {1e300, c.max},
+        };
+        for (const auto& [input, expected] : cases) {
+            nlohmann::json doc = serialized_single_fractal_doc();
+            doc["layers"][0]["params"][c.key] = input;
+
+            std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+            ASSERT_TRUE(loaded.has_value()) << c.key << " input " << input;
+            EXPECT_FLOAT_EQ(dynamic_cast<FractalVisual&>(*(*loaded)[0].visual).params().*(c.field), expected)
+                << c.key << " input " << input;
+        }
+    }
+}
+
+TEST(LayerPresetAdversarialTest, FractalBaseZoomBelowOneLoadsAsOne) {
+    nlohmann::json doc = serialized_single_fractal_doc();
+    doc["layers"][0]["params"]["base_zoom"] = 0.25;
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_FLOAT_EQ(dynamic_cast<FractalVisual&>(*(*loaded)[0].visual).params().base_zoom, 1.0f);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsFractalFloatParamsOfWrongTypeOrMissing) {
+    for (const FractalPresetFieldCase& c : kFractalPresetFieldCases) {
+        for (const nlohmann::json& bad : {nlohmann::json("0.5"), nlohmann::json(true), nlohmann::json(nullptr)}) {
+            nlohmann::json doc = serialized_single_fractal_doc();
+            doc["layers"][0]["params"][c.key] = bad;
+            EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << c.key << " " << bad.dump();
+        }
+        nlohmann::json doc = serialized_single_fractal_doc();
+        doc["layers"][0]["params"].erase(c.key);
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << c.key << " missing";
+    }
+}
+
+TEST(LayerPresetAdversarialTest, RejectsFractalOrbitClockwiseOfWrongTypeOrMissing) {
+    for (const nlohmann::json& bad : {nlohmann::json("true"), nlohmann::json(1), nlohmann::json(nullptr)}) {
+        nlohmann::json doc = serialized_single_fractal_doc();
+        doc["layers"][0]["params"]["julia_orbit_clockwise"] = bad;
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << bad.dump();
+    }
+    nlohmann::json doc = serialized_single_fractal_doc();
+    doc["layers"][0]["params"].erase("julia_orbit_clockwise");
+    EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}

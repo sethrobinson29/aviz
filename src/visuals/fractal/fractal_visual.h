@@ -18,13 +18,31 @@ float selected_band_amplitude(const std::array<float, audio_config::kTotalBandSl
 
 float one_pole_smooth(float current, float target, float time_constant_ms, float dt_seconds);
 
+float apply_sensitivity(float amplitude01, float sensitivity);
+
 float amplitude_to_zoom(float amplitude01, float base_zoom, float zoom_amplitude_scale);
 
-Vector2 julia_constant(float time_seconds, float amplitude01, float base_radius,
-                        float radius_amplitude_scale, float angular_speed_radians_per_sec,
-                        Vector2 orbit_center, bool clockwise);
+float advance_orbit_phase(float phase_radians, float angular_speed_radians_per_sec, bool clockwise,
+                           float dt_seconds);
 
-float color_cycle_hue(float time_seconds, float cycle_speed_hz);
+Vector2 julia_constant(float orbit_phase_radians, float amplitude01, float base_radius,
+                        float radius_amplitude_scale, Vector2 orbit_center);
+
+float advance_hue_phase(float phase01, float cycle_speed_hz, float dt_seconds);
+
+float clamp_base_zoom(double zoom);
+
+float clamp_zoom_amplitude_scale(double scale);
+
+float clamp_julia_base_radius(double radius);
+
+float clamp_julia_radius_amplitude_scale(double scale);
+
+float clamp_julia_angular_speed(double radians_per_sec);
+
+float clamp_julia_orbit_center(double coordinate);
+
+float clamp_color_cycle_speed_hz(double hz);
 
 }
 
@@ -76,7 +94,8 @@ private:
     int loc_boundary_margin_px_ = -1;
     int loc_palette_tex_ = -1;
     int loc_use_palette_texture_ = -1;
-    float elapsed_seconds_ = 0.0f;
+    float orbit_phase_radians_ = 0.0f;
+    float hue_phase_ = 0.0f;
     float smoothed_amplitude_ = 0.0f;
     Texture2D palette_texture_{};
     bool has_palette_texture_ = false;
