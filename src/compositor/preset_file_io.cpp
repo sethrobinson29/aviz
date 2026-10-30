@@ -1,15 +1,45 @@
 #include "compositor/preset_file_io.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string_view>
 
+namespace {
+
+constexpr std::string_view kCharactersInvalidInWindowsFilenames = "<>:\"|?*";
+
+constexpr std::array<std::string_view, 22> kWindowsReservedDeviceNames{
+    "CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+    "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
+
+bool is_windows_reserved_device_name(std::string_view filename) {
+    std::string stem(filename.substr(0, filename.find('.')));
+    while (!stem.empty() && stem.back() == ' ') {
+        stem.pop_back();
+    }
+    for (char& c : stem) {
+        c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    }
+    return std::find(kWindowsReservedDeviceNames.begin(), kWindowsReservedDeviceNames.end(), stem) !=
+           kWindowsReservedDeviceNames.end();
+}
+
+}
+
 namespace preset_file_io {
 
-std::string preset_path(const std::string& filename) {
-    return (std::filesystem::path(kPresetsDirectoryName) / filename).string();
+std::string presets_directory_in(const std::string& application_dir) {
+    return std::filesystem::absolute(std::filesystem::path(application_dir) / kPresetsDirectoryName)
+        .lexically_normal()
+        .string();
+}
+
+std::string preset_path(const std::string& presets_dir, const std::string& filename) {
+    return (std::filesystem::path(presets_dir) / filename).string();
 }
 
 bool is_safe_preset_filename(const std::string& filename) {
@@ -23,9 +53,15 @@ bool is_safe_preset_filename(const std::string& filename) {
         return false;
     }
     for (unsigned char c : filename) {
-        if (c < 0x20 || c == '/' || c == '\\') {
+        if (c < 0x20 || c == 0x7F || c == '/' || c == '\\') {
             return false;
         }
+        if (kCharactersInvalidInWindowsFilenames.find(static_cast<char>(c)) != std::string_view::npos) {
+            return false;
+        }
+    }
+    if (is_windows_reserved_device_name(filename)) {
+        return false;
     }
     if (filename.size() <= kExtension.size()) {
         return false;
@@ -68,10 +104,10 @@ WriteResult write_file(const std::string& path, const std::string& contents) {
     return WriteResult{true, {}};
 }
 
-std::vector<std::string> list_preset_files() {
+std::vector<std::string> list_preset_files(const std::string& presets_dir) {
     std::vector<std::string> names;
     try {
-        const std::filesystem::path dir(kPresetsDirectoryName);
+        const std::filesystem::path dir(presets_dir);
         if (!std::filesystem::exists(dir)) {
             return names;
         }

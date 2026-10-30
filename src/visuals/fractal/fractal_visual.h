@@ -44,6 +44,10 @@ float clamp_julia_orbit_center(double coordinate);
 
 float clamp_color_cycle_speed_hz(double hz);
 
+float clamp_amplitude_smoothing_tau_ms(double tau_ms);
+
+float clamp_boundary_margin_px(double margin_px);
+
 }
 
 struct FractalParams {

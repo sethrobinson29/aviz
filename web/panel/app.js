@@ -8,6 +8,25 @@
     var BLEND_MODES = ["Normal", "Additive", "Multiply", "Screen"];
     var REACTIVITY_SOURCES = ["GlobalBeat", "BandOnset", "BandAmplitude"];
     var NUM_BANDS = 16;
+    var PALETTE_NONE = "None";
+    var PALETTE_CUSTOM = "Custom";
+    var NAMED_PALETTES = [
+        {
+            name: "Warm-Cool",
+            stops: [
+                { position: 0, color: { r: 40, g: 90, b: 255, a: 255 } },
+                { position: 1, color: { r: 255, g: 60, b: 180, a: 255 } }
+            ]
+        },
+        {
+            name: "Sunset",
+            stops: [
+                { position: 0, color: { r: 255, g: 220, b: 0, a: 255 } },
+                { position: 0.5, color: { r: 255, g: 80, b: 0, a: 255 } },
+                { position: 1, color: { r: 120, g: 0, b: 200, a: 255 } }
+            ]
+        }
+    ];
 
     var layerListEl = document.getElementById("layer-list");
     var presetSelectEl = document.getElementById("preset-select");
@@ -38,6 +57,27 @@
         });
     }
     populateSelect(addVisualTypeEl, VISUAL_TYPES);
+
+    function stopsMatch(a, b) {
+        return a.length === b.length && a.every(function (stop, i) {
+            var other = b[i];
+            return stop.position === other.position &&
+                stop.color.r === other.color.r &&
+                stop.color.g === other.color.g &&
+                stop.color.b === other.color.b &&
+                stop.color.a === other.color.a;
+        });
+    }
+
+    function paletteSelectionFor(paletteOverride) {
+        if (paletteOverride === null) {
+            return PALETTE_NONE;
+        }
+        var match = NAMED_PALETTES.find(function (palette) {
+            return stopsMatch(palette.stops, paletteOverride.stops);
+        });
+        return match ? match.name : PALETTE_CUSTOM;
+    }
 
     function labeledControl(labelText, inputEl) {
         var label = document.createElement("label");
@@ -92,6 +132,27 @@
             post("set_blend_mode", { layer_id: layer.layer_id, blend_mode: blendSelect.value });
         });
         controls.appendChild(labeledControl("Blend", blendSelect));
+
+        var paletteSelect = document.createElement("select");
+        populateSelect(paletteSelect, [PALETTE_NONE].concat(NAMED_PALETTES.map(function (palette) {
+            return palette.name;
+        })));
+        var paletteCustomOption = document.createElement("option");
+        paletteCustomOption.value = PALETTE_CUSTOM;
+        paletteCustomOption.textContent = PALETTE_CUSTOM;
+        paletteCustomOption.disabled = true;
+        paletteCustomOption.hidden = true;
+        paletteSelect.appendChild(paletteCustomOption);
+        paletteSelect.addEventListener("change", function () {
+            var selected = NAMED_PALETTES.find(function (palette) {
+                return palette.name === paletteSelect.value;
+            });
+            post("set_palette_override", {
+                layer_id: layer.layer_id,
+                palette_override: selected ? { stops: selected.stops } : null
+            });
+        });
+        controls.appendChild(labeledControl("Palette", paletteSelect));
 
         var bandSelect = document.createElement("select");
         var bandOptions = ["Global"];
@@ -219,6 +280,8 @@
             enabled: enabledInput,
             opacity: opacityInput,
             blend: blendSelect,
+            palette: paletteSelect,
+            paletteCustomOption: paletteCustomOption,
             band: bandSelect,
             reactivity: reactivitySelect,
             sensitivity: sensitivityInput,
@@ -236,6 +299,9 @@
         if (active !== els.enabled) els.enabled.checked = layer.enabled;
         if (active !== els.opacity) els.opacity.value = layer.opacity;
         if (active !== els.blend) els.blend.value = layer.blend_mode;
+        var paletteSelection = paletteSelectionFor(layer.palette_override);
+        els.paletteCustomOption.hidden = paletteSelection !== PALETTE_CUSTOM;
+        if (active !== els.palette) els.palette.value = paletteSelection;
         els.visualParams.forEach(function (entry) {
             if (active === entry.input) return;
             var current = layer.params[entry.paramName];

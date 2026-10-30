@@ -150,18 +150,34 @@ run directly from `tsan/`.
   `sensitivity`, `enabled`) serializes to/from a versioned JSON schema
   (`layer_preset.h`/`.cpp`) and round-trips through `presets/` (a
   runtime-only folder next to the executable, not checked into the repo).
+  The folder is located from the executable's own path, not the working
+  directory, so the same presets appear however the app is launched
+  (shortcut, another shell, double-click). Each build configuration has its
+  own executable folder and therefore its own `presets/`
+  (`build/Debug/presets`, `build/Release/presets`).
   Every layer carries a stable `layer_id`, assigned on creation and
   preserved across save/load, so a reference to a specific layer survives a
   reorder — loading validates the id set (no duplicates, none invalid)
   before replacing the in-memory stack, rejecting the whole file rather than
-  partially applying a malformed one. Real panel-driven preset management is
-  built (see "Layer management from the panel" below); the debug tool's
-  `S`/`O` keys still exist alongside it (save/load a fixed debug filename),
-  removal deferred until the real UI is fully tested and confirmed.
+  partially applying a malformed one. Every numeric field in a preset is
+  clamped to its own valid range on load, whether or not it has a panel
+  control (opacity, sensitivity, line/bar thickness, spectrum gap and
+  height, particle radius and spawn rate, Fractal smoothing time and
+  boundary fade), so a hand-edited preset with out-of-range numbers loads
+  with those values pulled to the nearest limit instead of as written. A
+  palette override with no stops, or with stops out of ascending order, is
+  rejected; stop positions outside 0-1 are clamped. Presets are saved, listed and loaded from the
+  control panel (see "Layer management from the panel" below).
 - **Palette override** (milestone 7): a per-layer `palette_override`
   gradient (`Layer.palette_override`) that replaces a visual's own flat
-  color with a sampled gradient, layered under the existing tint multiply
-  rather than replacing it. Wired into all seven visual modules, each
+  color with a sampled gradient. A layer with an override skips its tint
+  multiply, so the gradient shows its true colors at any stack position;
+  the layer keeps its assigned tint, and clearing the override brings the
+  normal tinted look straight back. Each layer row in the panel has a
+  **Palette** dropdown: None, Warm-Cool, or Sunset. A hand-edited preset
+  can carry any other gradient, which shows as a read-only **Custom**
+  entry until you pick something else. Overrides save and load with
+  presets. Wired into all seven visual modules, each
   sampling by its own natural axis: Spectrum/Radial by each bar's frequency
   position, Waveform/Lissajous by position along the drawn line,
   Particles/Flow Field by each particle's life fraction (a color-over-life
@@ -198,22 +214,35 @@ run directly from `tsan/`.
   window with no shared-surface compositing, on its own dedicated thread.
   Security defaults ship with it, not as a follow-up: scoped local file
   access (served via `SetVirtualHostNameToFolderMapping` against
-  `web/panel/` rather than a `file://` URL), restricted navigation (anything
-  outside the panel's own virtual host is cancelled), a page-level Content
-  Security Policy, and DevTools disabled in release builds. WebView2
+  `web/panel/` rather than a `file://` URL), restricted navigation (top-level
+  and frame navigations outside the panel's own virtual host are cancelled,
+  new-window requests are refused, and any resource request to another
+  origin is answered with a blocked response), a page-level Content
+  Security Policy, and DevTools disabled in release builds (release builds
+  also clear the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment
+  variable before starting WebView2, so it cannot switch remote debugging
+  back on). The panel page cannot ask the app to open a file by path: an
+  audio file can only be chosen through the native file dialog. WebView2
   callbacks never call `Compositor` (or any window-mode-changing function)
   directly — they push onto a mutex-guarded `PanelDispatchQueue` that the
   render thread drains once per frame and applies via `panel_message_apply`,
   the same path for every message type.
 - **Layer management from the panel**: add (choose visual type)/remove/
   duplicate/drag-to-reorder, plus every generic per-layer control (opacity,
-  blend mode, `freq_band`, `reactivity_source`, `sensitivity`, `enabled`)
+  blend mode, palette override, `freq_band`, `reactivity_source`,
+  `sensitivity`, `enabled`)
   and preset list/load/save — all reusing the existing tested
-  `layer_preset`/`preset_file_io` schema and validation, now exposed through
-  real UI instead of the debug tool's fixed-filename `S`/`O` keys.
+  `layer_preset`/`preset_file_io` schema and validation. The keyboard debug
+  tool that predated the panel has been removed: the only keys the
+  visualizer window still handles are `F11` (fullscreen), `K` (dock) and
+  `L` (audio source). Changing an existing layer's visual type is no longer possible;
+  remove the layer and add one of the type you want.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames
-  against path traversal, separators, and unexpected extensions, since the
-  panel is the first place a user-typed filename reaches the filesystem.
+  against path traversal, separators, unexpected extensions, drive or
+  stream qualifiers (`C:name.json`, `name:stream.json`), other characters
+  Windows does not allow in filenames, and reserved device names
+  (`NUL.json`, `CON.json`, ...), since the panel is the first place a
+  user-typed filename reaches the filesystem.
 - **Per-visual-type panel controls (Particles, Flow Field, Lissajous, Radial, and Fractal so far).** A
   generic `set_visual_param` message (`layer_id`, `param_name`, `value` —
   a JSON number or a JSON boolean; a param's setter rejects the wrong type

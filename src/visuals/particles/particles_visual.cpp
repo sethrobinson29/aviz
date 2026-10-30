@@ -31,13 +31,18 @@ Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius) {
     return Vector2{center.x + direction.x * inner_radius, center.y + direction.y * inner_radius};
 }
 
+float clamp_radius(double radius) {
+    return number_math::clamp_number_to_range<float>(radius, visual_config::kParticleRadiusPxMin,
+                                                      visual_config::kParticleRadiusPxMax);
+}
+
 float clamp_inner_radius_fraction(double inner) {
     return number_math::clamp_number_to_range<float>(inner, 0.0f, 1.0f);
 }
 
-float clamp_spawn_rate_per_frame(float rate) {
-    return std::clamp(rate, visual_config::kParticlesSpawnRatePerFrameMin,
-                       visual_config::kParticlesSpawnRatePerFrameMax);
+float clamp_spawn_rate_per_frame(double rate) {
+    return number_math::clamp_number_to_range<float>(rate, visual_config::kParticlesSpawnRatePerFrameMin,
+                                                      visual_config::kParticlesSpawnRatePerFrameMax);
 }
 
 int clamp_lifetime_frames(int frames) {

@@ -58,19 +58,19 @@ Vector2 random_canvas_position(float width, float height, std::mt19937& rng) {
     return Vector2{x_dist(rng), y_dist(rng)};
 }
 
-float clamp_spawn_rate_per_frame(float rate) {
-    return std::clamp(rate, visual_config::kFlowFieldSpawnRatePerFrameMin,
-                       visual_config::kFlowFieldSpawnRatePerFrameMax);
+float clamp_spawn_rate_per_frame(double rate) {
+    return number_math::clamp_number_to_range<float>(rate, visual_config::kFlowFieldSpawnRatePerFrameMin,
+                                                      visual_config::kFlowFieldSpawnRatePerFrameMax);
 }
 
-float clamp_turbulence_frequency(float frequency) {
-    return std::clamp(frequency, visual_config::kFlowFieldTurbulenceFrequencyMin,
-                       visual_config::kFlowFieldTurbulenceFrequencyMax);
+float clamp_turbulence_frequency(double frequency) {
+    return number_math::clamp_number_to_range<float>(frequency, visual_config::kFlowFieldTurbulenceFrequencyMin,
+                                                      visual_config::kFlowFieldTurbulenceFrequencyMax);
 }
 
-float clamp_evolution_per_frame(float evolution) {
-    return std::clamp(evolution, visual_config::kFlowFieldEvolutionPerFrameMin,
-                       visual_config::kFlowFieldEvolutionPerFrameMax);
+float clamp_evolution_per_frame(double evolution) {
+    return number_math::clamp_number_to_range<float>(evolution, visual_config::kFlowFieldEvolutionPerFrameMin,
+                                                      visual_config::kFlowFieldEvolutionPerFrameMax);
 }
 
 int clamp_grid_cols(int cols) {

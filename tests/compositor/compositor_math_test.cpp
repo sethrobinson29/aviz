@@ -2,12 +2,15 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 
 #include <gtest/gtest.h>
 
 #include "compositor/compositor.h"
 #include "raylib.h"
 #include "rlgl.h"
+#include "visuals/palette.h"
+#include "visuals/waveform/waveform_visual.h"
 
 namespace {
 Layer make_test_layer(std::uint64_t id) {
@@ -240,4 +243,80 @@ TEST(ReassignLayerTintsTest, HandlesEmptyVector) {
     std::vector<Layer> layers;
     compositor_math::reassign_layer_tints(layers);
     EXPECT_TRUE(layers.empty());
+}
+
+TEST(ClampOpacityTest, ExtremeAndNonFiniteValuesLandOnADefinedBound) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(nan), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-infinity), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-1e300), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(infinity), 1.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(1e300), 1.0f);
+}
+
+TEST(ClampSensitivityTest, ExtremeAndNonFiniteValuesLandOnADefinedBound) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(nan), compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(-infinity), compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(infinity), compositor_math::kSensitivityMax);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(1e300), compositor_math::kSensitivityMax);
+}
+
+TEST(LayerCompositeColorTest, LayerWithoutPaletteOverrideCompositesWithItsTint) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.opacity = 1.0f;
+
+    Color color = compositor_math::layer_composite_color(layer);
+
+    EXPECT_EQ(color.r, 10);
+    EXPECT_EQ(color.g, 20);
+    EXPECT_EQ(color.b, 30);
+    EXPECT_EQ(color.a, 255);
+}
+
+TEST(LayerCompositeColorTest, LayerWithPaletteOverrideSkipsTintMultiply) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+
+    Color color = compositor_math::layer_composite_color(layer);
+
+    EXPECT_EQ(color.r, 255);
+    EXPECT_EQ(color.g, 255);
+    EXPECT_EQ(color.b, 255);
+}
+
+TEST(LayerCompositeColorTest, PaletteOverrideStillHonorsOpacity) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    layer.opacity = 0.5f;
+
+    EXPECT_EQ(compositor_math::layer_composite_color(layer).a, 127);
+}
+
+TEST(LayerCompositeColorTest, ClearingPaletteOverrideRevertsToStoredTintWithoutBookkeeping) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    ASSERT_EQ(compositor_math::layer_composite_color(layer).r, 255);
+
+    layer.palette_override = std::nullopt;
+
+    EXPECT_EQ(compositor_math::layer_composite_color(layer).r, 10);
+}
+
+TEST(ReassignLayerTintsTest, StillAssignsTintToLayersWithPaletteOverride) {
+    std::vector<Layer> layers;
+    layers.push_back(Layer{VisualType::Waveform, std::make_unique<WaveformVisual>()});
+    layers[0].palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    layers[0].tint_color = Color{0, 0, 0, 255};
+
+    compositor_math::reassign_layer_tints(layers);
+
+    EXPECT_EQ(layers[0].tint_color.r, compositor_math::layer_palette_color(0).r);
+    EXPECT_EQ(layers[0].tint_color.g, compositor_math::layer_palette_color(0).g);
+    EXPECT_EQ(layers[0].tint_color.b, compositor_math::layer_palette_color(0).b);
 }

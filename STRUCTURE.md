@@ -48,7 +48,10 @@ aviz/
 │   │   ├── spectrum/
 │   │   └── ...
 │   ├── ui_host/            # UIHost interface + WebView2 implementation, state bridge
-│   │                        # (C++ side of the C++/JS boundary — see spec §7)
+│   │                        # (C++ side of the C++/JS boundary — see spec §7),
+│   │                        # panel_navigation_policy.h/.cpp (new-window/frame-navigation/
+│   │                        # resource-request trust checks — see TESTING.md's Security
+│   │                        # / adversarial input section)
 │   ├── app/               # top-level orchestration: window/init, main loop, wiring
 │   │                        # (producer_host.h, audio_source_controller, window_layout_config.h)
 │   └── main.cpp
@@ -77,7 +80,7 @@ aviz/
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
 
-**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to the built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The debug tool's `S`/`O` keybindings write/read a fixed debug filename here (`kDebugPresetFilename`, `src/app/app.cpp`) — a leftover from testing before the real control panel UI existed. The debug tool itself is still present (removal deferred until the real UI is fully tested and confirmed), so this path is still live even though the panel's own preset save/load (spec §7) is now the primary one.
+**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to each built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on; practically this means a separate `presets/` per build configuration, e.g. `build/Debug/presets`, `build/Release/presets`), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). The path is resolved once at startup from the executable's own location, not the working directory, and passed in explicitly to save/load/list rather than re-derived in each of those (milestone 8 fix). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The debug tool's `S`/`O` keybindings write/read a fixed debug filename here (`kDebugPresetFilename`, `src/app/app.cpp`) — a leftover from testing before the real control panel UI existed. The debug tool itself is still present (removal deferred until the real UI is fully tested and confirmed), so this path is still live even though the panel's own preset save/load (spec §7) is now the primary one.
 
 ## Build options
 

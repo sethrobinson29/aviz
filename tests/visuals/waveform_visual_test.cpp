@@ -4,6 +4,7 @@
 
 #include "audio/audio_config.h"
 #include "visuals/visual_config.h"
+#include <limits>
 
 TEST(WaveformToPointsTest, IdleReturnsFlatMidLine) {
     auto pts = waveform_math::to_points(nullptr, 0, 200, 100, true);
@@ -235,4 +236,20 @@ TEST(SafeBandIndexTest, InRangeReturnsSameIndex) {
 TEST(SafeBandIndexTest, OutOfRangeFreqBandFallsBackToGlobalInsteadOfOutOfBoundsRead) {
     EXPECT_EQ(waveform_math::safe_band_index(999999), audio_config::kGlobalBandIndex);
     EXPECT_EQ(waveform_math::safe_band_index(audio_config::kNumBands), audio_config::kGlobalBandIndex);
+}
+
+TEST(WaveformClampTest, LineThicknessClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kLineThicknessPxMin;
+    const float max = visual_config::kLineThicknessPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(high), max) << high;
+    }
 }

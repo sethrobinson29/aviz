@@ -136,13 +136,11 @@ void Compositor::render(const AudioFeatures& features) {
         BeginBlendMode(factors.raylib_mode);
 
         RenderTexture2D& tex = layer.visual->render_texture();
-        const float alpha = compositor_math::clamp_opacity(layer.opacity) * 255.0f;
-        const Color& tint = layer.tint_color;
         DrawTextureRec(tex.texture,
                         Rectangle{0.0f, 0.0f, static_cast<float>(tex.texture.width),
                                   -static_cast<float>(tex.texture.height)},
                         Vector2{0.0f, 0.0f},
-                        Color{tint.r, tint.g, tint.b, static_cast<unsigned char>(alpha)});
+                        compositor_math::layer_composite_color(layer));
 
         EndBlendMode();
     }

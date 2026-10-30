@@ -21,6 +21,10 @@ std::vector<std::size_t> bar_indices_to_draw(std::optional<std::size_t> freq_ban
 
 float update_onset_pulse(float current_pulse, bool onset, float sensitivity);
 
+float clamp_gap_ratio(double gap_ratio);
+
+float clamp_max_height_fraction(double fraction);
+
 Color pulse_color(Color base, float pulse);
 
 Color bar_base_color(Color flat_color, const std::optional<Palette>& palette_override, std::size_t index,

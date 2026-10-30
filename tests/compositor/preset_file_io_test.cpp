@@ -1,8 +1,21 @@
 #include "compositor/preset_file_io.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
+
+#include "compositor/layer.h"
+#include "compositor/layer_preset.h"
+#include "compositor/palette_test_fixtures.h"
+#include "visuals/spectrum/spectrum_visual.h"
+#include "visuals/waveform/waveform_visual.h"
 
 namespace {
 
@@ -20,9 +33,14 @@ protected:
 
 class PresetDirectoryListTest : public ::testing::Test {
 protected:
-    void SetUp() override { std::filesystem::remove_all(preset_file_io::kPresetsDirectoryName); }
+    void SetUp() override {
+        presets_dir_ = (std::filesystem::temp_directory_path() / "aviz_preset_directory_list_test").string();
+        std::filesystem::remove_all(presets_dir_);
+    }
 
-    void TearDown() override { std::filesystem::remove_all(preset_file_io::kPresetsDirectoryName); }
+    void TearDown() override { std::filesystem::remove_all(presets_dir_); }
+
+    std::string presets_dir_;
 };
 
 }
@@ -77,6 +95,37 @@ TEST_F(PresetFileIoTest, ReadOnFileWithinAMissingDirectoryReturnsClearFailure) {
     EXPECT_FALSE(result.error.empty());
 }
 
+TEST_F(PresetFileIoTest, PaletteOverridesRoundTripStopForStopThroughFileOnDisk) {
+    const std::vector<std::optional<Palette>> palettes = palette_fixtures::all_cases();
+    std::vector<Layer> layers;
+    std::uint64_t next_id = 1;
+    for (const std::optional<Palette>& palette : palettes) {
+        Layer waveform{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+        waveform.layer_id = next_id++;
+        waveform.palette_override = palette;
+        layers.push_back(std::move(waveform));
+        Layer spectrum{VisualType::Spectrum, std::make_unique<SpectrumVisual>()};
+        spectrum.layer_id = next_id++;
+        spectrum.palette_override = palette;
+        layers.push_back(std::move(spectrum));
+    }
+    const std::string saved_text = layer_preset::serialize(layers);
+    const std::string path = (scratch_dir_ / "palettes.json").string();
+    ASSERT_TRUE(preset_file_io::write_file(path, saved_text).success);
+
+    preset_file_io::ReadResult read_result = preset_file_io::read_file(path);
+    ASSERT_TRUE(read_result.success) << read_result.error;
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(read_result.contents);
+
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_EQ(loaded->size(), layers.size());
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        SCOPED_TRACE(i);
+        palette_fixtures::expect_same_stops((*loaded)[i].palette_override, layers[i].palette_override);
+    }
+    EXPECT_EQ(layer_preset::serialize(*loaded), saved_text);
+}
+
 TEST(IsSafePresetFilenameTest, AcceptsOrdinaryJsonFilename) {
     EXPECT_TRUE(preset_file_io::is_safe_preset_filename("my-preset.json"));
 }
@@ -119,30 +168,86 @@ TEST(IsSafePresetFilenameTest, RejectsOverlyLongFilename) {
 }
 
 TEST(PresetPathTest, JoinsPresetsDirectoryAndFilename) {
-    const std::string joined = preset_file_io::preset_path("debug.json");
-    EXPECT_EQ(std::filesystem::path(joined),
-              std::filesystem::path(preset_file_io::kPresetsDirectoryName) / "debug.json");
+    const std::string joined = preset_file_io::preset_path("C:\\apps\\aviz\\presets", "debug.json");
+    EXPECT_EQ(std::filesystem::path(joined), std::filesystem::path("C:\\apps\\aviz\\presets") / "debug.json");
+}
+
+TEST(PresetsDirectoryTest, IsThePresetsFolderInsideTheApplicationDirectory) {
+    EXPECT_EQ(std::filesystem::path(preset_file_io::presets_directory_in("C:\\apps\\aviz\\")),
+              std::filesystem::path("C:\\apps\\aviz\\presets"));
+    EXPECT_EQ(std::filesystem::path(preset_file_io::presets_directory_in("C:\\apps\\aviz")),
+              std::filesystem::path("C:\\apps\\aviz\\presets"));
+}
+
+TEST(PresetsDirectoryTest, DoesNotDependOnTheWorkingDirectory) {
+    const std::filesystem::path original_working_dir = std::filesystem::current_path();
+    const std::string before = preset_file_io::presets_directory_in("C:\\apps\\aviz\\");
+
+    std::filesystem::current_path(std::filesystem::temp_directory_path());
+    const std::string after = preset_file_io::presets_directory_in("C:\\apps\\aviz\\");
+    std::filesystem::current_path(original_working_dir);
+
+    EXPECT_EQ(before, after);
+    EXPECT_TRUE(std::filesystem::path(after).is_absolute());
+}
+
+TEST(PresetsDirectoryTest, RelativeApplicationDirectoryIsMadeAbsolute) {
+    EXPECT_TRUE(std::filesystem::path(preset_file_io::presets_directory_in("./")).is_absolute());
 }
 
 TEST_F(PresetDirectoryListTest, NoPresetsDirectoryReturnsEmptyNotAnException) {
-    EXPECT_TRUE(preset_file_io::list_preset_files().empty());
+    EXPECT_TRUE(preset_file_io::list_preset_files(presets_dir_).empty());
 }
 
 TEST_F(PresetDirectoryListTest, ListsFilesPresentInThePresetsDirectory) {
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path("alpha.json"), "a").success);
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path("beta.json"), "b").success);
+    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "alpha.json"), "a").success);
+    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "beta.json"), "b").success);
 
-    std::vector<std::string> names = preset_file_io::list_preset_files();
+    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
 
     EXPECT_EQ(names, (std::vector<std::string>{"alpha.json", "beta.json"}));
 }
 
 TEST_F(PresetDirectoryListTest, IgnoresSubdirectoriesAndOnlyListsRegularFiles) {
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path("real.json"), "a").success);
-    std::filesystem::create_directories(
-        std::filesystem::path(preset_file_io::kPresetsDirectoryName) / "not_a_preset_dir");
+    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "real.json"), "a").success);
+    std::filesystem::create_directories(std::filesystem::path(presets_dir_) / "not_a_preset_dir");
 
-    std::vector<std::string> names = preset_file_io::list_preset_files();
+    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
 
     EXPECT_EQ(names, (std::vector<std::string>{"real.json"}));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsDriveQualifiedAndAlternateDataStreamNames) {
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("C:evil.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("D:x.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("preset.json:hidden.json"));
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("name:stream.json"));
+}
+
+TEST(PresetPathTest, DriveQualifiedFilenameEscapesPresetsDirectorySoValidationMustRejectIt) {
+    const std::filesystem::path presets_dir("C:\\apps\\aviz\\presets");
+    const std::filesystem::path joined(preset_file_io::preset_path(presets_dir.string(), "D:evil.json"));
+    EXPECT_NE(joined.parent_path(), presets_dir);
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("D:evil.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsCharactersWindowsDoesNotAllowInFilenames) {
+    for (const char* name : {"a<b.json", "a>b.json", "a\"b.json", "a|b.json", "a?b.json", "a*b.json"}) {
+        EXPECT_FALSE(preset_file_io::is_safe_preset_filename(name)) << name;
+    }
+    EXPECT_FALSE(preset_file_io::is_safe_preset_filename("bad\x7Fname.json"));
+}
+
+TEST(IsSafePresetFilenameTest, RejectsWindowsReservedDeviceNamesInAnyCase) {
+    for (const char* name : {"NUL.json", "nul.json", "CON.json", "con.json", "PRN.json", "AUX.json", "COM1.json",
+                             "com9.json", "LPT1.json", "lpt9.json", "nul.tar.json", "aux .json"}) {
+        EXPECT_FALSE(preset_file_io::is_safe_preset_filename(name)) << name;
+    }
+}
+
+TEST(IsSafePresetFilenameTest, AcceptsOrdinaryNamesThatOnlyResembleReservedOnes) {
+    for (const char* name : {"console.json", "nulls.json", "com10.json", "lpt.json", "my preset (v2).json",
+                             "auxiliary-mix.json", "a.b.c.json"}) {
+        EXPECT_TRUE(preset_file_io::is_safe_preset_filename(name)) << name;
+    }
 }

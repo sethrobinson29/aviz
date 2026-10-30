@@ -145,6 +145,7 @@ add_executable(aviz
   src/ui_host/panel_message.cpp
   src/ui_host/panel_dispatch_queue.cpp
   src/ui_host/panel_message_apply.cpp
+  src/ui_host/panel_navigation_policy.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT nlohmann_json::nlohmann_json)

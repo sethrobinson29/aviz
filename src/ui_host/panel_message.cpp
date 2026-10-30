@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cctype>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -9,7 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "audio/audio_config.h"
-#include "audio/audio_file_validation.h"
+#include "compositor/layer_preset.h"
 #include "compositor/preset_file_io.h"
 #include "visuals/number_clamp.h"
 
@@ -123,14 +124,6 @@ std::string require_param_name(const nlohmann::json& j) {
     return name;
 }
 
-std::string require_audio_file_path(const nlohmann::json& j) {
-    const std::string path = require_string(j, "path");
-    if (!audio_file_validation::is_plausible_audio_file_path(path)) {
-        throw std::invalid_argument("path is not a plausible audio file path");
-    }
-    return path;
-}
-
 std::optional<std::size_t> parse_freq_band(const nlohmann::json& j) {
     const nlohmann::json& field = j.at("freq_band");
     if (field.is_null()) {
@@ -144,6 +137,14 @@ std::optional<std::size_t> parse_freq_band(const nlohmann::json& j) {
         throw std::invalid_argument("freq_band out of range");
     }
     return static_cast<std::size_t>(band);
+}
+
+std::shared_ptr<const Palette> parse_palette_override(const nlohmann::json& j) {
+    const nlohmann::json& field = j.at("palette_override");
+    if (field.is_null()) {
+        return nullptr;
+    }
+    return std::make_shared<const Palette>(layer_preset::palette_from_json(field));
 }
 
 PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
@@ -183,6 +184,9 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     if (type == "set_sensitivity") {
         return SetLayerSensitivityMessage{require_layer_id(doc), require_float(doc, "sensitivity")};
     }
+    if (type == "set_palette_override") {
+        return SetPaletteOverrideMessage{require_layer_id(doc), parse_palette_override(doc)};
+    }
     if (type == "set_visual_param") {
         return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc),
                                      require_visual_param_value(doc)};
@@ -201,9 +205,6 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     }
     if (type == "switch_source") {
         return SwitchSourceMessage{};
-    }
-    if (type == "import_file") {
-        return ImportFileMessage{require_audio_file_path(doc)};
     }
     if (type == "enable_loopback") {
         return EnableLoopbackMessage{};

@@ -81,6 +81,16 @@ float advance_hue_phase(float phase01, float cycle_speed_hz, float dt_seconds) {
     return raw - std::floor(raw);
 }
 
+float clamp_amplitude_smoothing_tau_ms(double tau_ms) {
+    return number_math::clamp_number_to_range<float>(tau_ms, visual_config::kFractalAmplitudeSmoothingTauMsMin,
+                                                      visual_config::kFractalAmplitudeSmoothingTauMsMax);
+}
+
+float clamp_boundary_margin_px(double margin_px) {
+    return number_math::clamp_number_to_range<float>(margin_px, visual_config::kFractalBoundaryMarginPxMin,
+                                                      visual_config::kFractalBoundaryMarginPxMax);
+}
+
 float clamp_base_zoom(double zoom) {
     return number_math::clamp_number_to_range<float>(zoom, visual_config::kFractalBaseZoomMin,
                                                       visual_config::kFractalBaseZoomMax);

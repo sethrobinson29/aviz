@@ -21,11 +21,11 @@ Vector2 field_direction(float x, float y, float turbulence_frequency, float time
 
 Vector2 random_canvas_position(float width, float height, std::mt19937& rng);
 
-float clamp_spawn_rate_per_frame(float rate);
+float clamp_spawn_rate_per_frame(double rate);
 
-float clamp_turbulence_frequency(float frequency);
+float clamp_turbulence_frequency(double frequency);
 
-float clamp_evolution_per_frame(float evolution);
+float clamp_evolution_per_frame(double evolution);
 
 int clamp_grid_cols(int cols);
 

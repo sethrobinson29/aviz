@@ -20,9 +20,12 @@
 #include "audio/ring_buffer.h"
 #include "compositor/compositor.h"
 #include "compositor/compositor_math.h"
+#include "compositor/layer_preset.h"
+#include "compositor/palette_test_fixtures.h"
 #include "compositor/preset_file_io.h"
 #include "ui_host/fake_ui_host.h"
 #include "ui_host/panel_apply_test_fixture.h"
+#include "ui_host/panel_dispatch_queue.h"
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
@@ -45,6 +48,35 @@ nlohmann::json sent_of_kind(const FakeUIHost& ui_host, const std::string& kind) 
     }
     ADD_FAILURE() << "no message of kind \"" << kind << "\" was sent";
     return nlohmann::json{};
+}
+
+nlohmann::json color_wire_json(const Color& c) {
+    return nlohmann::json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
+}
+
+nlohmann::json palette_wire_json(const std::optional<Palette>& palette) {
+    if (!palette.has_value()) {
+        return nullptr;
+    }
+    nlohmann::json stops = nlohmann::json::array();
+    for (const PaletteStop& stop : palette->stops) {
+        stops.push_back(nlohmann::json{{"position", stop.position}, {"color", color_wire_json(stop.color)}});
+    }
+    return nlohmann::json{{"stops", stops}};
+}
+
+PanelMessage set_palette_message(std::uint64_t layer_id, const std::optional<Palette>& palette) {
+    nlohmann::json doc{{"type", "set_palette_override"},
+                       {"layer_id", layer_id},
+                       {"palette_override", palette_wire_json(palette)}};
+    std::optional<PanelMessage> message = panel_message::parse(doc.dump());
+    EXPECT_TRUE(message.has_value());
+    return message.value_or(PanelMessage{RequestStateMessage{}});
+}
+
+std::optional<Palette> pushed_palette_override(const nlohmann::json& pushed_layer) {
+    const nlohmann::json& field = pushed_layer.at("palette_override");
+    return field.is_null() ? std::nullopt : std::optional<Palette>(layer_preset::palette_from_json(field));
 }
 
 class PanelMessageApplyTest : public PanelApplyTestFixture {};
@@ -415,18 +447,115 @@ TEST_F(PanelMessageApplyImportFileTest, ImportFileOnMissingFileSendsFailureStatu
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
 }
 
+TEST_F(PanelMessageApplyTest, SetPaletteOverrideSetsLayerAndPushesItToThePanel) {
+    compositor_.add_layer(VisualType::Waveform);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(set_palette_message(id, palette_fixtures::sunset()));
+
+    palette_fixtures::expect_same_stops(compositor_.layers()[0].palette_override, palette_fixtures::sunset());
+    nlohmann::json state = last_sent(ui_host_);
+    EXPECT_EQ(state["kind"], "layer_stack");
+    palette_fixtures::expect_same_stops(pushed_palette_override(state["state"]["layers"][0]),
+                                        palette_fixtures::sunset());
+}
+
+TEST_F(PanelMessageApplyTest, SetPaletteOverrideNullClearsAndPushesNullToThePanel) {
+    compositor_.add_layer(VisualType::Waveform);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    compositor_.layers()[0].palette_override = palette_fixtures::warm_cool();
+
+    apply(set_palette_message(id, std::nullopt));
+
+    EXPECT_FALSE(compositor_.layers()[0].palette_override.has_value());
+    EXPECT_TRUE(last_sent(ui_host_)["state"]["layers"][0]["palette_override"].is_null());
+}
+
+TEST_F(PanelMessageApplyTest, SetPaletteOverrideOnlyChangesTheTargetLayer) {
+    compositor_.add_layer(VisualType::Waveform);
+    compositor_.add_layer(VisualType::Spectrum);
+    std::uint64_t second_id = compositor_.layers()[1].layer_id;
+
+    apply(set_palette_message(second_id, palette_fixtures::warm_cool()));
+
+    EXPECT_FALSE(compositor_.layers()[0].palette_override.has_value());
+    EXPECT_TRUE(compositor_.layers()[1].palette_override.has_value());
+}
+
+TEST_F(PanelMessageApplyTest, SetPaletteOverrideUnknownLayerChangesNothingButStillPushesState) {
+    compositor_.add_layer(VisualType::Waveform);
+
+    apply(set_palette_message(9999, palette_fixtures::warm_cool()));
+
+    EXPECT_FALSE(compositor_.layers()[0].palette_override.has_value());
+    EXPECT_EQ(last_sent(ui_host_)["kind"], "layer_stack");
+}
+
+TEST_F(PanelMessageApplyTest, SetPaletteOverrideLeavesStoredTintUntouched) {
+    compositor_.add_layer(VisualType::Waveform);
+    compositor_math::reassign_layer_tints(compositor_.layers());
+    const Color tint_before = compositor_.layers()[0].tint_color;
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+
+    apply(set_palette_message(id, palette_fixtures::sunset()));
+    apply(set_palette_message(id, std::nullopt));
+
+    EXPECT_EQ(compositor_.layers()[0].tint_color.r, tint_before.r);
+    EXPECT_EQ(compositor_.layers()[0].tint_color.g, tint_before.g);
+    EXPECT_EQ(compositor_.layers()[0].tint_color.b, tint_before.b);
+}
+
+TEST_F(PanelMessageApplyTest, DuplicateLayerKeepsPaletteOverrideSetThroughThePanel) {
+    compositor_.add_layer(VisualType::Waveform);
+    std::uint64_t id = compositor_.layers()[0].layer_id;
+    apply(set_palette_message(id, palette_fixtures::fractional_position_odd_alpha()));
+
+    apply(PanelMessage{DuplicateLayerMessage{id}});
+
+    ASSERT_EQ(compositor_.layers().size(), 2u);
+    palette_fixtures::expect_same_stops(compositor_.layers()[1].palette_override,
+                                        palette_fixtures::fractional_position_odd_alpha());
+}
+
 class PanelMessageApplyPresetTest : public PanelMessageApplyTest {
 protected:
-    void SetUp() override { std::filesystem::remove_all(preset_file_io::kPresetsDirectoryName); }
-    void TearDown() override { std::filesystem::remove_all(preset_file_io::kPresetsDirectoryName); }
+    void SetUp() override { std::filesystem::remove_all(presets_dir_); }
+    void TearDown() override { std::filesystem::remove_all(presets_dir_); }
 };
+
+TEST_F(PanelMessageApplyPresetTest, PaletteOverridesSetThroughPanelSurviveSaveAndLoadStopForStop) {
+    const std::vector<std::optional<Palette>> palettes = palette_fixtures::all_cases();
+    std::vector<std::uint64_t> ids;
+    for (std::size_t i = 0; i < palettes.size(); ++i) {
+        compositor_.add_layer(VisualType::Spectrum);
+        ids.push_back(compositor_.layers()[i].layer_id);
+        apply(set_palette_message(ids[i], palettes[i]));
+    }
+    apply(PanelMessage{SavePresetMessage{"palette-round-trip.json"}});
+    ASSERT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
+
+    for (std::size_t i = 0; i < palettes.size(); ++i) {
+        apply(set_palette_message(ids[i], palettes[(i + 1) % palettes.size()]));
+    }
+    apply(PanelMessage{LoadPresetMessage{"palette-round-trip.json"}});
+
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
+    ASSERT_EQ(compositor_.layers().size(), palettes.size());
+    nlohmann::json pushed_layers = last_sent(ui_host_)["state"]["layers"];
+    for (std::size_t i = 0; i < palettes.size(); ++i) {
+        SCOPED_TRACE(i);
+        EXPECT_EQ(compositor_.layers()[i].layer_id, ids[i]);
+        palette_fixtures::expect_same_stops(compositor_.layers()[i].palette_override, palettes[i]);
+        palette_fixtures::expect_same_stops(pushed_palette_override(pushed_layers[i]), palettes[i]);
+    }
+}
 
 TEST_F(PanelMessageApplyPresetTest, SavePresetWritesFileAndSendsSuccessStatus) {
     compositor_.add_layer(VisualType::Waveform);
 
     apply(PanelMessage{SavePresetMessage{"apply-test.json"}});
 
-    EXPECT_TRUE(std::filesystem::exists(preset_file_io::preset_path("apply-test.json")));
+    EXPECT_TRUE(std::filesystem::exists(preset_file_io::preset_path(presets_dir_, "apply-test.json")));
     nlohmann::json status = sent_of_kind(ui_host_, "status");
     EXPECT_EQ(status["ok"], true);
     nlohmann::json preset_list = sent_of_kind(ui_host_, "preset_list");
@@ -444,7 +573,7 @@ TEST_F(PanelMessageApplyPresetTest, LoadPresetReplacesLayerStackAndSendsSuccessS
     AudioSourceController writer_audio_source(writer_producer_host);
     WindowLayoutController writer_window_layout(writer, writer_host);
     panel_message_apply::PanelApplyContext writer_ctx{writer, writer_host, writer_window_layout,
-                                                        writer_audio_source};
+                                                        writer_audio_source, presets_dir_};
     panel_message_apply::apply(PanelMessage{SavePresetMessage{"apply-load-test.json"}}, writer_ctx);
 
     compositor_.add_layer(VisualType::Waveform);
@@ -468,7 +597,7 @@ TEST_F(PanelMessageApplyPresetTest, LoadPresetOnMissingFileSendsFailureStatusAnd
 }
 
 TEST_F(PanelMessageApplyPresetTest, LoadPresetOnMalformedFileSendsFailureStatusAndLeavesStackUnchanged) {
-    preset_file_io::write_file(preset_file_io::preset_path("malformed.json"), "{ not valid json");
+    preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "malformed.json"), "{ not valid json");
     compositor_.add_layer(VisualType::Waveform);
 
     apply(PanelMessage{LoadPresetMessage{"malformed.json"}});
@@ -635,4 +764,65 @@ TEST_F(PanelMessageApplyTest, FractalParamsFromPanelJsonAreAppliedClampedAndPush
     apply(*wrong_type);
     EXPECT_FALSE(fractal.params().julia_orbit_clockwise);
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyImportFileTest, NativeFileDialogImportReachesTheAudioSourceThroughTheDispatchQueue) {
+    PanelDispatchQueue queue;
+    queue.push(PanelMessage{ImportFileMessage{wav_path_.string()}});
+
+    for (const PanelMessage& message : queue.drain()) {
+        apply(message);
+    }
+
+    EXPECT_EQ(audio_source_.kind(), AudioSourceKind::File);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
+    EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["source"], "file");
+}
+
+TEST_F(PanelMessageApplyImportFileTest, ImportFileJsonFromThePanelChannelNeverReachesTheAudioSource) {
+    nlohmann::json text{{"type", "import_file"}, {"path", wav_path_.string()}};
+    PanelDispatchQueue queue;
+
+    std::optional<PanelMessage> parsed = panel_message::parse(text.dump());
+    if (parsed.has_value()) {
+        queue.push(*parsed);
+    }
+    for (const PanelMessage& message : queue.drain()) {
+        apply(message);
+    }
+
+    EXPECT_FALSE(parsed.has_value());
+    EXPECT_EQ(audio_source_.kind(), AudioSourceKind::None);
+    EXPECT_TRUE(ui_host_.sent_messages.empty());
+}
+
+TEST_F(PanelMessageApplyPresetTest, SaveListAndLoadUseThePresetsDirectoryNotTheWorkingDirectory) {
+    const std::filesystem::path original_working_dir = std::filesystem::current_path();
+    const std::filesystem::path unrelated_working_dir =
+        std::filesystem::temp_directory_path() / "aviz_panel_apply_unrelated_working_dir";
+    std::filesystem::remove_all(unrelated_working_dir);
+    std::filesystem::create_directories(unrelated_working_dir);
+    std::filesystem::current_path(unrelated_working_dir);
+
+    compositor_.add_layer(VisualType::Spectrum);
+    apply(PanelMessage{SavePresetMessage{"cwd-test.json"}});
+    const bool saved_in_presets_dir = std::filesystem::exists(std::filesystem::path(presets_dir_) / "cwd-test.json");
+    const bool saved_under_working_dir = std::filesystem::exists(
+        unrelated_working_dir / preset_file_io::kPresetsDirectoryName / "cwd-test.json");
+    const nlohmann::json preset_list = sent_of_kind(ui_host_, "preset_list");
+    compositor_.remove_layer(0);
+    ui_host_.sent_messages.clear();
+    apply(PanelMessage{LoadPresetMessage{"cwd-test.json"}});
+    const nlohmann::json load_status = sent_of_kind(ui_host_, "status");
+
+    std::filesystem::current_path(original_working_dir);
+    std::filesystem::remove_all(unrelated_working_dir);
+
+    EXPECT_TRUE(saved_in_presets_dir);
+    EXPECT_FALSE(saved_under_working_dir);
+    EXPECT_NE(std::find(preset_list["files"].begin(), preset_list["files"].end(), "cwd-test.json"),
+              preset_list["files"].end());
+    EXPECT_EQ(load_status["ok"], true);
+    ASSERT_EQ(compositor_.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Spectrum);
 }

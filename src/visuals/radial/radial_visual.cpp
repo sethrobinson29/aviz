@@ -6,6 +6,7 @@
 #include "audio/audio_config.h"
 #include "visuals/number_clamp.h"
 #include "visuals/spectrum/spectrum_visual.h"
+#include "visuals/visual_config.h"
 
 namespace radial_math {
 
@@ -41,6 +42,11 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
                     center.y + (inner_radius + length) * sin_a}});
     }
     return segments;
+}
+
+float clamp_thickness(double thickness) {
+    return number_math::clamp_number_to_range<float>(thickness, visual_config::kRadialThicknessPxMin,
+                                                      visual_config::kRadialThicknessPxMax);
 }
 
 float clamp_inner_radius_fraction(double inner, float outer) {

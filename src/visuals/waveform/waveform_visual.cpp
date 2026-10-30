@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace waveform_math {
@@ -32,6 +33,11 @@ float band_amplitude_scale(float energy, float reference) {
         return 0.0f;
     }
     return std::clamp(energy / reference, 0.0f, 1.0f);
+}
+
+float clamp_line_thickness(double thickness) {
+    return number_math::clamp_number_to_range<float>(thickness, visual_config::kLineThicknessPxMin,
+                                                      visual_config::kLineThicknessPxMax);
 }
 
 float pulse_thickness(float base_thickness, float pulse) {

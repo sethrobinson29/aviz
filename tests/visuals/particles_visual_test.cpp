@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "audio/audio_config.h"
+#include "visuals/visual_config.h"
 
 namespace {
 constexpr float kEpsilon = 1e-3f;
@@ -350,4 +351,36 @@ TEST(ParticlesClampInnerRadiusFractionTest, NonFiniteAndExtremeValuesClampInstea
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-1e300), 0.0f);
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(infinity), 1.0f);
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1e300), 1.0f);
+}
+
+TEST(ParticlesClampTest, RadiusClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kParticleRadiusPxMin;
+    const float max = visual_config::kParticleRadiusPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(particles_math::clamp_radius(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_radius(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_radius(high), max) << high;
+    }
+}
+
+TEST(ParticlesClampTest, SpawnRateClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kParticlesSpawnRatePerFrameMin;
+    const float max = visual_config::kParticlesSpawnRatePerFrameMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(high), max) << high;
+    }
 }

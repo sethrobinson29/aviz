@@ -24,10 +24,10 @@ void push_layer_stack(Compositor& compositor, UIHost& ui_host) {
     ui_host.send_to_panel(msg.dump());
 }
 
-void push_preset_list(UIHost& ui_host) {
+void push_preset_list(UIHost& ui_host, const std::string& presets_dir) {
     nlohmann::json msg;
     msg["kind"] = "preset_list";
-    msg["files"] = preset_file_io::list_preset_files();
+    msg["files"] = preset_file_io::list_preset_files(presets_dir);
     ui_host.send_to_panel(msg.dump());
 }
 
@@ -39,13 +39,13 @@ void push_status(UIHost& ui_host, bool ok, const std::string& text) {
     ui_host.send_to_panel(msg.dump());
 }
 
-void push_full_state(Compositor& compositor, UIHost& ui_host) {
-    push_layer_stack(compositor, ui_host);
-    push_preset_list(ui_host);
+void push_full_state(PanelApplyContext& ctx) {
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+    push_preset_list(ctx.ui_host, ctx.presets_dir);
 }
 
 void apply_one(const RequestStateMessage&, PanelApplyContext& ctx) {
-    push_full_state(ctx.compositor, ctx.ui_host);
+    push_full_state(ctx);
     push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
 }
 
@@ -135,6 +135,15 @@ void apply_one(const SetLayerSensitivityMessage& msg, PanelApplyContext& ctx) {
     push_layer_stack(ctx.compositor, ctx.ui_host);
 }
 
+void apply_one(const SetPaletteOverrideMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].palette_override =
+            msg.palette_override ? std::optional<Palette>(*msg.palette_override) : std::nullopt;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
 void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
     std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
     if (index.has_value()) {
@@ -148,7 +157,7 @@ void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
 }
 
 void apply_one(const LoadPresetMessage& msg, PanelApplyContext& ctx) {
-    const std::string path = preset_file_io::preset_path(msg.filename);
+    const std::string path = preset_file_io::preset_path(ctx.presets_dir, msg.filename);
     preset_file_io::ReadResult read_result = preset_file_io::read_file(path);
     if (!read_result.success) {
         push_status(ctx.ui_host, false, "failed loading preset from " + msg.filename + ": " + read_result.error);
@@ -175,7 +184,7 @@ void apply_one(const LoadPresetMessage& msg, PanelApplyContext& ctx) {
 }
 
 void apply_one(const SavePresetMessage& msg, PanelApplyContext& ctx) {
-    const std::string path = preset_file_io::preset_path(msg.filename);
+    const std::string path = preset_file_io::preset_path(ctx.presets_dir, msg.filename);
     const std::string json_text = layer_preset::serialize(ctx.compositor.layers());
     preset_file_io::WriteResult result = preset_file_io::write_file(path, json_text);
     if (result.success) {
@@ -184,7 +193,7 @@ void apply_one(const SavePresetMessage& msg, PanelApplyContext& ctx) {
     } else {
         push_status(ctx.ui_host, false, "failed saving preset to " + msg.filename + ": " + result.error);
     }
-    push_full_state(ctx.compositor, ctx.ui_host);
+    push_full_state(ctx);
 }
 
 void apply_one(const SetDockedMessage& msg, PanelApplyContext& ctx) {

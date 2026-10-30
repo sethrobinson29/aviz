@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include "compositor/palette_test_fixtures.h"
+
 namespace {
 
 template <typename T>
@@ -196,6 +198,87 @@ TEST(PanelMessageParseTest, ParsesSetSensitivity) {
     EXPECT_FLOAT_EQ(typed.sensitivity, 2.5f);
 }
 
+TEST(PanelMessageParseTest, ParsesSetPaletteOverrideWithStops) {
+    auto message = panel_message::parse(
+        R"({"type":"set_palette_override","layer_id":7,"palette_override":{"stops":[)"
+        R"({"position":0,"color":{"r":255,"g":220,"b":0,"a":255}},)"
+        R"({"position":0.5,"color":{"r":255,"g":80,"b":0,"a":255}},)"
+        R"({"position":1,"color":{"r":120,"g":0,"b":200,"a":255}}]}})");
+
+    auto parsed = expect_type<SetPaletteOverrideMessage>(message);
+
+    EXPECT_EQ(parsed.layer_id, 7u);
+    ASSERT_NE(parsed.palette_override, nullptr);
+    palette_fixtures::expect_same_stops(*parsed.palette_override, palette_fixtures::sunset());
+}
+
+TEST(PanelMessageParseTest, ParsesSetPaletteOverrideWithNullAsClear) {
+    auto message = panel_message::parse(R"({"type":"set_palette_override","layer_id":7,"palette_override":null})");
+
+    auto parsed = expect_type<SetPaletteOverrideMessage>(message);
+
+    EXPECT_EQ(parsed.layer_id, 7u);
+    EXPECT_EQ(parsed.palette_override, nullptr);
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideClampsStopPositionsLikePresetLoad) {
+    auto message = panel_message::parse(
+        R"({"type":"set_palette_override","layer_id":1,"palette_override":{"stops":[)"
+        R"({"position":-5,"color":{"r":1,"g":2,"b":3,"a":4}},)"
+        R"({"position":1e300,"color":{"r":5,"g":6,"b":7,"a":8}}]}})");
+
+    auto parsed = expect_type<SetPaletteOverrideMessage>(message);
+
+    ASSERT_NE(parsed.palette_override, nullptr);
+    EXPECT_FLOAT_EQ(parsed.palette_override->stops[0].position, 0.0f);
+    EXPECT_FLOAT_EQ(parsed.palette_override->stops[1].position, 1.0f);
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsMissingField) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_palette_override","layer_id":1})").has_value());
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsMissingOrInvalidLayerId) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_palette_override","palette_override":null})").has_value());
+    EXPECT_FALSE(
+        panel_message::parse(R"({"type":"set_palette_override","layer_id":-1,"palette_override":null})").has_value());
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsNonObjectAndMissingStops) {
+    for (const char* value : {R"("Sunset")", "1", "true", "[]", "{}", R"({"stops":"nope"})"}) {
+        const std::string text =
+            std::string(R"({"type":"set_palette_override","layer_id":1,"palette_override":)") + value + "}";
+        EXPECT_FALSE(panel_message::parse(text).has_value()) << value;
+    }
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsEmptyStops) {
+    EXPECT_FALSE(
+        panel_message::parse(R"({"type":"set_palette_override","layer_id":1,"palette_override":{"stops":[]}})")
+            .has_value());
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsDescendingStops) {
+    EXPECT_FALSE(panel_message::parse(
+                     R"({"type":"set_palette_override","layer_id":1,"palette_override":{"stops":[)"
+                     R"({"position":0.8,"color":{"r":1,"g":2,"b":3,"a":4}},)"
+                     R"({"position":0.2,"color":{"r":5,"g":6,"b":7,"a":8}}]}})")
+                     .has_value());
+}
+
+TEST(PanelMessageParseTest, SetPaletteOverrideRejectsMalformedStops) {
+    for (const char* stop : {"1", R"({"position":0})", R"({"color":{"r":1,"g":2,"b":3,"a":4}})",
+                             R"({"position":"0","color":{"r":1,"g":2,"b":3,"a":4}})",
+                             R"({"position":0,"color":"red"})", R"({"position":0,"color":{"r":1,"g":2,"b":3}})",
+                             R"({"position":0,"color":{"r":256,"g":2,"b":3,"a":4}})",
+                             R"({"position":0,"color":{"r":-1,"g":2,"b":3,"a":4}})"}) {
+        const std::string text =
+            std::string(R"({"type":"set_palette_override","layer_id":1,"palette_override":{"stops":[)") + stop +
+            "]}}";
+        EXPECT_FALSE(panel_message::parse(text).has_value()) << stop;
+    }
+}
+
 TEST(PanelMessageParseTest, ParsesSetVisualParam) {
     auto message =
         panel_message::parse(R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame","value":5.0})");
@@ -348,31 +431,20 @@ TEST(PanelMessageParseTest, SwitchSourceIgnoresExtraFields) {
     expect_type<SwitchSourceMessage>(message);
 }
 
-TEST(PanelMessageParseTest, ParsesImportFile) {
-    auto message = panel_message::parse(R"({"type":"import_file","path":"C:\\music\\track.wav"})");
-    ImportFileMessage typed = expect_type<ImportFileMessage>(message);
-    EXPECT_EQ(typed.path, "C:\\music\\track.wav");
-}
-
-TEST(PanelMessageParseTest, ImportFileAcceptsMp3AndFlacExtensions) {
-    expect_type<ImportFileMessage>(panel_message::parse(R"({"type":"import_file","path":"track.mp3"})"));
-    expect_type<ImportFileMessage>(panel_message::parse(R"({"type":"import_file","path":"track.flac"})"));
-}
-
-TEST(PanelMessageParseTest, ImportFileRejectsUnsupportedExtension) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":"track.exe"})").has_value());
-}
-
-TEST(PanelMessageParseTest, ImportFileRejectsEmptyPath) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":""})").has_value());
-}
-
-TEST(PanelMessageParseTest, ImportFileRejectsMissingPath) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file"})").has_value());
-}
-
-TEST(PanelMessageParseTest, ImportFileRejectsNonStringPath) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"import_file","path":123})").has_value());
+TEST(PanelMessageParseTest, ImportFileIsNotAcceptedFromThePanelMessageChannel) {
+    for (const char* text : {
+             R"({"type":"import_file","path":"C:\\music\\track.wav"})",
+             R"({"type":"import_file","path":"track.wav"})",
+             R"({"type":"import_file","path":"track.mp3"})",
+             R"({"type":"import_file","path":"track.flac"})",
+             R"({"type":"import_file","path":"C:\\Users\\someone\\private.wav"})",
+             R"({"type":"import_file","path":"track.exe"})",
+             R"({"type":"import_file","path":""})",
+             R"({"type":"import_file","path":123})",
+             R"({"type":"import_file"})",
+         }) {
+        EXPECT_FALSE(panel_message::parse(text).has_value()) << text;
+    }
 }
 
 TEST(PanelMessageParseTest, ParsesEnableLoopback) {
@@ -404,4 +476,14 @@ TEST(PanelMessageParseTest, VisualParamValueBeyondFloatRangeParsesToAFiniteFloat
         R"({"type":"set_visual_param","layer_id":1,"param_name":"spawn_rate_per_frame","value":-1e300})");
     EXPECT_EQ(std::get<float>(expect_type<SetVisualParamMessage>(low).value),
               std::numeric_limits<float>::lowest());
+}
+
+TEST(PanelMessageParseTest, RejectsPresetFilenamesThatWouldEscapeThePresetsDirectoryOnWindows) {
+    for (const char* type : {"save_preset", "load_preset"}) {
+        for (const char* filename : {"C:evil.json", "name:stream.json", "NUL.json", "a*b.json"}) {
+            const std::string text =
+                std::string(R"({"type":")") + type + R"(","filename":")" + filename + R"("})";
+            EXPECT_FALSE(panel_message::parse(text).has_value()) << text;
+        }
+    }
 }

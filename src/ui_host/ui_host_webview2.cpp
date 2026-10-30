@@ -11,7 +11,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdio>
-#include <cwchar>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -23,6 +22,7 @@
 
 #include "ui_host/panel_dispatch_queue.h"
 #include "ui_host/panel_message.h"
+#include "ui_host/panel_navigation_policy.h"
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
@@ -30,9 +30,11 @@ using Microsoft::WRL::ComPtr;
 namespace {
 
 constexpr wchar_t kWindowClassName[] = L"AvizControlPanel";
-constexpr wchar_t kVirtualHostName[] = L"aviz.local";
-constexpr wchar_t kStartPage[] = L"https://aviz.local/index.html";
-constexpr wchar_t kTrustedPrefix[] = L"https://aviz.local/";
+constexpr int kBlockedResourceStatusCode = 403;
+
+#ifdef NDEBUG
+constexpr wchar_t kAdditionalBrowserArgumentsVariable[] = L"WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
+#endif
 
 constexpr UINT kMsgShowPanel = WM_APP + 1;
 constexpr UINT kMsgHidePanel = WM_APP + 2;
@@ -76,7 +78,19 @@ bool is_trusted_uri(const wchar_t* uri) {
     if (uri == nullptr) {
         return false;
     }
-    return std::wcsncmp(uri, kTrustedPrefix, std::wcslen(kTrustedPrefix)) == 0;
+    return panel_navigation_policy::is_trusted_uri(uri);
+}
+
+template <typename NavigationArgs>
+void cancel_navigation_unless_trusted(NavigationArgs* args) {
+    LPWSTR uri = nullptr;
+    const bool trusted = SUCCEEDED(args->get_Uri(&uri)) && is_trusted_uri(uri);
+    if (uri != nullptr) {
+        CoTaskMemFree(uri);
+    }
+    if (!trusted) {
+        args->put_Cancel(TRUE);
+    }
 }
 
 bool is_open_file_dialog_request(const std::string& json_text) {
@@ -239,6 +253,9 @@ private:
                 environment_->CreateCoreWebView2Controller(hwnd, ctrl_completed.Get());
                 return S_OK;
             });
+#ifdef NDEBUG
+        SetEnvironmentVariableW(kAdditionalBrowserArgumentsVariable, nullptr);
+#endif
         HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr, env_completed.Get());
         if (FAILED(hr)) {
             std::fprintf(stderr, "ui_host: CreateCoreWebView2EnvironmentWithOptions failed (hr=0x%08lx)\n",
@@ -273,19 +290,55 @@ private:
                          "content not loaded\n");
             return;
         }
-        webview3->SetVirtualHostNameToFolderMapping(kVirtualHostName, content_dir_w.c_str(),
+        webview3->SetVirtualHostNameToFolderMapping(panel_navigation_policy::kVirtualHostName,
+                                                      content_dir_w.c_str(),
                                                       COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW);
 
         EventRegistrationToken token;
         webview_->add_NavigationStarting(
             Callback<ICoreWebView2NavigationStartingEventHandler>(
                 [](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+                    cancel_navigation_unless_trusted(args);
+                    return S_OK;
+                })
+                .Get(),
+            &token);
+
+        webview_->add_FrameNavigationStarting(
+            Callback<ICoreWebView2NavigationStartingEventHandler>(
+                [](ICoreWebView2*, ICoreWebView2NavigationStartingEventArgs* args) -> HRESULT {
+                    cancel_navigation_unless_trusted(args);
+                    return S_OK;
+                })
+                .Get(),
+            &token);
+
+        webview_->add_NewWindowRequested(
+            Callback<ICoreWebView2NewWindowRequestedEventHandler>(
+                [](ICoreWebView2*, ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
+                    args->put_Handled(TRUE);
+                    return S_OK;
+                })
+                .Get(),
+            &token);
+
+        webview_->AddWebResourceRequestedFilter(L"*", COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+        webview_->add_WebResourceRequested(
+            Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+                [this](ICoreWebView2*, ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+                    ComPtr<ICoreWebView2WebResourceRequest> request;
                     LPWSTR uri = nullptr;
-                    if (SUCCEEDED(args->get_Uri(&uri)) && uri != nullptr) {
-                        if (!is_trusted_uri(uri)) {
-                            args->put_Cancel(TRUE);
-                        }
+                    const bool trusted = SUCCEEDED(args->get_Request(&request)) && request &&
+                                         SUCCEEDED(request->get_Uri(&uri)) && is_trusted_uri(uri);
+                    if (uri != nullptr) {
                         CoTaskMemFree(uri);
+                    }
+                    if (!trusted) {
+                        ComPtr<ICoreWebView2WebResourceResponse> blocked;
+                        if (SUCCEEDED(environment_->CreateWebResourceResponse(
+                                nullptr, kBlockedResourceStatusCode, L"Blocked", L"", &blocked))) {
+                            args->put_Response(blocked.Get());
+                        }
                     }
                     return S_OK;
                 })
@@ -317,7 +370,7 @@ private:
                 .Get(),
             &token);
 
-        webview_->Navigate(kStartPage);
+        webview_->Navigate(panel_navigation_policy::kStartPage);
     }
 
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {

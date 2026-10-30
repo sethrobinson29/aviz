@@ -5,6 +5,7 @@
 #include <random>
 
 #include <gtest/gtest.h>
+#include "visuals/visual_config.h"
 
 namespace {
 float length(Vector2 v) { return std::sqrt(v.x * v.x + v.y * v.y); }
@@ -260,4 +261,52 @@ TEST(RippleImpulseTest, ZeroFarOutsideRing) {
                                                         10.0f, 4.0f);
     EXPECT_FLOAT_EQ(impulse.x, 0.0f);
     EXPECT_FLOAT_EQ(impulse.y, 0.0f);
+}
+
+TEST(FlowFieldClampTest, SpawnRateClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kFlowFieldSpawnRatePerFrameMin;
+    const float max = visual_config::kFlowFieldSpawnRatePerFrameMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(flow_field_math::clamp_spawn_rate_per_frame(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_spawn_rate_per_frame(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_spawn_rate_per_frame(high), max) << high;
+    }
+}
+
+TEST(FlowFieldClampTest, TurbulenceFrequencyClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kFlowFieldTurbulenceFrequencyMin;
+    const float max = visual_config::kFlowFieldTurbulenceFrequencyMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(flow_field_math::clamp_turbulence_frequency(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_turbulence_frequency(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_turbulence_frequency(high), max) << high;
+    }
+}
+
+TEST(FlowFieldClampTest, EvolutionPerFrameClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kFlowFieldEvolutionPerFrameMin;
+    const float max = visual_config::kFlowFieldEvolutionPerFrameMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(flow_field_math::clamp_evolution_per_frame(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_evolution_per_frame(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(flow_field_math::clamp_evolution_per_frame(high), max) << high;
+    }
 }

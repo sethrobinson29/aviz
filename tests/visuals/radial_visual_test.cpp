@@ -5,6 +5,7 @@
 #include <limits>
 
 #include <gtest/gtest.h>
+#include "visuals/visual_config.h"
 
 namespace {
 constexpr float kEpsilon = 1e-3f;
@@ -202,4 +203,20 @@ TEST(RadialClampRadiusFractionTest, FullyStretchedAndFullyCollapsedPairsBothKeep
     EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(1.0, 0.0f), 1.0f);
     EXPECT_FLOAT_EQ(radial_math::clamp_inner_radius_fraction(1.0, 1.0f), 1.0f - radial_math::kMinRadiusGapFraction);
     EXPECT_FLOAT_EQ(radial_math::clamp_max_radius_fraction(0.0, 0.0f), radial_math::kMinRadiusGapFraction);
+}
+
+TEST(RadialClampTest, ThicknessClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kRadialThicknessPxMin;
+    const float max = visual_config::kRadialThicknessPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(radial_math::clamp_thickness(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(radial_math::clamp_thickness(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(radial_math::clamp_thickness(high), max) << high;
+    }
 }

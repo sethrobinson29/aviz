@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace spectrum_math {
@@ -32,6 +33,16 @@ std::vector<Rectangle> to_bars(const float* band_energy, const float* band_refer
         bars.push_back(Rectangle{x, y, bar_width, bar_height});
     }
     return bars;
+}
+
+float clamp_gap_ratio(double gap_ratio) {
+    return number_math::clamp_number_to_range<float>(gap_ratio, visual_config::kSpectrumGapRatioMin,
+                                                      visual_config::kSpectrumGapRatioMax);
+}
+
+float clamp_max_height_fraction(double fraction) {
+    return number_math::clamp_number_to_range<float>(fraction, visual_config::kSpectrumMaxHeightFractionMin,
+                                                      visual_config::kSpectrumMaxHeightFractionMax);
 }
 
 float update_onset_pulse(float current_pulse, bool onset, float sensitivity) {

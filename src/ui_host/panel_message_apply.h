@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "app/audio_source_controller.h"
 #include "app/window_layout_controller.h"
 #include "compositor/compositor.h"
@@ -13,6 +15,7 @@ struct PanelApplyContext {
     UIHost& ui_host;
     WindowLayoutController& window_layout;
     AudioSourceController& audio_source;
+    std::string presets_dir;
 };
 
 void apply(const PanelMessage& message, PanelApplyContext& ctx);

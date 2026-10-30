@@ -1,8 +1,6 @@
 build/
 tsan/build/
 presets/
-milestone-4-debug-controls.md
-milestone-4-debug-controls.md
 
 # Real test-audio files are local-only (large/binary, often copyrighted) —
 # keep the directory tracked via .gitkeep without committing contents.

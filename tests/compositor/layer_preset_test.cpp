@@ -22,6 +22,7 @@
 #include "visuals/spectrum/spectrum_visual.h"
 #include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
+#include "compositor/compositor_math.h"
 
 namespace {
 
@@ -519,7 +520,7 @@ TEST(LayerPresetAdversarialTest, ExtremeBurstCountLoadsClampedForParticlesAndFlo
               visual_config::kMaxParticles);
 }
 
-TEST(LayerPresetAdversarialTest, FloatFieldsBeyondFloatRangeLoadAsFiniteValues) {
+TEST(LayerPresetAdversarialTest, ExtremeFloatFieldsLoadClampedToEachFieldsOwnRange) {
     nlohmann::json doc = serialized_single_particles_doc();
     doc["layers"][0]["opacity"] = 1e300;
     doc["layers"][0]["sensitivity"] = -1e300;
@@ -531,10 +532,32 @@ TEST(LayerPresetAdversarialTest, FloatFieldsBeyondFloatRangeLoadAsFiniteValues) 
     ASSERT_TRUE(loaded.has_value());
     const Layer& layer = (*loaded)[0];
     const ParticlesParams& params = dynamic_cast<ParticlesVisual&>(*layer.visual).params();
-    EXPECT_EQ(layer.opacity, std::numeric_limits<float>::max());
-    EXPECT_EQ(layer.sensitivity, std::numeric_limits<float>::lowest());
-    EXPECT_EQ(params.radius, std::numeric_limits<float>::max());
-    EXPECT_EQ(params.spawn_rate_per_frame, std::numeric_limits<float>::lowest());
+    EXPECT_FLOAT_EQ(layer.opacity, 1.0f);
+    EXPECT_FLOAT_EQ(layer.sensitivity, compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(params.radius, visual_config::kParticleRadiusPxMax);
+    EXPECT_FLOAT_EQ(params.spawn_rate_per_frame, visual_config::kParticlesSpawnRatePerFrameMin);
+}
+
+TEST(LayerPresetAdversarialTest, SpawnRatePerFrameLoadsClampedToThePanelRangeForParticlesAndFlowField) {
+    nlohmann::json particles_doc = serialized_single_particles_doc();
+    particles_doc["layers"][0]["params"]["spawn_rate_per_frame"] = 1e300;
+    std::optional<std::vector<Layer>> particles = layer_preset::deserialize(particles_doc.dump());
+    ASSERT_TRUE(particles.has_value());
+    EXPECT_FLOAT_EQ(dynamic_cast<ParticlesVisual&>(*(*particles)[0].visual).params().spawn_rate_per_frame,
+                    visual_config::kParticlesSpawnRatePerFrameMax);
+
+    nlohmann::json flow_doc = serialized_single_flow_field_doc();
+    flow_doc["layers"][0]["params"]["spawn_rate_per_frame"] = 1e300;
+    std::optional<std::vector<Layer>> flow = layer_preset::deserialize(flow_doc.dump());
+    ASSERT_TRUE(flow.has_value());
+    EXPECT_FLOAT_EQ(dynamic_cast<FlowFieldVisual&>(*(*flow)[0].visual).params().spawn_rate_per_frame,
+                    visual_config::kFlowFieldSpawnRatePerFrameMax);
+
+    flow_doc["layers"][0]["params"]["spawn_rate_per_frame"] = -3.0;
+    flow = layer_preset::deserialize(flow_doc.dump());
+    ASSERT_TRUE(flow.has_value());
+    EXPECT_FLOAT_EQ(dynamic_cast<FlowFieldVisual&>(*(*flow)[0].visual).params().spawn_rate_per_frame,
+                    visual_config::kFlowFieldSpawnRatePerFrameMin);
 }
 
 TEST(LayerPresetAdversarialTest, RejectsBooleanWhereANumberIsRequired) {
@@ -839,4 +862,179 @@ TEST(LayerPresetAdversarialTest, RejectsFractalOrbitClockwiseOfWrongTypeOrMissin
     nlohmann::json doc = serialized_single_fractal_doc();
     doc["layers"][0]["params"].erase("julia_orbit_clockwise");
     EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt);
+}
+
+namespace {
+
+struct PresetParamRangeCase {
+    VisualType type;
+    const char* key;
+    float min;
+    float max;
+};
+
+const PresetParamRangeCase kPresetParamRangeCases[] = {
+    {VisualType::Waveform, "line_thickness", visual_config::kLineThicknessPxMin,
+     visual_config::kLineThicknessPxMax},
+    {VisualType::Lissajous, "line_thickness", visual_config::kLineThicknessPxMin,
+     visual_config::kLineThicknessPxMax},
+    {VisualType::Spectrum, "gap_ratio", visual_config::kSpectrumGapRatioMin, visual_config::kSpectrumGapRatioMax},
+    {VisualType::Spectrum, "max_height_fraction", visual_config::kSpectrumMaxHeightFractionMin,
+     visual_config::kSpectrumMaxHeightFractionMax},
+    {VisualType::Radial, "thickness", visual_config::kRadialThicknessPxMin, visual_config::kRadialThicknessPxMax},
+    {VisualType::Particles, "radius", visual_config::kParticleRadiusPxMin, visual_config::kParticleRadiusPxMax},
+    {VisualType::Particles, "spawn_rate_per_frame", visual_config::kParticlesSpawnRatePerFrameMin,
+     visual_config::kParticlesSpawnRatePerFrameMax},
+    {VisualType::FlowField, "radius", visual_config::kParticleRadiusPxMin, visual_config::kParticleRadiusPxMax},
+    {VisualType::FlowField, "spawn_rate_per_frame", visual_config::kFlowFieldSpawnRatePerFrameMin,
+     visual_config::kFlowFieldSpawnRatePerFrameMax},
+    {VisualType::Fractal, "amplitude_smoothing_tau_ms", visual_config::kFractalAmplitudeSmoothingTauMsMin,
+     visual_config::kFractalAmplitudeSmoothingTauMsMax},
+    {VisualType::Fractal, "boundary_margin_px", visual_config::kFractalBoundaryMarginPxMin,
+     visual_config::kFractalBoundaryMarginPxMax},
+};
+
+nlohmann::json serialized_single_default_layer_doc(VisualType type) {
+    std::vector<Layer> layers;
+    Layer layer{type, make_visual(type)};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+    return nlohmann::json::parse(layer_preset::serialize(layers));
+}
+
+float reserialized_param(const std::vector<Layer>& layers, const char* key) {
+    return nlohmann::json::parse(layer_preset::serialize(layers))["layers"][0]["params"][key].get<float>();
+}
+
+}
+
+TEST(LayerPresetAdversarialTest, PreviouslyUnboundedParamsLoadClampedToTheirRangeForEveryVisualType) {
+    for (const PresetParamRangeCase& c : kPresetParamRangeCases) {
+        const std::pair<double, float> cases[] = {
+            {static_cast<double>(c.min) - 1.0, c.min},
+            {-1e300, c.min},
+            {static_cast<double>(c.max) + 1.0, c.max},
+            {1e300, c.max},
+        };
+        for (const auto& [input, expected] : cases) {
+            nlohmann::json doc = serialized_single_default_layer_doc(c.type);
+            ASSERT_TRUE(doc["layers"][0]["params"].contains(c.key)) << c.key;
+            doc["layers"][0]["params"][c.key] = input;
+
+            std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+            ASSERT_TRUE(loaded.has_value()) << c.key << " input " << input;
+            EXPECT_FLOAT_EQ(reserialized_param(*loaded, c.key), expected) << c.key << " input " << input;
+        }
+    }
+}
+
+TEST(LayerPresetAdversarialTest, PreviouslyUnboundedParamsInsideTheirRangeLoadUnchanged) {
+    for (const PresetParamRangeCase& c : kPresetParamRangeCases) {
+        const float inside = c.min + (c.max - c.min) * 0.25f;
+        nlohmann::json doc = serialized_single_default_layer_doc(c.type);
+        doc["layers"][0]["params"][c.key] = inside;
+
+        std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+        ASSERT_TRUE(loaded.has_value()) << c.key;
+        EXPECT_FLOAT_EQ(reserialized_param(*loaded, c.key), inside) << c.key;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, PreviouslyUnboundedParamsOfWrongTypeOrMissingAreRejected) {
+    for (const PresetParamRangeCase& c : kPresetParamRangeCases) {
+        for (const nlohmann::json& bad : {nlohmann::json("1.0"), nlohmann::json(true), nlohmann::json(nullptr)}) {
+            nlohmann::json doc = serialized_single_default_layer_doc(c.type);
+            doc["layers"][0]["params"][c.key] = bad;
+            EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << c.key << " " << bad.dump();
+        }
+        nlohmann::json doc = serialized_single_default_layer_doc(c.type);
+        doc["layers"][0]["params"].erase(c.key);
+        EXPECT_EQ(layer_preset::deserialize(doc.dump()), std::nullopt) << c.key << " missing";
+    }
+}
+
+TEST(LayerPresetAdversarialTest, SpectrumGapRatioCannotLoadAsTheValueThatDividesBarWidthByZero) {
+    nlohmann::json doc = serialized_single_default_layer_doc(VisualType::Spectrum);
+    doc["layers"][0]["params"]["gap_ratio"] = -1.0;
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(doc.dump());
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_FLOAT_EQ(dynamic_cast<SpectrumVisual&>(*(*loaded)[0].visual).params().gap_ratio,
+                    visual_config::kSpectrumGapRatioMin);
+}
+
+TEST(LayerPresetAdversarialTest, OpacityAndSensitivityLoadClampedToTheirPanelRanges) {
+    const std::pair<double, float> opacity_cases[] = {{-0.5, 0.0f}, {-1e300, 0.0f}, {1.5, 1.0f}, {1e300, 1.0f}};
+    for (const auto& [input, expected] : opacity_cases) {
+        nlohmann::json layer = minimal_waveform_layer_json(1);
+        layer["opacity"] = input;
+        std::optional<std::vector<Layer>> loaded =
+            layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer})));
+        ASSERT_TRUE(loaded.has_value()) << input;
+        EXPECT_FLOAT_EQ((*loaded)[0].opacity, expected) << input;
+    }
+
+    const std::pair<double, float> sensitivity_cases[] = {{-1.0, compositor_math::kSensitivityMin},
+                                                          {-1e300, compositor_math::kSensitivityMin},
+                                                          {9.0, compositor_math::kSensitivityMax},
+                                                          {1e300, compositor_math::kSensitivityMax}};
+    for (const auto& [input, expected] : sensitivity_cases) {
+        nlohmann::json layer = minimal_waveform_layer_json(1);
+        layer["sensitivity"] = input;
+        std::optional<std::vector<Layer>> loaded =
+            layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer})));
+        ASSERT_TRUE(loaded.has_value()) << input;
+        EXPECT_FLOAT_EQ((*loaded)[0].sensitivity, expected) << input;
+    }
+}
+
+namespace {
+
+nlohmann::json palette_stop_json(double position) {
+    return nlohmann::json{{"position", position},
+                          {"color", nlohmann::json{{"r", 10}, {"g", 20}, {"b", 30}, {"a", 255}}}};
+}
+
+std::optional<std::vector<Layer>> load_waveform_layer_with_palette_stops(nlohmann::json stops) {
+    nlohmann::json layer = minimal_waveform_layer_json(1);
+    layer["palette_override"] = nlohmann::json{{"stops", std::move(stops)}};
+    return layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer})));
+}
+
+}
+
+TEST(LayerPresetAdversarialTest, RejectsPaletteOverrideWithNoStops) {
+    EXPECT_EQ(load_waveform_layer_with_palette_stops(nlohmann::json::array()), std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, RejectsPaletteOverrideWhoseStopsAreNotInAscendingOrder) {
+    EXPECT_EQ(load_waveform_layer_with_palette_stops(
+                  nlohmann::json::array({palette_stop_json(0.8), palette_stop_json(0.2)})),
+              std::nullopt);
+    EXPECT_EQ(load_waveform_layer_with_palette_stops(nlohmann::json::array(
+                  {palette_stop_json(0.0), palette_stop_json(0.6), palette_stop_json(0.5)})),
+              std::nullopt);
+}
+
+TEST(LayerPresetAdversarialTest, PaletteStopPositionsOutsideUnitRangeLoadClamped) {
+    std::optional<std::vector<Layer>> loaded = load_waveform_layer_with_palette_stops(
+        nlohmann::json::array({palette_stop_json(-5.0), palette_stop_json(0.5), palette_stop_json(1e300)}));
+
+    ASSERT_TRUE(loaded.has_value());
+    ASSERT_TRUE((*loaded)[0].palette_override.has_value());
+    const std::vector<PaletteStop>& stops = (*loaded)[0].palette_override->stops;
+    ASSERT_EQ(stops.size(), 3u);
+    EXPECT_FLOAT_EQ(stops[0].position, 0.0f);
+    EXPECT_FLOAT_EQ(stops[1].position, 0.5f);
+    EXPECT_FLOAT_EQ(stops[2].position, 1.0f);
+}
+
+TEST(LayerPresetAdversarialTest, AcceptsSingleStopAndEqualPositionPaletteOverrides) {
+    EXPECT_TRUE(load_waveform_layer_with_palette_stops(nlohmann::json::array({palette_stop_json(0.3)})).has_value());
+    EXPECT_TRUE(load_waveform_layer_with_palette_stops(
+                    nlohmann::json::array({palette_stop_json(0.5), palette_stop_json(0.5)}))
+                    .has_value());
 }

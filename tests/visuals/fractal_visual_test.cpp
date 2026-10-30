@@ -316,3 +316,35 @@ TEST(FractalClampTest, BaseZoomNeverGoesBelowOne) {
     EXPECT_FLOAT_EQ(fractal_math::clamp_base_zoom(0.0), 1.0f);
     EXPECT_FLOAT_EQ(fractal_math::clamp_base_zoom(-3.0), 1.0f);
 }
+
+TEST(FractalClampTest, AmplitudeSmoothingTauClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kFractalAmplitudeSmoothingTauMsMin;
+    const float max = visual_config::kFractalAmplitudeSmoothingTauMsMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(fractal_math::clamp_amplitude_smoothing_tau_ms(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(fractal_math::clamp_amplitude_smoothing_tau_ms(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(fractal_math::clamp_amplitude_smoothing_tau_ms(high), max) << high;
+    }
+}
+
+TEST(FractalClampTest, BoundaryMarginClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kFractalBoundaryMarginPxMin;
+    const float max = visual_config::kFractalBoundaryMarginPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(fractal_math::clamp_boundary_margin_px(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(fractal_math::clamp_boundary_margin_px(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(fractal_math::clamp_boundary_margin_px(high), max) << high;
+    }
+}

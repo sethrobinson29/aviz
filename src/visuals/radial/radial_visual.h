@@ -28,6 +28,8 @@ float clamp_inner_radius_fraction(double inner, float outer);
 
 float clamp_max_radius_fraction(double outer, float inner);
 
+float clamp_thickness(double thickness);
+
 }
 
 struct RadialParams {

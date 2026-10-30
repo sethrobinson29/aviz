@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,6 +11,8 @@
 #include "compositor/layer_types.h"
 #include "compositor/visual_param_value.h"
 #include "visuals/reactivity_source.h"
+
+struct Palette;
 
 struct RequestStateMessage {};
 
@@ -60,6 +63,11 @@ struct SetLayerSensitivityMessage {
     float sensitivity;
 };
 
+struct SetPaletteOverrideMessage {
+    std::uint64_t layer_id;
+    std::shared_ptr<const Palette> palette_override;
+};
+
 struct SetVisualParamMessage {
     std::uint64_t layer_id;
     std::string param_name;
@@ -94,8 +102,9 @@ using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
-                 SetVisualParamMessage, LoadPresetMessage, SavePresetMessage, SetDockedMessage,
-                 SetFullscreenMessage, SwitchSourceMessage, ImportFileMessage, EnableLoopbackMessage>;
+                 SetPaletteOverrideMessage, SetVisualParamMessage, LoadPresetMessage, SavePresetMessage,
+                 SetDockedMessage, SetFullscreenMessage, SwitchSourceMessage, ImportFileMessage,
+                 EnableLoopbackMessage>;
 
 namespace panel_message {
 

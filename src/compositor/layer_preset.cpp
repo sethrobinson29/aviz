@@ -116,23 +116,6 @@ nlohmann::json color_to_json(const Color& c) {
     return nlohmann::json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
 }
 
-Palette palette_from_json(const nlohmann::json& j) {
-    if (!j.is_object() || !j.contains("stops") || !j.at("stops").is_array()) {
-        throw std::invalid_argument("palette_override must be an object with a stops array");
-    }
-    Palette palette;
-    for (const nlohmann::json& stop_json : j.at("stops")) {
-        if (!stop_json.is_object()) {
-            throw std::invalid_argument("palette stop must be an object");
-        }
-        PaletteStop stop;
-        stop.position = require_float_field(stop_json, "position");
-        stop.color = color_from_json(stop_json.at("color"));
-        palette.stops.push_back(stop);
-    }
-    return palette;
-}
-
 nlohmann::json palette_to_json(const Palette& palette) {
     nlohmann::json stops = nlohmann::json::array();
     for (const PaletteStop& stop : palette.stops) {
@@ -148,7 +131,7 @@ nlohmann::json params_to_json(const WaveformParams& p) {
 WaveformParams waveform_params_from_json(const nlohmann::json& j) {
     WaveformParams p;
     p.line_color = color_from_json(j.at("line_color"));
-    p.line_thickness = require_float_field(j, "line_thickness");
+    p.line_thickness = waveform_math::clamp_line_thickness(require_number_field(j, "line_thickness"));
     return p;
 }
 
@@ -161,8 +144,9 @@ nlohmann::json params_to_json(const SpectrumParams& p) {
 SpectrumParams spectrum_params_from_json(const nlohmann::json& j) {
     SpectrumParams p;
     p.bar_color = color_from_json(j.at("bar_color"));
-    p.gap_ratio = require_float_field(j, "gap_ratio");
-    p.max_height_fraction = require_float_field(j, "max_height_fraction");
+    p.gap_ratio = spectrum_math::clamp_gap_ratio(require_number_field(j, "gap_ratio"));
+    p.max_height_fraction =
+        spectrum_math::clamp_max_height_fraction(require_number_field(j, "max_height_fraction"));
     return p;
 }
 
@@ -176,7 +160,7 @@ nlohmann::json params_to_json(const RadialParams& p) {
 RadialParams radial_params_from_json(const nlohmann::json& j) {
     RadialParams p;
     p.bar_color = color_from_json(j.at("bar_color"));
-    p.thickness = require_float_field(j, "thickness");
+    p.thickness = radial_math::clamp_thickness(require_number_field(j, "thickness"));
     p.max_radius_fraction =
         radial_math::clamp_max_radius_fraction(require_number_field(j, "max_radius_fraction"), 0.0f);
     p.inner_radius_fraction = radial_math::clamp_inner_radius_fraction(
@@ -196,11 +180,12 @@ nlohmann::json params_to_json(const ParticlesParams& p) {
 ParticlesParams particles_params_from_json(const nlohmann::json& j) {
     ParticlesParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
-    p.radius = require_float_field(j, "radius");
+    p.radius = particles_math::clamp_radius(require_number_field(j, "radius"));
     p.lifetime_frames =
         particles_math::clamp_lifetime_frames_from_number(require_number_field(j, "lifetime_frames"));
     p.burst_count = particles_math::clamp_burst_count_from_number(require_number_field(j, "burst_count"));
-    p.spawn_rate_per_frame = require_float_field(j, "spawn_rate_per_frame");
+    p.spawn_rate_per_frame =
+        particles_math::clamp_spawn_rate_per_frame(require_number_field(j, "spawn_rate_per_frame"));
     p.inner_radius_fraction =
         particles_math::clamp_inner_radius_fraction(require_number_field(j, "inner_radius_fraction"));
     return p;
@@ -215,7 +200,7 @@ nlohmann::json params_to_json(const LissajousParams& p) {
 LissajousParams lissajous_params_from_json(const nlohmann::json& j) {
     LissajousParams p;
     p.line_color = color_from_json(j.at("line_color"));
-    p.line_thickness = require_float_field(j, "line_thickness");
+    p.line_thickness = waveform_math::clamp_line_thickness(require_number_field(j, "line_thickness"));
     p.compression_exponent =
         lissajous_math::clamp_compression_exponent(require_number_field(j, "compression_exponent"));
     return p;
@@ -237,16 +222,18 @@ nlohmann::json params_to_json(const FlowFieldParams& p) {
 FlowFieldParams flow_field_params_from_json(const nlohmann::json& j) {
     FlowFieldParams p;
     p.particle_color = color_from_json(j.at("particle_color"));
-    p.radius = require_float_field(j, "radius");
+    p.radius = particles_math::clamp_radius(require_number_field(j, "radius"));
     p.lifetime_frames =
         particles_math::clamp_lifetime_frames_from_number(require_number_field(j, "lifetime_frames"));
     p.burst_count = particles_math::clamp_burst_count_from_number(require_number_field(j, "burst_count"));
-    p.spawn_rate_per_frame = require_float_field(j, "spawn_rate_per_frame");
+    p.spawn_rate_per_frame =
+        flow_field_math::clamp_spawn_rate_per_frame(require_number_field(j, "spawn_rate_per_frame"));
     p.ripple_on_onset_enabled = j.at("ripple_on_onset_enabled").get<bool>();
     p.burst_on_onset_enabled = j.at("burst_on_onset_enabled").get<bool>();
     p.turbulence_frequency =
-        flow_field_math::clamp_turbulence_frequency(require_float_field(j, "turbulence_frequency"));
-    p.evolution_per_frame = flow_field_math::clamp_evolution_per_frame(require_float_field(j, "evolution_per_frame"));
+        flow_field_math::clamp_turbulence_frequency(require_number_field(j, "turbulence_frequency"));
+    p.evolution_per_frame =
+        flow_field_math::clamp_evolution_per_frame(require_number_field(j, "evolution_per_frame"));
     p.grid_cols = flow_field_math::clamp_grid_cols_from_number(require_number_field(j, "grid_cols"));
     return p;
 }
@@ -282,8 +269,9 @@ FractalParams fractal_params_from_json(const nlohmann::json& j) {
     p.julia_orbit_clockwise = j.at("julia_orbit_clockwise").get<bool>();
     p.color_cycle_speed_hz =
         fractal_math::clamp_color_cycle_speed_hz(require_number_field(j, "color_cycle_speed_hz"));
-    p.amplitude_smoothing_tau_ms = require_float_field(j, "amplitude_smoothing_tau_ms");
-    p.boundary_margin_px = require_float_field(j, "boundary_margin_px");
+    p.amplitude_smoothing_tau_ms =
+        fractal_math::clamp_amplitude_smoothing_tau_ms(require_number_field(j, "amplitude_smoothing_tau_ms"));
+    p.boundary_margin_px = fractal_math::clamp_boundary_margin_px(require_number_field(j, "boundary_margin_px"));
     return p;
 }
 
@@ -364,13 +352,14 @@ Layer layer_from_json(const nlohmann::json& j) {
     Layer layer{visual_type, make_visual_from_params_json(visual_type, j.at("params"))};
     layer.layer_id = layer_id;
     layer.enabled = j.at("enabled").get<bool>();
-    layer.opacity = require_float_field(j, "opacity");
+    layer.opacity = compositor_math::clamp_opacity(require_number_field(j, "opacity"));
     layer.blend_mode = string_to_enum<LayerBlendMode>(j.at("blend_mode").get<std::string>(), kBlendModeTable);
     layer.tint_color = color_from_json(j.at("tint_color"));
 
     const nlohmann::json& palette_json = j.at("palette_override");
-    layer.palette_override = palette_json.is_null() ? std::nullopt
-                                                      : std::optional<Palette>(palette_from_json(palette_json));
+    layer.palette_override = palette_json.is_null()
+                                  ? std::nullopt
+                                  : std::optional<Palette>(layer_preset::palette_from_json(palette_json));
 
     const nlohmann::json& freq_band_json = j.at("freq_band");
     if (freq_band_json.is_null()) {
@@ -388,7 +377,7 @@ Layer layer_from_json(const nlohmann::json& j) {
 
     layer.reactivity_source =
         string_to_enum<ReactivitySource>(j.at("reactivity_source").get<std::string>(), kReactivitySourceTable);
-    layer.sensitivity = require_float_field(j, "sensitivity");
+    layer.sensitivity = compositor_math::clamp_sensitivity(require_number_field(j, "sensitivity"));
 
     return layer;
 }
@@ -396,6 +385,30 @@ Layer layer_from_json(const nlohmann::json& j) {
 }
 
 namespace layer_preset {
+
+Palette palette_from_json(const nlohmann::json& j) {
+    if (!j.is_object() || !j.contains("stops") || !j.at("stops").is_array()) {
+        throw std::invalid_argument("palette_override must be an object with a stops array");
+    }
+    Palette palette;
+    for (const nlohmann::json& stop_json : j.at("stops")) {
+        if (!stop_json.is_object()) {
+            throw std::invalid_argument("palette stop must be an object");
+        }
+        PaletteStop stop;
+        stop.position =
+            number_math::clamp_number_to_range<float>(require_number_field(stop_json, "position"), 0.0f, 1.0f);
+        stop.color = color_from_json(stop_json.at("color"));
+        if (!palette.stops.empty() && stop.position < palette.stops.back().position) {
+            throw std::invalid_argument("palette stops must be ordered by ascending position");
+        }
+        palette.stops.push_back(stop);
+    }
+    if (palette.stops.empty()) {
+        throw std::invalid_argument("palette_override must have at least one stop");
+    }
+    return palette;
+}
 
 std::string serialize(const std::vector<Layer>& layers) {
     nlohmann::json doc;

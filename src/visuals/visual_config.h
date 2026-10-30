@@ -12,6 +12,26 @@ inline constexpr float kSpectrumOnsetPulseRestBrightnessFraction = 0.55f;
 
 inline constexpr float kMinBarHeightPx = 4.0f;
 
+inline constexpr float kLineThicknessPxMin = 0.5f;
+
+inline constexpr float kLineThicknessPxMax = 32.0f;
+
+inline constexpr float kSpectrumGapRatioMin = 0.0f;
+
+inline constexpr float kSpectrumGapRatioMax = 4.0f;
+
+inline constexpr float kSpectrumMaxHeightFractionMin = 0.0f;
+
+inline constexpr float kSpectrumMaxHeightFractionMax = 1.0f;
+
+inline constexpr float kRadialThicknessPxMin = 0.5f;
+
+inline constexpr float kRadialThicknessPxMax = 64.0f;
+
+inline constexpr float kParticleRadiusPxMin = 0.5f;
+
+inline constexpr float kParticleRadiusPxMax = 32.0f;
+
 inline constexpr int kMaxParticles = 1024;
 
 inline constexpr float kParticleBaseSpeedPxPerFrame = 4.0f;
@@ -118,6 +138,10 @@ inline constexpr float kFractalJuliaOrbitCenterMax = 0.5f;
 
 inline constexpr float kFractalAmplitudeSmoothingTauMs = 2000.0f;
 
+inline constexpr float kFractalAmplitudeSmoothingTauMsMin = 0.0f;
+
+inline constexpr float kFractalAmplitudeSmoothingTauMsMax = 10000.0f;
+
 inline constexpr float kFractalColorCycleSpeedHz = 0.05f;
 
 inline constexpr float kFractalColorCycleSpeedHzMin = 0.0f;
@@ -125,6 +149,10 @@ inline constexpr float kFractalColorCycleSpeedHzMin = 0.0f;
 inline constexpr float kFractalColorCycleSpeedHzMax = 0.5f;
 
 inline constexpr float kFractalBoundaryMarginPx = 18.0f;
+
+inline constexpr float kFractalBoundaryMarginPxMin = 1.0f;
+
+inline constexpr float kFractalBoundaryMarginPxMax = 200.0f;
 
 inline constexpr int kFractalPaletteGradientWidth = 256;
 
