@@ -1,0 +1,93 @@
+@font-face {
+    font-family: Inter;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: block;
+    src: url("../fonts/inter-latin-wght-normal.woff2") format("woff2");
+}
+
+:root {
+    color-scheme: dark;
+
+    --font-family: Inter, system-ui;
+
+    --color-accent: #9dff5c;
+    --color-accent-bright: #c3ff9c;
+    --color-accent-mid: #3f9e3c;
+    --color-accent-mid-bright: #5fc24f;
+    --color-accent-deep: #1d5c2a;
+    --gradient-accent-vertical: linear-gradient(180deg, #9dff5c, #3f9e3c);
+    --gradient-accent-horizontal: linear-gradient(90deg, #9dff5c, #3f9e3c);
+    --gradient-accent-horizontal-bright: linear-gradient(90deg, #c3ff9c, #5fc24f);
+
+    --surface-page: #05060a;
+    --surface-panel: linear-gradient(165deg, #171b21, #0c0e12);
+    --surface-title: linear-gradient(180deg, #242a32, #191d23);
+    --surface-card: linear-gradient(170deg, #181c22, #0f1115);
+    --surface-footer: linear-gradient(180deg, #13161b, #0d0f13);
+    --surface-well: #0c0e12;
+    --surface-well-raised: #12151a;
+    --surface-track: #20262e;
+    --surface-control-round: #1c2026;
+    --surface-drag-over: #1a2a1c;
+
+    --border-panel: #262c33;
+    --border-card: #242a31;
+    --border-control: #2a3038;
+    --border-button: #363d47;
+    --border-button-hover: #454e59;
+    --border-add-button: #303741;
+    --border-add-button-hover: #5f8a45;
+    --border-footer: #1c2026;
+    --border-switch-off: #2d343c;
+    --border-thumb: #1d2a1d;
+    --border-select-hover: #f2f5f7;
+
+    --text-primary: #d7e2e8;
+    --text-control: #aab6c0;
+    --text-button: #cdd8de;
+    --text-button-ghost: #9aa6b0;
+    --text-caption: #7d8a95;
+    --text-title: #8a97a3;
+    --text-add-button: #b5c1ba;
+    --text-add-button-hover: #e4f2dc;
+    --text-drag-handle: #6b7680;
+    --text-on-accent: #0a0f13;
+
+    --status-success: #9dff5c;
+    --status-failure: #ff7a70;
+
+    --gradient-button: linear-gradient(180deg, #2a313b, #1b2026);
+    --gradient-add-button: linear-gradient(180deg, #232932, #171b21);
+    --gradient-thumb: radial-gradient(circle at 35% 30%, #ffffff, #cfe9c4);
+    --gradient-thumb-pressed: radial-gradient(circle at 35% 30%, #9aa0a7, #5d636a);
+
+    --shadow-button: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-add-button: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 5px rgba(0, 0, 0, 0.4);
+    --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    --shadow-select-hover: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 0 12px rgba(255, 255, 255, 0.35);
+    --shadow-switch-knob: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-switch-knob-on: 0 0 6px rgba(157, 255, 92, 0.9);
+    --shadow-thumb: 0 0 8px rgba(157, 255, 92, 0.7), 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-thumb-pressed: 0 0 4px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-track: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+
+    --radius-card: 12px;
+    --radius-button: 10px;
+    --radius-select: 8px;
+    --radius-input: 6px;
+    --radius-badge: 5px;
+    --radius-round: 999px;
+
+    --focus-ring-width: 2px;
+    --focus-ring-offset: 2px;
+    --focus-ring-color: #9dff5c;
+
+    --size-title-bar: 46px;
+    --size-switch-width: 34px;
+    --size-switch-height: 18px;
+    --size-slider-thumb: 14px;
+    --size-slider-track: 6px;
+    --size-remove-button: 22px;
+    --size-scrollbar: 10px;
+}

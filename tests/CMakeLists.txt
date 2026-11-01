@@ -150,6 +150,8 @@ add_executable(ui_host_tests
   ui_host/panel_dispatch_round_trip_test.cpp
   ui_host/panel_message_apply_test.cpp
   ui_host/panel_navigation_policy_test.cpp
+  ui_host/panel_source_lint.cpp
+  ui_host/panel_source_lint_test.cpp
   ../src/ui_host/panel_message.cpp
   ../src/ui_host/panel_dispatch_queue.cpp
   ../src/ui_host/panel_message_apply.cpp
@@ -182,4 +184,7 @@ add_executable(ui_host_tests
 )
 target_include_directories(ui_host_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/tests)
 target_link_libraries(ui_host_tests PRIVATE GTest::gtest_main GTest::gmock raylib nlohmann_json::nlohmann_json miniaudio)
+target_compile_definitions(ui_host_tests PRIVATE
+  AVIZ_WEB_PANEL_DIR="${CMAKE_SOURCE_DIR}/web/panel"
+  AVIZ_ASSETS_DIR="${CMAKE_SOURCE_DIR}/assets")
 gtest_discover_tests(ui_host_tests)

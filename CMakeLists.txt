@@ -172,6 +172,12 @@ add_custom_command(TARGET aviz POST_BUILD
 
 add_custom_command(TARGET aviz POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets/fonts
+    $<TARGET_FILE_DIR:aviz>/assets/fonts
+  COMMENT "Copying assets/fonts next to aviz executable")
+
+add_custom_command(TARGET aviz POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/web/panel
     $<TARGET_FILE_DIR:aviz>/web/panel
   COMMENT "Copying web/panel next to aviz executable")

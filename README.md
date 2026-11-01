@@ -18,8 +18,9 @@ implemented — see "Features" below. The WebView2 control panel is now a real
 layer-management UI (add/remove/duplicate/drag-reorder, generic per-layer
 controls, preset save/load) with security defaults, docked/detached window
 management, and synced fullscreen/dock/source-switch controls (panel UI,
-hotkey, and hotkeys-from-either-window all agree) — theme selection is the
-one remaining milestone 8 item. **No launch argument selects an audio
+hotkey, and hotkeys-from-either-window all agree). One theme ships, Dark
+Y2K, and the reskin of the panel and visualizer window to it is in progress.
+There is no theme switcher. **No launch argument selects an audio
 source anymore**: `aviz.exe` starts with no active producer at all, and an
 audio source (import a local file, or explicitly enable loopback capture)
 is chosen from the control panel after launch — see "Features" below.
@@ -226,6 +227,20 @@ run directly from `tsan/`.
   uncapped past 1.0, by design) and, pre-clamp, sets the snap-up magnitude
   of an onset-driven pulse (Waveform's line-thickness pulse, Spectrum's
   per-band white-flash pulse).
+- **Theme and fonts**: every panel theme value is a CSS custom property in
+  `web/panel/themes/dark-y2k.css`, loaded before `app.css`, which uses `var()`
+  only. A CTest lint (`PanelSourceLintTest`, `tests/ui_host/`) fails on a
+  literal color in `app.css`, on a token `app.css` uses that the theme does not
+  define, and on `innerHTML` or `setAttribute("style")` in `app.js`. It also
+  checks the theme loads first, the Content Security Policy is unchanged, and
+  nothing loads off-box. Status text uses `#9dff5c` for success and `#ff7a70`
+  for failure; the design gave no failure color, so the red was chosen to read
+  clearly on the dark panel. The panel font is Inter (variable, Latin, WOFF2)
+  in `web/panel/fonts/`; the raylib window's font is an ASCII subset of Inter
+  SemiBold (`assets/fonts/Inter-SemiBold-ascii.ttf`), since raylib cannot read
+  WOFF2. Both are bundled with their OFL-1.1 license, and `assets/fonts` is
+  copied next to the executable after the build. Layer names outside Latin
+  fall back to system fonts.
 - **Control panel window**: a `UIHost` interface (`src/ui_host/ui_host.h`)
   with a WebView2 implementation, opening alongside the raylib visualizer
   window with no shared-surface compositing, on its own dedicated thread.
