@@ -57,6 +57,21 @@ std::vector<std::uint8_t> make_valid_wav(std::uint32_t sample_rate, std::uint16_
 
 }
 
+#ifdef _WIN32
+TEST(FileProducerTest, OpensFileWhoseUtf8PathIsNotAscii) {
+    const std::filesystem::path path = temp_path("aviz_test") / L"caf\x00E9_\x65E5\x672C.wav";
+    std::filesystem::create_directories(path.parent_path());
+    write_bytes(path, make_valid_wav(44100, 2, 4410));
+
+    {
+        FileProducer producer(path.u8string());
+        EXPECT_EQ(producer.native_sample_rate(), 44100u);
+    }
+
+    std::filesystem::remove_all(path.parent_path());
+}
+#endif
+
 TEST(FileProducerTest, ThrowsOnMissingFile) {
     EXPECT_THROW(FileProducer producer("this_file_does_not_exist.wav"), std::runtime_error);
 }

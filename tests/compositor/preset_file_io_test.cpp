@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -215,6 +216,48 @@ TEST_F(PresetDirectoryListTest, IgnoresSubdirectoriesAndOnlyListsRegularFiles) {
     std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
 
     EXPECT_EQ(names, (std::vector<std::string>{"real.json"}));
+}
+
+TEST_F(PresetDirectoryListTest, NonAsciiFilenamesAreListedAsUtf8) {
+    const std::filesystem::path dir(presets_dir_);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / L"caf\x00E9.json") << "{}";
+    std::ofstream(dir / L"\x65E5\x672C.json") << "{}";
+
+    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
+
+    EXPECT_EQ(names, (std::vector<std::string>{"caf\xC3\xA9.json", "\xE6\x97\xA5\xE6\x9C\xAC.json"}));
+}
+
+TEST_F(PresetDirectoryListTest, FilenameThatCannotConvertToUtf8IsSkippedNotThrown) {
+    const std::filesystem::path dir(presets_dir_);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "good.json") << "{}";
+    std::ofstream(dir / std::wstring(L"lone_surrogate_\xD800.json")) << "{}";
+
+    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
+
+    EXPECT_EQ(names, (std::vector<std::string>{"good.json"}));
+}
+
+TEST_F(PresetFileIoTest, NonAsciiPresetFilenameRoundTripsToTheRealFilenameOnDisk) {
+    const std::string dir = scratch_dir_.u8string();
+    const std::string path = preset_file_io::preset_path(dir, "\xE6\x97\xA5\xE6\x9C\xAC caf\xC3\xA9.json");
+
+    ASSERT_TRUE(preset_file_io::write_file(path, "contents").success);
+
+    EXPECT_TRUE(std::filesystem::exists(scratch_dir_ / L"\x65E5\x672C caf\x00E9.json"));
+    preset_file_io::ReadResult read_back = preset_file_io::read_file(path);
+    ASSERT_TRUE(read_back.success);
+    EXPECT_EQ(read_back.contents, "contents");
+}
+
+TEST(PresetsDirectoryTest, NonAsciiApplicationDirectoryComesBackAsUtf8) {
+    const std::filesystem::path app_dir = std::filesystem::temp_directory_path() / L"caf\x00E9";
+
+    const std::string presets_dir = preset_file_io::presets_directory_in(app_dir.string());
+
+    EXPECT_EQ(std::filesystem::u8path(presets_dir), (app_dir / "presets").lexically_normal());
 }
 
 TEST(IsSafePresetFilenameTest, RejectsDriveQualifiedAndAlternateDataStreamNames) {

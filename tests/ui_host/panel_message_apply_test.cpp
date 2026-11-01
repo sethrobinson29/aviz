@@ -523,6 +523,24 @@ protected:
     void TearDown() override { std::filesystem::remove_all(presets_dir_); }
 };
 
+TEST_F(PanelMessageApplyPresetTest, RequestStateSurvivesNonAsciiPresetFilenamesOnDisk) {
+    const std::filesystem::path dir(presets_dir_);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / L"caf\x00E9.json") << "{}";
+    std::ofstream(dir / L"\x65E5\x672C.json") << "{}";
+
+    EXPECT_NO_THROW(apply(PanelMessage{RequestStateMessage{}}));
+
+    EXPECT_EQ(sent_of_kind(ui_host_, "preset_list")["files"],
+              nlohmann::json::array({"caf\xC3\xA9.json", "\xE6\x97\xA5\xE6\x9C\xAC.json"}));
+}
+
+TEST_F(PanelMessageApplyImportFileTest, StatusTextWithInvalidUtf8ReachesThePanelInsteadOfThrowing) {
+    EXPECT_NO_THROW(apply(PanelMessage{ImportFileMessage{"missing_caf\xE9.wav"}}));
+
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
 TEST_F(PanelMessageApplyPresetTest, PaletteOverridesSetThroughPanelSurviveSaveAndLoadStopForStop) {
     const std::vector<std::optional<Palette>> palettes = palette_fixtures::all_cases();
     std::vector<std::uint64_t> ids;

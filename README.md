@@ -154,7 +154,9 @@ run directly from `tsan/`.
   directory, so the same presets appear however the app is launched
   (shortcut, another shell, double-click). Each build configuration has its
   own executable folder and therefore its own `presets/`
-  (`build/Debug/presets`, `build/Release/presets`).
+  (`build/Debug/presets`, `build/Release/presets`). Paths are handled as
+  UTF-8 throughout, so preset and audio files with non-ASCII names work; a
+  file in `presets/` whose name is not valid Unicode is left out of the list.
   Every layer carries a stable `layer_id`, assigned on creation and
   preserved across save/load, so a reference to a specific layer survives a
   reorder — loading validates the id set (no duplicates, none invalid)

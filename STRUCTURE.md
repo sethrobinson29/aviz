@@ -53,10 +53,19 @@ aviz/
 │   │                        # resource-request trust checks — see TESTING.md's Security
 │   │                        # / adversarial input section)
 │   ├── app/               # top-level orchestration: window/init, main loop, wiring
-│   │                        # (producer_host.h, audio_source_controller, window_layout_config.h)
+│   │                        # (producer_host.h, audio_source_controller, window_layout_config.h),
+│   │                        # plus the visualizer window's chrome (theme data struct, overlay
+│   │                        # drawing, raylib-free button/layout logic)
 │   └── main.cpp
 ├── web/
-│   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI, theme selection)
+│   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI)
+│       ├── themes/          # built-in theme definitions as CSS custom-property token files
+│       │                     # (currently dark-y2k.css only), loaded before app.css, which uses
+│       │                     # var() only. Lives here, not under assets/, because the panel's
+│       │                     # virtual host maps only web/panel. Not to be confused with layer
+│       │                     # presets, which are user-created and live outside the repo in the
+│       │                     # runtime presets/ directory.
+│       └── fonts/            # the panel's bundled font files and their licenses
 ├── tests/
 │   ├── audio/             # mirrors src/audio — FFT banding, onset, envelope tests
 │   ├── compositor/         # layer stack serialization, blend logic tests, layer preset
@@ -69,11 +78,11 @@ aviz/
 │   └── fixtures/            # synthetic signal generators, known test tones/impulses
 ├── assets/
 │   ├── shaders/            # custom shaders (mandelbrot.fs, the Fractal module's GLSL shader — see spec §6)
-│   ├── fonts/               # UI text if any
-│   ├── themes/               # built-in theme definitions (palette/gradient/chrome data,
-│   │                          # e.g. Y2K, Frutiger Aero) — consumed by web/panel. Not to be
-│   │                          # confused with layer presets, which are user-created and live
-│   │                          # outside the repo in the app's runtime data directory, not here.
+│   ├── fonts/               # font files for text drawn in the raylib window (visualizer chrome
+│   │                         # overlays), copied next to the executable after the build. The
+│   │                         # panel's own fonts live in web/panel/fonts/. The raylib-side theme
+│   │                         # data is a struct in code under src/app, not a file here; the panel's
+│   │                         # theme tokens are in web/panel/themes/.
 │   └── test-audio/           # pre-recorded fixture files, distinct from synthetic-generated
 │                               # ones. Contents are git-ignored (unreleased personal material) —
 │                               # directory itself is kept via .gitkeep. See Conventions below.
@@ -109,7 +118,7 @@ aviz/
 - **`assets/test-audio/` vs. `tests/fixtures/` are conceptually distinct**, even though both serve testing:
   - `tests/fixtures/` — synthetic, code-generated signals (exact frequencies, exact impulse timing) used in automated unit tests.
   - `assets/test-audio/` — real recorded files for human "does this sound/look reasonable on real music" spot-checks per `TESTING.md`. Not asserted on programmatically. **Contents are git-ignored**, not committed — the files in use are unreleased personal material, so they stay local rather than entering git history. The directory itself is kept present (via `.gitkeep` or equivalent) so `STRUCTURE.md`'s layout still holds even with no tracked files inside.
-- **`web/panel/` (the WebView2 UI) is not covered by GoogleTest/CTest.** `tests/ui_host/` covers only the C++ side of the state bridge (message format, serialization). No JS test framework has been chosen yet — until one is, panel behavior (theme switching, drag-reorder, layout) is human-review territory, same as visual/audio correctness in `TESTING.md`. Flag this rather than silently picking a JS framework.
+- **`web/panel/` (the WebView2 UI) is not covered by GoogleTest/CTest.** `tests/ui_host/` covers only the C++ side of the state bridge (message format, serialization). No JS test framework has been chosen yet — until one is, panel behavior (theming, drag-reorder, layout) is human-review territory, same as visual/audio correctness in `TESTING.md`. Flag this rather than silently picking a JS framework.
 - **A shared, cross-module utility that must stay raylib-free (e.g. `number_clamp.h`) lives in `src/visuals/` alongside `reactivity_source.h`, not in a new top-level `utils/`.** This project deliberately has no top-level `include/` (above), and a `utils/` dump would be the same kind of ungrounded catch-all — `src/visuals/` already holds raylib-free shared headers used outside the directory's own namesake modules, so a new one of the same kind joins them there rather than establishing a second location.
 - **`handoffs/` is reference material, not part of the load-bearing doc set.** Unlike `CLAUDE.md`/`TESTING.md`/`STRUCTURE.md`/the design spec/`DEFINITION_OF_DONE.md`, files here aren't kept in sync automatically and don't get the "flag if stale" treatment — they're point-in-time notes (a design export's quirks, an audit prompt) meant to be read once at the relevant point in the project, not treated as ongoing architecture truth. If something in a handoff conflicts with the core docs, the core docs win.
 

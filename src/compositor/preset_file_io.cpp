@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 #include <string_view>
+#include <system_error>
 
 namespace {
 
@@ -35,11 +36,11 @@ namespace preset_file_io {
 std::string presets_directory_in(const std::string& application_dir) {
     return std::filesystem::absolute(std::filesystem::path(application_dir) / kPresetsDirectoryName)
         .lexically_normal()
-        .string();
+        .u8string();
 }
 
 std::string preset_path(const std::string& presets_dir, const std::string& filename) {
-    return (std::filesystem::path(presets_dir) / filename).string();
+    return (std::filesystem::u8path(presets_dir) / std::filesystem::u8path(filename)).u8string();
 }
 
 bool is_safe_preset_filename(const std::string& filename) {
@@ -70,7 +71,7 @@ bool is_safe_preset_filename(const std::string& filename) {
 }
 
 ReadResult read_file(const std::string& path) {
-    std::ifstream file(path, std::ios::binary);
+    std::ifstream file(std::filesystem::u8path(path), std::ios::binary);
     if (!file.is_open()) {
         return ReadResult{false, {}, "could not open file for reading: " + path};
     }
@@ -83,17 +84,17 @@ ReadResult read_file(const std::string& path) {
 }
 
 WriteResult write_file(const std::string& path, const std::string& contents) {
-    const std::filesystem::path fs_path(path);
+    const std::filesystem::path fs_path = std::filesystem::u8path(path);
     const std::filesystem::path parent = fs_path.parent_path();
     if (!parent.empty()) {
         std::error_code ec;
         std::filesystem::create_directories(parent, ec);
         if (ec) {
-            return WriteResult{false, "could not create directory " + parent.string() + ": " + ec.message()};
+            return WriteResult{false, "could not create directory " + parent.u8string() + ": " + ec.message()};
         }
     }
 
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    std::ofstream file(fs_path, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
         return WriteResult{false, "could not open file for writing: " + path};
     }
@@ -107,16 +108,21 @@ WriteResult write_file(const std::string& path, const std::string& contents) {
 std::vector<std::string> list_preset_files(const std::string& presets_dir) {
     std::vector<std::string> names;
     try {
-        const std::filesystem::path dir(presets_dir);
+        const std::filesystem::path dir = std::filesystem::u8path(presets_dir);
         if (!std::filesystem::exists(dir)) {
             return names;
         }
         for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(dir)) {
-            if (entry.is_regular_file()) {
-                names.push_back(entry.path().filename().string());
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            try {
+                names.push_back(entry.path().filename().u8string());
+            } catch (const std::system_error&) {
+                continue;
             }
         }
-    } catch (const std::filesystem::filesystem_error&) {
+    } catch (const std::system_error&) {
         return {};
     }
     std::sort(names.begin(), names.end());

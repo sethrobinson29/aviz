@@ -17,18 +17,22 @@ namespace panel_message_apply {
 
 namespace {
 
+std::string to_panel_json(const nlohmann::json& msg) {
+    return msg.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+}
+
 void push_layer_stack(Compositor& compositor, UIHost& ui_host) {
     nlohmann::json msg;
     msg["kind"] = "layer_stack";
     msg["state"] = nlohmann::json::parse(layer_preset::serialize(compositor.layers()));
-    ui_host.send_to_panel(msg.dump());
+    ui_host.send_to_panel(to_panel_json(msg));
 }
 
 void push_preset_list(UIHost& ui_host, const std::string& presets_dir) {
     nlohmann::json msg;
     msg["kind"] = "preset_list";
     msg["files"] = preset_file_io::list_preset_files(presets_dir);
-    ui_host.send_to_panel(msg.dump());
+    ui_host.send_to_panel(to_panel_json(msg));
 }
 
 void push_status(UIHost& ui_host, bool ok, const std::string& text) {
@@ -36,7 +40,7 @@ void push_status(UIHost& ui_host, bool ok, const std::string& text) {
     msg["kind"] = "status";
     msg["ok"] = ok;
     msg["message"] = text;
-    ui_host.send_to_panel(msg.dump());
+    ui_host.send_to_panel(to_panel_json(msg));
 }
 
 void push_full_state(PanelApplyContext& ctx) {
@@ -251,7 +255,7 @@ void push_window_state(UIHost& ui_host, const WindowLayoutController& window_lay
         source = "loopback";
     }
     msg["source"] = source;
-    ui_host.send_to_panel(msg.dump());
+    ui_host.send_to_panel(to_panel_json(msg));
 }
 
 }

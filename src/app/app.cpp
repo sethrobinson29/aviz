@@ -36,7 +36,7 @@ std::string resolve_absolute_panel_content_dir() {
     const char* app_dir = GetApplicationDirectory();
     std::string candidate = std::string(app_dir) + "web/panel";
     std::string resolved = DirectoryExists(candidate.c_str()) ? candidate : std::string("web/panel");
-    return std::filesystem::absolute(resolved).string();
+    return std::filesystem::absolute(resolved).u8string();
 }
 
 std::mt19937 make_seeded_rng() { return std::mt19937(std::random_device{}()); }

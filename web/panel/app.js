@@ -92,6 +92,7 @@
         var li = document.createElement("li");
         li.className = "layer-row";
         li.dataset.layerId = String(layer.layer_id);
+        li.dataset.visualType = layer.visual_type;
 
         var title = document.createElement("div");
         title.className = "layer-title";
@@ -331,8 +332,12 @@
 
         layers.forEach(function (layer, index) {
             var li = layerRowElements.get(layer.layer_id);
-            if (!li) {
-                li = buildLayerRow(layer);
+            if (!li || li.dataset.visualType !== layer.visual_type) {
+                var rebuilt = buildLayerRow(layer);
+                if (li) {
+                    li.replaceWith(rebuilt);
+                }
+                li = rebuilt;
                 layerRowElements.set(layer.layer_id, li);
             }
             updateLayerRow(li, layer, index);
