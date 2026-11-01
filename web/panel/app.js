@@ -1,5 +1,4 @@
 (function () {
-    var VISUAL_TYPES = ["Waveform", "Spectrum", "Radial", "Particles", "Lissajous", "FlowField", "Fractal"];
     var RADIAL_MIN_RADIUS_GAP = 0.05;
 
     function roundToHundredths(value) {
@@ -31,7 +30,6 @@
 
     var layerListEl = document.getElementById("layer-list");
     var presetSelectEl = document.getElementById("preset-select");
-    var addVisualTypeEl = document.getElementById("add-visual-type");
     var statusEl = document.getElementById("status");
     var savePresetNameEl = document.getElementById("save-preset-name");
     var dockCheckbox = document.getElementById("dock-checkbox");
@@ -57,7 +55,6 @@
             select.appendChild(el);
         });
     }
-    populateSelect(addVisualTypeEl, VISUAL_TYPES);
 
     function stopsMatch(a, b) {
         return a.length === b.length && a.every(function (stop, i) {
@@ -339,8 +336,7 @@
     }
 
     function renderLayerList(layers) {
-        var scrollX = window.scrollX;
-        var scrollY = window.scrollY;
+        var listScrollTop = layerListEl.scrollTop;
 
         var seenIds = new Set();
         var currentOrder = Array.prototype.map.call(layerListEl.children, function (el) {
@@ -373,7 +369,7 @@
             }
         });
 
-        window.scrollTo(scrollX, scrollY);
+        layerListEl.scrollTop = listScrollTop;
     }
 
     function renderPresetList(files) {
@@ -392,6 +388,7 @@
 
     function showStatus(ok, message) {
         statusEl.textContent = message;
+        statusEl.title = message;
         statusEl.classList.toggle("error", !ok);
     }
 
@@ -460,8 +457,10 @@
         }
     });
 
-    document.getElementById("add-layer-button").addEventListener("click", function () {
-        post("add_layer", { visual_type: addVisualTypeEl.value });
+    Array.prototype.forEach.call(document.querySelectorAll(".add-button"), function (button) {
+        button.addEventListener("click", function () {
+            post("add_layer", { visual_type: button.dataset.visualType });
+        });
     });
 
     document.getElementById("load-preset-button").addEventListener("click", function () {

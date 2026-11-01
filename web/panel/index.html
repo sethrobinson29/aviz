@@ -9,46 +9,81 @@
 <link rel="stylesheet" href="app.css" />
 </head>
 <body>
-<main>
-  <h1>aviz control panel</h1>
+<svg class="icon-sprite" aria-hidden="true">
+  <symbol id="icon-waveform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2l2-5 3 10 3-14 3 16 3-10 2 3h2"></path></symbol>
+  <symbol id="icon-spectrum" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20v-7M8 20V6M12 20v-9M16 20V4M20 20v-6"></path></symbol>
+  <symbol id="icon-radial" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"></path></symbol>
+  <symbol id="icon-lissajous" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c-2.5-4.5-9-4.5-9 0s6.5 4.5 9 0 9-4.5 9 0-6.5 4.5-9 0z"></path></symbol>
+  <symbol id="icon-particles" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="6" cy="7" r="1.6"></circle><circle cx="12" cy="5" r="1.1"></circle><circle cx="18" cy="8" r="1.8"></circle><circle cx="8" cy="14" r="1.2"></circle><circle cx="15" cy="13" r="1.5"></circle><circle cx="5" cy="19" r="1.1"></circle><circle cx="11" cy="19" r="1.7"></circle><circle cx="19" cy="18" r="1.2"></circle></symbol>
+  <symbol id="icon-flow-field" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7c4-3 6 3 10 0s6-2 8-1M3 12c4-3 6 3 10 0s6-2 8-1M3 17c4-3 6 3 10 0s6-2 8-1"></path></symbol>
+  <symbol id="icon-fractal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"></path><path d="M7.5 11h9L12 19z"></path></symbol>
+</svg>
 
-  <section id="window-section">
-    <h2>Window</h2>
-    <div class="row">
-      <label><input type="checkbox" id="dock-checkbox" /> Docked</label>
-      <label><input type="checkbox" id="fullscreen-checkbox" /> Fullscreen</label>
+<div class="panel">
+  <header class="title-bar">
+    <span class="title-bar-label">Layer Control</span>
+  </header>
+
+  <section class="panel-header">
+    <div class="source-row">
+      <button id="import-file-button" class="metal-button" type="button">Import File</button>
+      <button id="enable-loopback-button" class="metal-button" type="button">Enable Loopback</button>
+      <button id="source-button" class="source-pill" type="button">No Source</button>
+      <label class="window-option"><input type="checkbox" id="dock-checkbox" /> Docked</label>
+      <label class="window-option"><input type="checkbox" id="fullscreen-checkbox" /> Fullscreen</label>
     </div>
-    <div class="row">
-      <button id="import-file-button" type="button">Import File&hellip;</button>
-      <button id="enable-loopback-button" type="button">Enable Loopback</button>
-      <button id="source-button" type="button">No Source</button>
+
+    <div class="add-layer">
+      <span class="caption">Add layer</span>
+      <div class="add-layer-row">
+        <button class="add-button" type="button" data-visual-type="Waveform" title="Add Waveform layer" aria-label="Add Waveform layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-waveform"></use></svg>
+          <span class="add-button-label">Wave</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="Spectrum" title="Add Spectrum layer" aria-label="Add Spectrum layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-spectrum"></use></svg>
+          <span class="add-button-label">Spectrum</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="Radial" title="Add Radial layer" aria-label="Add Radial layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-radial"></use></svg>
+          <span class="add-button-label">Radial</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="Lissajous" title="Add Lissajous layer" aria-label="Add Lissajous layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-lissajous"></use></svg>
+          <span class="add-button-label">Lissajous</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="Particles" title="Add Particles layer" aria-label="Add Particles layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-particles"></use></svg>
+          <span class="add-button-label">Particles</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="FlowField" title="Add Flow Field layer" aria-label="Add Flow Field layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-flow-field"></use></svg>
+          <span class="add-button-label">Flow</span>
+        </button>
+        <button class="add-button" type="button" data-visual-type="Fractal" title="Add Fractal layer" aria-label="Add Fractal layer">
+          <svg class="add-button-icon" aria-hidden="true"><use href="#icon-fractal"></use></svg>
+          <span class="add-button-label">Fractal</span>
+        </button>
+      </div>
     </div>
   </section>
 
-  <section id="presets-section">
-    <h2>Layer presets</h2>
-    <div class="row">
-      <select id="preset-select"></select>
-      <button id="load-preset-button" type="button">Load</button>
-      <button id="refresh-presets-button" type="button">Refresh</button>
-    </div>
-    <div class="row">
-      <input id="save-preset-name" type="text" placeholder="filename.json" />
-      <button id="save-preset-button" type="button">Save as</button>
-    </div>
-  </section>
+  <ul id="layer-list"></ul>
 
-  <section id="layers-section">
-    <h2>Layers</h2>
-    <div class="row">
-      <select id="add-visual-type"></select>
-      <button id="add-layer-button" type="button">Add layer</button>
-    </div>
-    <ul id="layer-list"></ul>
-  </section>
+  <p id="status" role="status"></p>
 
-  <p id="status"></p>
-</main>
+  <footer class="panel-footer">
+    <div class="footer-row">
+      <input id="save-preset-name" type="text" placeholder="filename.json" aria-label="Preset filename" />
+      <button id="save-preset-button" class="ghost-button" type="button">Save Preset</button>
+      <button id="load-preset-button" class="ghost-button" type="button">Load Preset</button>
+    </div>
+    <div class="footer-row">
+      <select id="preset-select" aria-label="Preset to load"></select>
+      <button id="refresh-presets-button" class="ghost-button" type="button">Refresh</button>
+    </div>
+  </footer>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

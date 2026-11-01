@@ -241,6 +241,13 @@ run directly from `tsan/`.
   WOFF2. Both are bundled with their OFL-1.1 license, and `assets/fonts` is
   copied next to the executable after the build. Layer names outside Latin
   fall back to system fonts.
+- **Panel layout**: a single column with a title bar, a fixed header (source
+  controls and seven add-layer icon buttons), a scrolling layer list (the only
+  part that scrolls, with a themed scrollbar), a one-line status line (long
+  messages truncate, with the full text as hovertext), and a fixed footer.
+  Add-layer buttons show labels at 410 CSS px wide and up, and icons only below
+  that; `title` and `aria-label` stay in both cases. Preset save and load sit in
+  the footer: filename field, then Save Preset and Load Preset on one row.
 - **Control panel window**: a `UIHost` interface (`src/ui_host/ui_host.h`)
   with a WebView2 implementation, opening alongside the raylib visualizer
   window with no shared-surface compositing, on its own dedicated thread.
