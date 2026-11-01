@@ -139,6 +139,7 @@ add_executable(aviz
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
+  src/compositor/layer_name.cpp
   src/compositor/layer_preset.cpp
   src/compositor/preset_file_io.cpp
   src/compositor/visual_param.cpp

@@ -9,6 +9,7 @@
 
 #include "compositor/compositor_math.h"
 #include "compositor/layer.h"
+#include "compositor/layer_name.h"
 #include "compositor/layer_preset.h"
 #include "compositor/preset_file_io.h"
 #include "compositor/visual_param.h"
@@ -144,6 +145,21 @@ void apply_one(const SetPaletteOverrideMessage& msg, PanelApplyContext& ctx) {
     if (index.has_value()) {
         ctx.compositor.layers()[*index].palette_override =
             msg.palette_override ? std::optional<Palette>(*msg.palette_override) : std::nullopt;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerNameMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        std::optional<std::string> name = layer_name::normalized(msg.name);
+        if (name.has_value()) {
+            ctx.compositor.layers()[*index].name = std::move(*name);
+        } else {
+            push_status(ctx.ui_host, false,
+                        "layer name rejected: at most " + std::to_string(layer_name::kMaxCodePoints) +
+                            " characters, no control characters");
+        }
     }
     push_layer_stack(ctx.compositor, ctx.ui_host);
 }

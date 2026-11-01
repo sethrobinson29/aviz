@@ -145,7 +145,22 @@ run directly from `tsan/`.
   (opacity, blend mode, tint, `freq_band`, `reactivity_source`, `enabled`).
   Disabled layers are skipped entirely — no offscreen render, no
   compositing pass.
-- **Layer preset save/load**: the full layer stack (visual type, opacity,
+- **Layer names**: each layer has an editable name, saved in presets and
+  copied by Duplicate. An unnamed layer stores nothing and the panel shows
+  `Layer N` for its current position as a dimmer placeholder, so the default
+  always follows reordering; clearing the field reverts to it. A name is at
+  most 50 Unicode code points (at most 200 bytes). The input's `maxlength`
+  counts UTF-16 units, so it stops emoji at 25; a preset can hold the full 50.
+  C++ validates every name (`layer_name::normalized`): it decodes UTF-8 itself,
+  rejects control characters (U+0000-U+001F, U+007F-U+009F) and bidi controls
+  (U+202A-U+202E, U+2066-U+2069), and trims leading and trailing whitespace
+  before measuring. Whitespace here means the Unicode space separators (U+0020,
+  U+00A0, U+1680, U+2000-U+200A, U+202F, U+205F, U+3000) plus the line and
+  paragraph separators (U+2028, U+2029); tab and newline are control characters
+  and are rejected, not trimmed. A rejected name from the panel reverts and
+  shows a red status. In a preset file, a non-string or invalid name rejects
+  the whole file; a missing `name` means unnamed, so older presets still load.
+- **Layer preset save/load**: the full layer stack (visual type, name, opacity,
   blend mode, tint, palette override, `freq_band`, `reactivity_source`,
   `sensitivity`, `enabled`) serializes to/from a versioned JSON schema
   (`layer_preset.h`/`.cpp`) and round-trips through `presets/` (a

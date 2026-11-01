@@ -1038,3 +1038,120 @@ TEST(LayerPresetAdversarialTest, AcceptsSingleStopAndEqualPositionPaletteOverrid
                     nlohmann::json::array({palette_stop_json(0.5), palette_stop_json(0.5)}))
                     .has_value());
 }
+
+namespace {
+
+constexpr char kBackslash = static_cast<char>(92);
+
+std::string doc_with_raw_name_json(const std::string& raw_name_json) {
+    nlohmann::json layer = minimal_waveform_layer_json(1);
+    const std::string marker = "NAME_MARKER";
+    layer["name"] = marker;
+    std::string text = wrap_doc(nlohmann::json::array({layer}));
+    return text.replace(text.find("\"" + marker + "\""), marker.size() + 2, raw_name_json);
+}
+
+std::string escaped_name(const char* hex) { return std::string("\"a") + kBackslash + "u" + hex + "b\""; }
+
+}
+
+TEST(LayerPresetRoundTripTest, NameRoundTrips) {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.layer_id = 1;
+    layer.name = "caf\xC3\xA9 \xF0\x9F\x98\x80";
+    layers.push_back(std::move(layer));
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(layer_preset::serialize(layers));
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ((*loaded)[0].name, "caf\xC3\xA9 \xF0\x9F\x98\x80");
+}
+
+TEST(LayerPresetRoundTripTest, UnnamedLayerRoundTripsAsEmpty) {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.layer_id = 1;
+    layers.push_back(std::move(layer));
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(layer_preset::serialize(layers));
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_TRUE((*loaded)[0].name.empty());
+}
+
+TEST(LayerPresetRoundTripTest, FiftyFourByteCodePointNameSerializesWithoutThrowing) {
+    std::vector<Layer> layers;
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.layer_id = 1;
+    for (int i = 0; i < 50; ++i) {
+        layer.name += "\xF0\x9F\x98\x80";
+    }
+    const std::string expected = layer.name;
+    layers.push_back(std::move(layer));
+
+    std::string json_text;
+    EXPECT_NO_THROW(json_text = layer_preset::serialize(layers));
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(json_text);
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ((*loaded)[0].name, expected);
+}
+
+TEST(LayerPresetCompatibilityTest, OlderPresetWithNoNameFieldLoadsAsUnnamed) {
+    const nlohmann::json older_layer = minimal_waveform_layer_json(1);
+    ASSERT_FALSE(older_layer.contains("name"));
+
+    std::optional<std::vector<Layer>> loaded =
+        layer_preset::deserialize(wrap_doc(nlohmann::json::array({older_layer})));
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_TRUE((*loaded)[0].name.empty());
+}
+
+TEST(LayerPresetAdversarialTest, RejectsNameOfWrongJsonType) {
+    for (const char* raw : {"null", "5", "1.5", "true", "[]", "{}"}) {
+        EXPECT_FALSE(layer_preset::deserialize(doc_with_raw_name_json(raw)).has_value()) << raw;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, RejectsNamePastTheCodePointCap) {
+    nlohmann::json layer = minimal_waveform_layer_json(1);
+    layer["name"] = std::string(51, 'a');
+    EXPECT_FALSE(layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer}))).has_value());
+
+    layer["name"] = std::string(50, 'a');
+    EXPECT_TRUE(layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer}))).has_value());
+}
+
+TEST(LayerPresetAdversarialTest, RejectsEscapedControlAndBidiCharactersInName) {
+    for (const char* hex : {"0000", "0001", "001f", "007f", "0080", "009f", "202a", "202e", "2066", "2069"}) {
+        EXPECT_FALSE(layer_preset::deserialize(doc_with_raw_name_json(escaped_name(hex))).has_value()) << hex;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, RejectsLoneSurrogateEscapesInName) {
+    for (const char* hex : {"d800", "dfff"}) {
+        EXPECT_FALSE(layer_preset::deserialize(doc_with_raw_name_json(escaped_name(hex))).has_value()) << hex;
+    }
+}
+
+TEST(LayerPresetAdversarialTest, OneInvalidNameRejectsTheWholeFile) {
+    nlohmann::json good = minimal_waveform_layer_json(1);
+    good["name"] = "fine";
+    nlohmann::json bad = minimal_waveform_layer_json(2);
+    bad["name"] = std::string(51, 'a');
+
+    EXPECT_FALSE(layer_preset::deserialize(wrap_doc(nlohmann::json::array({good, bad}))).has_value());
+}
+
+TEST(LayerPresetAdversarialTest, NameIsTrimmedOnLoad) {
+    nlohmann::json layer = minimal_waveform_layer_json(1);
+    layer["name"] = "  padded  ";
+
+    std::optional<std::vector<Layer>> loaded =
+        layer_preset::deserialize(wrap_doc(nlohmann::json::array({layer})));
+
+    ASSERT_TRUE(loaded.has_value());
+    EXPECT_EQ((*loaded)[0].name, "padded");
+}

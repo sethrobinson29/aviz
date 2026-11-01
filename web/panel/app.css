@@ -88,6 +88,15 @@ button:disabled:hover {
     margin-bottom: 6px;
 }
 
+.layer-name {
+    flex: 1;
+    min-width: 0;
+}
+
+.layer-name::placeholder {
+    color: #8a8a94;
+}
+
 .drag-handle {
     cursor: grab;
     color: #8a8a94;

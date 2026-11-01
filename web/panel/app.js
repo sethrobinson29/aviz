@@ -8,6 +8,7 @@
     var BLEND_MODES = ["Normal", "Additive", "Multiply", "Screen"];
     var REACTIVITY_SOURCES = ["GlobalBeat", "BandOnset", "BandAmplitude"];
     var NUM_BANDS = 16;
+    var LAYER_NAME_MAX_LENGTH = 50;
     var PALETTE_NONE = "None";
     var PALETTE_CUSTOM = "Custom";
     var NAMED_PALETTES = [
@@ -103,8 +104,24 @@
         handle.textContent = "⠷";
 
         var titleText = document.createElement("span");
+
+        var nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "layer-name";
+        nameInput.maxLength = LAYER_NAME_MAX_LENGTH;
+        nameInput.setAttribute("aria-label", "Layer name");
+        nameInput.addEventListener("change", function () {
+            post("set_layer_name", { layer_id: layer.layer_id, name: nameInput.value });
+        });
+        nameInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                nameInput.blur();
+            }
+        });
+
         title.appendChild(handle);
         title.appendChild(titleText);
+        title.appendChild(nameInput);
         li.appendChild(title);
 
         var controls = document.createElement("div");
@@ -278,6 +295,7 @@
 
         li._els = {
             title: titleText,
+            name: nameInput,
             enabled: enabledInput,
             opacity: opacityInput,
             blend: blendSelect,
@@ -294,9 +312,11 @@
 
     function updateLayerRow(li, layer, index) {
         var els = li._els;
-        els.title.textContent = index + ": " + layer.visual_type + " (#" + layer.layer_id + ")";
+        els.title.textContent = index + ": " + layer.visual_type;
 
         var active = document.activeElement;
+        els.name.placeholder = "Layer " + (index + 1);
+        if (active !== els.name) els.name.value = layer.name;
         if (active !== els.enabled) els.enabled.checked = layer.enabled;
         if (active !== els.opacity) els.opacity.value = layer.opacity;
         if (active !== els.blend) els.blend.value = layer.blend_mode;

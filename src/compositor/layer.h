@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 
 #include "compositor/layer_types.h"
 #include "raylib.h"
@@ -24,6 +25,7 @@ struct Layer {
     float sensitivity = 1.0f;
     bool enabled = true;
     std::uint64_t layer_id = kInvalidLayerId;
+    std::string name;
 };
 
 std::unique_ptr<VisualModule> make_visual(VisualType type);

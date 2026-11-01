@@ -487,3 +487,39 @@ TEST(PanelMessageParseTest, RejectsPresetFilenamesThatWouldEscapeThePresetsDirec
         }
     }
 }
+
+TEST(PanelMessageParseTest, ParsesSetLayerName) {
+    auto message = expect_type<SetLayerNameMessage>(
+        panel_message::parse(R"({"type":"set_layer_name","layer_id":7,"name":"Kick pulse"})"));
+
+    EXPECT_EQ(message.layer_id, 7u);
+    EXPECT_EQ(message.name, "Kick pulse");
+}
+
+TEST(PanelMessageParseTest, SetLayerNameRejectsWrongJsonTypes) {
+    for (const char* name : {"null", "5", "true", "[]", "{}"}) {
+        const std::string text = std::string(R"({"type":"set_layer_name","layer_id":7,"name":)") + name + "}";
+        EXPECT_FALSE(panel_message::parse(text).has_value()) << name;
+    }
+}
+
+TEST(PanelMessageParseTest, SetLayerNameRejectsMissingFields) {
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_layer_name","layer_id":7})").has_value());
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_layer_name","name":"x"})").has_value());
+    EXPECT_FALSE(panel_message::parse(R"({"type":"set_layer_name","layer_id":-1,"name":"x"})").has_value());
+}
+
+TEST(PanelMessageParseTest, SetLayerNameLeavesContentChecksToApply) {
+    auto message = expect_type<SetLayerNameMessage>(panel_message::parse(
+        std::string(R"({"type":"set_layer_name","layer_id":7,"name":")") + std::string(51, 'a') + "\"}"));
+
+    EXPECT_EQ(message.name.size(), 51u);
+}
+
+TEST(PanelMessageParseTest, SetLayerNameRejectsRawInvalidUtf8AndLoneSurrogates) {
+    const std::string prefix = R"({"type":"set_layer_name","layer_id":7,"name":")";
+    const char backslash = static_cast<char>(92);
+
+    EXPECT_FALSE(panel_message::parse(prefix + "caf\xE9\"}").has_value());
+    EXPECT_FALSE(panel_message::parse(prefix + backslash + "ud800\"}").has_value());
+}

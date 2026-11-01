@@ -844,3 +844,74 @@ TEST_F(PanelMessageApplyPresetTest, SaveListAndLoadUseThePresetsDirectoryNotTheW
     ASSERT_EQ(compositor_.layers().size(), 1u);
     EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Spectrum);
 }
+
+TEST_F(PanelMessageApplyTest, SetLayerNameStoresTrimmedNameAndPushesItToThePanel) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+
+    apply(PanelMessage{SetLayerNameMessage{id, "  Kick pulse  "}});
+
+    EXPECT_EQ(compositor_.layers()[0].name, "Kick pulse");
+    EXPECT_EQ(sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["name"], "Kick pulse");
+}
+
+TEST_F(PanelMessageApplyTest, ClearingANameStoresEmpty) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+    compositor_.layers()[0].name = "Kick pulse";
+
+    apply(PanelMessage{SetLayerNameMessage{id, "   "}});
+
+    EXPECT_TRUE(compositor_.layers()[0].name.empty());
+}
+
+TEST_F(PanelMessageApplyTest, OverLengthNameIsRejectedWithStatusAndAStackPushThatRevertsThePanel) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+    compositor_.layers()[0].name = "Original";
+
+    apply(PanelMessage{SetLayerNameMessage{id, std::string(51, 'a')}});
+
+    EXPECT_EQ(compositor_.layers()[0].name, "Original");
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+    EXPECT_EQ(sent_of_kind(ui_host_, "layer_stack")["state"]["layers"][0]["name"], "Original");
+}
+
+TEST_F(PanelMessageApplyTest, EscapedControlCharacterFromThePanelChannelIsRejectedByApply) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+    const std::string text = R"({"type":"set_layer_name","layer_id":)" + std::to_string(id) + R"(,"name":"a)" +
+                             static_cast<char>(92) + R"(u0000b"})";
+
+    std::optional<PanelMessage> message = panel_message::parse(text);
+    ASSERT_TRUE(message.has_value());
+    apply(*message);
+
+    EXPECT_TRUE(compositor_.layers()[0].name.empty());
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+}
+
+TEST_F(PanelMessageApplyTest, InvalidUtf8BuiltNativelyNeverReachesTheStackOrThrows) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+
+    EXPECT_NO_THROW(apply(PanelMessage{SetLayerNameMessage{id, "caf\xE9"}}));
+
+    EXPECT_TRUE(compositor_.layers()[0].name.empty());
+}
+
+TEST_F(PanelMessageApplyTest, SetLayerNameForUnknownLayerChangesNothingAndStillPushesTheStack) {
+    compositor_.add_layer(VisualType::Waveform);
+
+    apply(PanelMessage{SetLayerNameMessage{999, "ghost"}});
+
+    EXPECT_TRUE(compositor_.layers()[0].name.empty());
+    EXPECT_EQ(sent_of_kind(ui_host_, "layer_stack")["kind"], "layer_stack");
+}
+
+TEST_F(PanelMessageApplyPresetTest, LayerNameSurvivesSaveAndLoadThroughThePanelPath) {
+    const std::uint64_t id = compositor_.layers()[compositor_.add_layer(VisualType::Waveform).value()].layer_id;
+    apply(PanelMessage{SetLayerNameMessage{id, "Kick pulse"}});
+    apply(PanelMessage{SavePresetMessage{"named.json"}});
+    apply(PanelMessage{SetLayerNameMessage{id, ""}});
+
+    apply(PanelMessage{LoadPresetMessage{"named.json"}});
+
+    ASSERT_EQ(compositor_.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers()[0].name, "Kick pulse");
+}

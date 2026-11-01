@@ -11,6 +11,7 @@
 #include "audio/audio_config.h"
 #include "compositor/compositor.h"
 #include "compositor/compositor_math.h"
+#include "compositor/layer_name.h"
 #include "visuals/flow_field/flow_field_visual.h"
 #include "visuals/fractal/fractal_visual.h"
 #include "visuals/lissajous/lissajous_visual.h"
@@ -322,6 +323,7 @@ nlohmann::json params_json_for_layer(const Layer& layer) {
 nlohmann::json layer_to_json(const Layer& layer) {
     nlohmann::json j;
     j["layer_id"] = layer.layer_id;
+    j["name"] = layer.name;
     j["visual_type"] = enum_to_string(layer.visual_type, kVisualTypeTable);
     j["enabled"] = layer.enabled;
     j["opacity"] = layer.opacity;
@@ -334,6 +336,21 @@ nlohmann::json layer_to_json(const Layer& layer) {
     j["sensitivity"] = layer.sensitivity;
     j["params"] = params_json_for_layer(layer);
     return j;
+}
+
+std::string optional_name_from_json(const nlohmann::json& j) {
+    if (!j.contains("name")) {
+        return std::string();
+    }
+    const nlohmann::json& field = j.at("name");
+    if (!field.is_string()) {
+        throw std::invalid_argument("name must be a string");
+    }
+    std::optional<std::string> name = layer_name::normalized(field.get<std::string>());
+    if (!name.has_value()) {
+        throw std::invalid_argument("name is not a valid layer name");
+    }
+    return *name;
 }
 
 Layer layer_from_json(const nlohmann::json& j) {
@@ -351,6 +368,7 @@ Layer layer_from_json(const nlohmann::json& j) {
 
     Layer layer{visual_type, make_visual_from_params_json(visual_type, j.at("params"))};
     layer.layer_id = layer_id;
+    layer.name = optional_name_from_json(j);
     layer.enabled = j.at("enabled").get<bool>();
     layer.opacity = compositor_math::clamp_opacity(require_number_field(j, "opacity"));
     layer.blend_mode = string_to_enum<LayerBlendMode>(j.at("blend_mode").get<std::string>(), kBlendModeTable);

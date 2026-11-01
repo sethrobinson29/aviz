@@ -51,6 +51,7 @@ std::optional<std::size_t> Compositor::duplicate_layer(std::size_t index) {
     copy.reactivity_source = source.reactivity_source;
     copy.sensitivity = source.sensitivity;
     copy.enabled = source.enabled;
+    copy.name = source.name;
     copy.layer_id = allocate_layer_id();
     if (width_ > 0 && height_ > 0) {
         copy.visual->resize(width_, height_);

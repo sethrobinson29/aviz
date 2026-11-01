@@ -187,6 +187,9 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
     if (type == "set_palette_override") {
         return SetPaletteOverrideMessage{require_layer_id(doc), parse_palette_override(doc)};
     }
+    if (type == "set_layer_name") {
+        return SetLayerNameMessage{require_layer_id(doc), require_string(doc, "name")};
+    }
     if (type == "set_visual_param") {
         return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc),
                                      require_visual_param_value(doc)};

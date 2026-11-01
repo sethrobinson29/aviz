@@ -63,6 +63,7 @@ gtest_discover_tests(visuals_tests)
 add_executable(compositor_tests
   compositor/compositor_math_test.cpp
   compositor/compositor_test.cpp
+  compositor/layer_name_test.cpp
   compositor/layer_test.cpp
   compositor/layer_preset_test.cpp
   compositor/preset_file_io_test.cpp
@@ -70,6 +71,7 @@ add_executable(compositor_tests
   ../src/compositor/compositor_math.cpp
   ../src/compositor/compositor.cpp
   ../src/compositor/layer.cpp
+  ../src/compositor/layer_name.cpp
   ../src/compositor/layer_preset.cpp
   ../src/compositor/preset_file_io.cpp
   ../src/compositor/visual_param.cpp
@@ -165,6 +167,7 @@ add_executable(ui_host_tests
   ../src/compositor/compositor.cpp
   ../src/compositor/compositor_math.cpp
   ../src/compositor/layer.cpp
+  ../src/compositor/layer_name.cpp
   ../src/compositor/layer_preset.cpp
   ../src/compositor/preset_file_io.cpp
   ../src/compositor/visual_param.cpp

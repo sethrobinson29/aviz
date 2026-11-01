@@ -94,6 +94,7 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     source.reactivity_source = ReactivitySource::BandAmplitude;
     source.sensitivity = 2.5f;
     source.enabled = false;
+    source.name = "Kick pulse";
 
     std::optional<std::size_t> new_index = compositor.duplicate_layer(source_index);
 
@@ -112,6 +113,16 @@ TEST(CompositorDuplicateLayerTest, CopiesFieldsAndAppendsAtEnd) {
     EXPECT_EQ(copy.reactivity_source, ReactivitySource::BandAmplitude);
     EXPECT_FLOAT_EQ(copy.sensitivity, 2.5f);
     EXPECT_FALSE(copy.enabled);
+    EXPECT_EQ(copy.name, "Kick pulse");
+}
+
+TEST(CompositorDuplicateLayerTest, UnnamedLayerDuplicatesAsUnnamed) {
+    Compositor compositor;
+    std::size_t source_index = compositor.add_layer(VisualType::Waveform).value();
+
+    std::size_t copy_index = compositor.duplicate_layer(source_index).value();
+
+    EXPECT_TRUE(compositor.layers()[copy_index].name.empty());
 }
 
 TEST(CompositorDuplicateLayerTest, WaveformParamsSurviveDuplication) {

@@ -68,6 +68,11 @@ struct SetPaletteOverrideMessage {
     std::shared_ptr<const Palette> palette_override;
 };
 
+struct SetLayerNameMessage {
+    std::uint64_t layer_id;
+    std::string name;
+};
+
 struct SetVisualParamMessage {
     std::uint64_t layer_id;
     std::string param_name;
@@ -102,9 +107,9 @@ using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
-                 SetPaletteOverrideMessage, SetVisualParamMessage, LoadPresetMessage, SavePresetMessage,
-                 SetDockedMessage, SetFullscreenMessage, SwitchSourceMessage, ImportFileMessage,
-                 EnableLoopbackMessage>;
+                 SetPaletteOverrideMessage, SetLayerNameMessage, SetVisualParamMessage, LoadPresetMessage,
+                 SavePresetMessage, SetDockedMessage, SetFullscreenMessage, SwitchSourceMessage,
+                 ImportFileMessage, EnableLoopbackMessage>;
 
 namespace panel_message {
 
