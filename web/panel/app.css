@@ -223,13 +223,15 @@ input[type="range"], input[type="checkbox"] {
 }
 
 .layer-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     border: 1px solid var(--border-card);
     border-radius: var(--radius-card);
-    padding: 8px;
+    padding: 12px;
     margin-bottom: 10px;
     background: var(--surface-card);
     box-shadow: var(--shadow-card);
-    user-select: none;
 }
 
 .layer-row:last-child {
@@ -241,48 +243,307 @@ input[type="range"], input[type="checkbox"] {
     background: var(--surface-drag-over);
 }
 
-.layer-title {
+.layer-header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-weight: bold;
-    margin-bottom: 6px;
-}
-
-.layer-name {
-    flex: 1;
-    min-width: 0;
-}
-
-.layer-name::placeholder {
-    color: var(--text-caption);
+    gap: 8px;
 }
 
 .drag-handle {
+    flex-shrink: 0;
+    width: 8px;
+    height: 12px;
+    padding: 4px 3px;
+    background-image:
+        radial-gradient(circle, var(--text-drag-handle) 1.2px, transparent 1.7px),
+        radial-gradient(circle, var(--text-drag-handle) 1.2px, transparent 1.7px);
+    background-size: 4px 4px;
+    background-position: 0 0, 4px 0;
+    background-repeat: repeat-y;
+    background-origin: content-box;
+    background-clip: content-box;
     cursor: grab;
-    color: var(--text-drag-handle);
-    padding: 0 2px;
+    user-select: none;
+}
+
+.drag-handle:hover {
+    background-image:
+        radial-gradient(circle, var(--text-control) 1.2px, transparent 1.7px),
+        radial-gradient(circle, var(--text-control) 1.2px, transparent 1.7px);
 }
 
 .drag-handle:active {
     cursor: grabbing;
 }
 
-.layer-controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-}
-
-.layer-controls label {
-    display: flex;
+.layer-number {
+    flex-shrink: 0;
+    min-width: 26px;
+    height: 20px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-    white-space: nowrap;
+    justify-content: center;
+    border-radius: var(--radius-badge);
+    background: var(--surface-well);
+    border: 1px solid var(--border-panel);
+    color: var(--color-accent);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+    user-select: none;
 }
 
-.layer-controls input[type="range"] {
-    width: 90px;
+input[type="checkbox"].switch {
+    -webkit-appearance: none;
+    appearance: none;
+    flex-shrink: 0;
+    position: relative;
+    width: var(--size-switch-width);
+    height: var(--size-switch-height);
+    margin: 0;
+    padding: 0;
+    border-radius: var(--radius-round);
+    background: var(--surface-track);
+    border: 1px solid var(--border-switch-off);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+input[type="checkbox"].switch::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: var(--size-switch-knob);
+    height: var(--size-switch-knob);
+    border-radius: 50%;
+    background: var(--color-switch-knob-off);
+    box-shadow: var(--shadow-switch-knob);
+}
+
+input[type="checkbox"].switch:checked {
+    background: var(--gradient-accent-vertical);
+    border-color: var(--color-accent);
+}
+
+input[type="checkbox"].switch:checked::before {
+    left: 18px;
+    background: var(--text-on-accent);
+    box-shadow: var(--shadow-switch-knob-on);
+}
+
+.layer-name {
+    flex: 1;
+    min-width: 0;
+    margin: 0 -2px;
+    padding: 4px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-input);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+}
+
+.layer-name::placeholder {
+    color: var(--text-caption);
+    font-weight: 600;
+}
+
+.layer-name:hover, .layer-name:focus {
+    background: var(--surface-well-raised);
+    border-color: var(--border-control);
+}
+
+abbr.type-chip {
+    flex-shrink: 0;
+    padding: 3px 6px;
+    border-radius: var(--radius-badge);
+    background: var(--surface-well);
+    border: 1px solid var(--border-panel);
+    color: var(--text-chip);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-decoration: none;
+    cursor: help;
+    user-select: none;
+}
+
+.layer-row.is-disabled .layer-number,
+.layer-row.is-disabled .layer-name,
+.layer-row.is-disabled abbr.type-chip {
+    color: var(--text-caption);
+}
+
+.icon-button {
+    flex-shrink: 0;
+    width: var(--size-remove-button);
+    height: var(--size-remove-button);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--surface-control-round);
+    border: 1px solid var(--border-control);
+    box-shadow: none;
+    color: var(--text-icon-button);
+}
+
+.icon-button:hover {
+    border-color: var(--border-button-hover);
+    color: var(--text-primary);
+}
+
+.icon-button svg {
+    display: block;
+    width: 12px;
+    height: 12px;
+}
+
+.module-toggle svg {
+    transition: transform 0.12s;
+}
+
+.module-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+.control-row {
+    display: flex;
+    gap: 8px;
+}
+
+.control-row.slider-row {
+    gap: 16px;
+}
+
+.field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.slider-field {
+    gap: 4px;
+}
+
+.field-caption {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--text-caption);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.field-caption-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.field-value {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-control);
+}
+
+select.pill {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    padding: 5px 22px 5px 10px;
+    border-radius: var(--radius-select);
+    background-color: var(--surface-well-raised);
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--color-select-arrow) 50%),
+        linear-gradient(135deg, var(--color-select-arrow) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    border: 1px solid var(--border-control);
+    color: var(--text-control);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+select.pill:hover {
+    border-color: var(--border-select-hover);
+    box-shadow: var(--shadow-select-hover);
+}
+
+select.pill option {
+    background: var(--surface-well-raised);
+    color: var(--text-control);
+}
+
+select.pill option:disabled {
+    color: var(--text-option-disabled);
+}
+
+input[type="range"].track {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: var(--size-slider-thumb);
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+input[type="range"].track::-webkit-slider-runnable-track {
+    height: var(--size-slider-track);
+    border-radius: var(--radius-round);
+    background:
+        var(--gradient-accent-horizontal) 0 0 / calc(7px + (100% - 14px) * var(--p, 0)) 100% no-repeat,
+        var(--surface-track);
+    box-shadow: var(--shadow-track);
+}
+
+input[type="range"].track::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: var(--size-slider-thumb);
+    height: var(--size-slider-thumb);
+    margin-top: -4px;
+    border-radius: 50%;
+    background: var(--gradient-thumb);
+    border: 1px solid var(--border-thumb);
+    box-shadow: var(--shadow-thumb);
+}
+
+input[type="range"].track:active::-webkit-slider-thumb {
+    background: var(--gradient-thumb-pressed);
+    box-shadow: var(--shadow-thumb-pressed);
+}
+
+.module-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px 16px;
+}
+
+.module-controls[hidden] {
+    display: none;
+}
+
+.switch-field {
+    gap: 4px;
 }
 
 #status {

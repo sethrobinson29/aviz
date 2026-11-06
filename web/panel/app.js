@@ -37,6 +37,7 @@
     var sourceButton = document.getElementById("source-button");
     var importFileButton = document.getElementById("import-file-button");
     var enableLoopbackButton = document.getElementById("enable-loopback-button");
+    var iconTemplate = document.getElementById("icon-template");
 
     var SOURCE_BUTTON_LABELS = { none: "No Source", file: "File", loopback: "Loopback" };
 
@@ -77,30 +78,172 @@
         return match ? match.name : PALETTE_CUSTOM;
     }
 
-    function labeledControl(labelText, inputEl) {
+    var VISUAL_TYPE_INFO = {
+        Waveform: { label: "Waveform", chip: "WAV" },
+        Spectrum: { label: "Spectrum", chip: "SPC" },
+        Radial: { label: "Radial", chip: "RAD" },
+        Lissajous: { label: "Lissajous", chip: "LIS" },
+        Particles: { label: "Particles", chip: "PRT" },
+        FlowField: { label: "Flow Field", chip: "FLW" },
+        Fractal: { label: "Fractal", chip: "FRC" }
+    };
+
+    var expandedModuleSections = new Map();
+
+    function visualTypeInfo(visualType) {
+        return VISUAL_TYPE_INFO[visualType] || { label: String(visualType), chip: "?" };
+    }
+
+    function stepDecimals(step) {
+        var text = String(step);
+        var dot = text.indexOf(".");
+        return dot < 0 ? 0 : text.length - dot - 1;
+    }
+
+    function formatSliderValue(input, value) {
+        var number = Number(value);
+        if (!isFinite(number)) return "";
+        var decimals = stepDecimals(input.step);
+        var text = number.toFixed(decimals);
+        if (parseFloat(text) === 0) {
+            text = (0).toFixed(decimals);
+        }
+        if (parseFloat(input.min) < 0 && parseFloat(text) > 0) {
+            text = "+" + text;
+        }
+        return text;
+    }
+
+    function setSliderFill(input) {
+        var min = parseFloat(input.min);
+        var max = parseFloat(input.max);
+        var value = parseFloat(input.value);
+        var fraction = max > min ? (value - min) / (max - min) : 0;
+        fraction = Math.min(1, Math.max(0, fraction));
+        input.style.setProperty("--p", String(fraction));
+    }
+
+    function iconSvg(symbolId) {
+        var svg = iconTemplate.content.firstElementChild.cloneNode(true);
+        svg.querySelector("use").setAttribute("href", "#" + symbolId);
+        return svg;
+    }
+
+    function iconButton(symbolId, label, onClick) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.className = "icon-button";
+        button.title = label;
+        button.setAttribute("aria-label", label);
+        button.appendChild(iconSvg(symbolId));
+        button.addEventListener("click", onClick);
+        return button;
+    }
+
+    function fieldCaption(labelText) {
+        var caption = document.createElement("span");
+        caption.className = "field-caption";
+        var text = document.createElement("span");
+        text.className = "field-caption-text";
+        text.textContent = labelText;
+        caption.appendChild(text);
+        return caption;
+    }
+
+    function selectField(labelText, select) {
         var label = document.createElement("label");
-        var span = document.createElement("span");
-        span.textContent = labelText;
-        label.appendChild(span);
-        label.appendChild(inputEl);
+        label.className = "field";
+        label.appendChild(fieldCaption(labelText));
+        select.classList.add("pill");
+        label.appendChild(select);
         return label;
     }
 
+    function sliderField(labelText, min, max, step, onInput) {
+        var label = document.createElement("label");
+        label.className = "field slider-field";
+        var caption = fieldCaption(labelText);
+        var readout = document.createElement("span");
+        readout.className = "field-value";
+        caption.appendChild(readout);
+        label.appendChild(caption);
+
+        var input = document.createElement("input");
+        input.type = "range";
+        input.className = "track";
+        input.min = min;
+        input.max = max;
+        input.step = step;
+        input.addEventListener("input", function () {
+            onInput(input);
+            setSliderFill(input);
+            readout.textContent = formatSliderValue(input, input.value);
+        });
+        label.appendChild(input);
+
+        return { field: label, input: input, readout: readout };
+    }
+
+    function switchField(labelText, onChange) {
+        var label = document.createElement("label");
+        label.className = "field switch-field";
+        label.appendChild(fieldCaption(labelText));
+        var input = document.createElement("input");
+        input.type = "checkbox";
+        input.className = "switch";
+        input.addEventListener("change", function () {
+            onChange(input);
+        });
+        label.appendChild(input);
+        return { field: label, input: input };
+    }
+
+    function syncSlider(slider, value, active) {
+        if (active !== slider.input) {
+            slider.input.value = value;
+        }
+        setSliderFill(slider.input);
+        slider.readout.textContent = formatSliderValue(slider.input, value);
+    }
+
+    function controlRow(extraClass, fields) {
+        var row = document.createElement("div");
+        row.className = extraClass ? "control-row " + extraClass : "control-row";
+        fields.forEach(function (field) {
+            row.appendChild(field);
+        });
+        return row;
+    }
+
     function buildLayerRow(layer) {
+        var info = visualTypeInfo(layer.visual_type);
+
         var li = document.createElement("li");
         li.className = "layer-row";
         li.dataset.layerId = String(layer.layer_id);
         li.dataset.visualType = layer.visual_type;
 
-        var title = document.createElement("div");
-        title.className = "layer-title";
+        var header = document.createElement("div");
+        header.className = "layer-header";
 
         var handle = document.createElement("span");
         handle.className = "drag-handle";
         handle.draggable = true;
-        handle.textContent = "⠷";
+        handle.title = "Drag to reorder";
+        handle.setAttribute("aria-hidden", "true");
+        header.appendChild(handle);
 
-        var titleText = document.createElement("span");
+        var number = document.createElement("span");
+        number.className = "layer-number";
+        header.appendChild(number);
+
+        var enabledInput = document.createElement("input");
+        enabledInput.type = "checkbox";
+        enabledInput.className = "switch";
+        enabledInput.addEventListener("change", function () {
+            post("set_enabled", { layer_id: layer.layer_id, enabled: enabledInput.checked });
+        });
+        header.appendChild(enabledInput);
 
         var nameInput = document.createElement("input");
         nameInput.type = "text";
@@ -115,38 +258,39 @@
                 nameInput.blur();
             }
         });
+        header.appendChild(nameInput);
 
-        title.appendChild(handle);
-        title.appendChild(titleText);
-        title.appendChild(nameInput);
-        li.appendChild(title);
+        var chip = document.createElement("abbr");
+        chip.className = "type-chip";
+        chip.title = info.label;
+        chip.textContent = info.chip;
+        header.appendChild(chip);
 
-        var controls = document.createElement("div");
-        controls.className = "layer-controls";
+        li.appendChild(header);
 
-        var enabledInput = document.createElement("input");
-        enabledInput.type = "checkbox";
-        enabledInput.addEventListener("change", function () {
-            post("set_enabled", { layer_id: layer.layer_id, enabled: enabledInput.checked });
+        var reactivitySelect = document.createElement("select");
+        populateSelect(reactivitySelect, REACTIVITY_SOURCES);
+        reactivitySelect.addEventListener("change", function () {
+            post("set_reactivity_source", { layer_id: layer.layer_id, reactivity_source: reactivitySelect.value });
         });
-        controls.appendChild(labeledControl("Enabled", enabledInput));
-
-        var opacityInput = document.createElement("input");
-        opacityInput.type = "range";
-        opacityInput.min = "0";
-        opacityInput.max = "1";
-        opacityInput.step = "0.01";
-        opacityInput.addEventListener("input", function () {
-            post("set_opacity", { layer_id: layer.layer_id, opacity: parseFloat(opacityInput.value) });
-        });
-        controls.appendChild(labeledControl("Opacity", opacityInput));
+        li.appendChild(controlRow(null, [selectField("Reactivity", reactivitySelect)]));
 
         var blendSelect = document.createElement("select");
         populateSelect(blendSelect, BLEND_MODES);
         blendSelect.addEventListener("change", function () {
             post("set_blend_mode", { layer_id: layer.layer_id, blend_mode: blendSelect.value });
         });
-        controls.appendChild(labeledControl("Blend", blendSelect));
+
+        var bandSelect = document.createElement("select");
+        var bandOptions = ["Global"];
+        for (var b = 0; b < NUM_BANDS; b++) {
+            bandOptions.push(String(b));
+        }
+        populateSelect(bandSelect, bandOptions);
+        bandSelect.addEventListener("change", function () {
+            var value = bandSelect.value === "Global" ? null : parseInt(bandSelect.value, 10);
+            post("set_freq_band", { layer_id: layer.layer_id, freq_band: value });
+        });
 
         var paletteSelect = document.createElement("select");
         populateSelect(paletteSelect, [PALETTE_NONE].concat(NAMED_PALETTES.map(function (palette) {
@@ -167,46 +311,29 @@
                 palette_override: selected ? { stops: selected.stops } : null
             });
         });
-        controls.appendChild(labeledControl("Palette", paletteSelect));
 
-        var bandSelect = document.createElement("select");
-        var bandOptions = ["Global"];
-        for (var b = 0; b < NUM_BANDS; b++) {
-            bandOptions.push(String(b));
-        }
-        populateSelect(bandSelect, bandOptions);
-        bandSelect.addEventListener("change", function () {
-            var value = bandSelect.value === "Global" ? null : parseInt(bandSelect.value, 10);
-            post("set_freq_band", { layer_id: layer.layer_id, freq_band: value });
+        li.appendChild(controlRow(null, [
+            selectField("Blend", blendSelect),
+            selectField("Band", bandSelect),
+            selectField("Palette", paletteSelect)
+        ]));
+
+        var opacitySlider = sliderField("Opacity", "0", "1", "0.01", function (input) {
+            post("set_opacity", { layer_id: layer.layer_id, opacity: parseFloat(input.value) });
         });
-        controls.appendChild(labeledControl("Band", bandSelect));
-
-        var reactivitySelect = document.createElement("select");
-        populateSelect(reactivitySelect, REACTIVITY_SOURCES);
-        reactivitySelect.addEventListener("change", function () {
-            post("set_reactivity_source", { layer_id: layer.layer_id, reactivity_source: reactivitySelect.value });
+        var sensitivitySlider = sliderField("Sensitivity", "0", "4", "0.1", function (input) {
+            post("set_sensitivity", { layer_id: layer.layer_id, sensitivity: parseFloat(input.value) });
         });
-        controls.appendChild(labeledControl("Reactivity", reactivitySelect));
+        li.appendChild(controlRow("slider-row", [opacitySlider.field, sensitivitySlider.field]));
 
-        var sensitivityInput = document.createElement("input");
-        sensitivityInput.type = "range";
-        sensitivityInput.min = "0";
-        sensitivityInput.max = "4";
-        sensitivityInput.step = "0.1";
-        sensitivityInput.addEventListener("input", function () {
-            post("set_sensitivity", { layer_id: layer.layer_id, sensitivity: parseFloat(sensitivityInput.value) });
-        });
-        controls.appendChild(labeledControl("Sensitivity", sensitivityInput));
-
-        var visualParamInputs = [];
+        var moduleControls = document.createElement("div");
+        moduleControls.className = "module-controls";
+        moduleControls.id = "module-controls-" + layer.layer_id;
+        var visualParamSliders = [];
+        var visualParamSwitches = [];
 
         function addVisualParamSlider(labelText, paramName, min, max, step, limit) {
-            var input = document.createElement("input");
-            input.type = "range";
-            input.min = min;
-            input.max = max;
-            input.step = step;
-            input.addEventListener("input", function () {
+            var slider = sliderField(labelText, min, max, step, function (input) {
                 if (limit) {
                     input.value = limit(parseFloat(input.value));
                 }
@@ -216,23 +343,23 @@
                     value: parseFloat(input.value)
                 });
             });
-            controls.appendChild(labeledControl(labelText, input));
-            visualParamInputs.push({ input: input, paramName: paramName });
-            return input;
+            moduleControls.appendChild(slider.field);
+            slider.paramName = paramName;
+            visualParamSliders.push(slider);
+            return slider.input;
         }
 
-        function addVisualParamCheckbox(labelText, paramName) {
-            var input = document.createElement("input");
-            input.type = "checkbox";
-            input.addEventListener("change", function () {
+        function addVisualParamSwitch(labelText, paramName) {
+            var entry = switchField(labelText, function (input) {
                 post("set_visual_param", {
                     layer_id: layer.layer_id,
                     param_name: paramName,
                     value: input.checked
                 });
             });
-            controls.appendChild(labeledControl(labelText, input));
-            visualParamInputs.push({ input: input, paramName: paramName });
+            moduleControls.appendChild(entry.field);
+            entry.paramName = paramName;
+            visualParamSwitches.push(entry);
         }
 
         if (layer.visual_type === "Particles") {
@@ -245,8 +372,8 @@
             addVisualParamSlider("Turbulence", "turbulence_frequency", "0.002", "0.05", "0.001");
             addVisualParamSlider("Evolution Speed", "evolution_per_frame", "0", "0.05", "0.001");
             addVisualParamSlider("Grid Resolution", "grid_cols", "8", "32", "1");
-            addVisualParamCheckbox("Ripple on Onset", "ripple_on_onset_enabled");
-            addVisualParamCheckbox("Burst on Onset", "burst_on_onset_enabled");
+            addVisualParamSwitch("Ripple on Onset", "ripple_on_onset_enabled");
+            addVisualParamSwitch("Burst on Onset", "burst_on_onset_enabled");
         } else if (layer.visual_type === "Radial") {
             var innerRadiusInput = addVisualParamSlider(
                 "Inner Radius", "inner_radius_fraction", "0", "0.95", "0.01",
@@ -268,71 +395,90 @@
             addVisualParamSlider("Orbit Speed", "julia_angular_speed_radians_per_sec", "0", "1", "0.01");
             addVisualParamSlider("Orbit Center X", "julia_orbit_center_x", "-0.5", "0.5", "0.01");
             addVisualParamSlider("Orbit Center Y", "julia_orbit_center_y", "-0.5", "0.5", "0.01");
-            addVisualParamCheckbox("Clockwise Orbit", "julia_orbit_clockwise");
             addVisualParamSlider("Color Cycle Speed", "color_cycle_speed_hz", "0", "0.5", "0.005");
+            addVisualParamSwitch("Clockwise Orbit", "julia_orbit_clockwise");
         }
 
-        var dupBtn = document.createElement("button");
-        dupBtn.type = "button";
-        dupBtn.textContent = "Duplicate";
-        dupBtn.addEventListener("click", function () {
+        var moduleToggle = null;
+        if (moduleControls.childElementCount > 0) {
+            var expanded = expandedModuleSections.get(layer.layer_id) === true;
+            moduleControls.hidden = !expanded;
+            moduleToggle = iconButton("icon-chevron", "", function () {
+                var nowExpanded = moduleControls.hidden;
+                moduleControls.hidden = !nowExpanded;
+                if (nowExpanded) {
+                    expandedModuleSections.set(layer.layer_id, true);
+                } else {
+                    expandedModuleSections.delete(layer.layer_id);
+                }
+                updateModuleToggle(moduleToggle, info, nowExpanded);
+            });
+            moduleToggle.classList.add("module-toggle");
+            moduleToggle.setAttribute("aria-controls", moduleControls.id);
+            updateModuleToggle(moduleToggle, info, expanded);
+            header.appendChild(moduleToggle);
+            li.appendChild(moduleControls);
+        }
+
+        header.appendChild(iconButton("icon-duplicate", "Duplicate " + info.label + " layer", function () {
             post("duplicate_layer", { layer_id: layer.layer_id });
-        });
-        controls.appendChild(dupBtn);
-
-        var removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.textContent = "Remove";
-        removeBtn.addEventListener("click", function () {
+        }));
+        header.appendChild(iconButton("icon-remove", "Remove " + info.label + " layer", function () {
             post("remove_layer", { layer_id: layer.layer_id });
-        });
-        controls.appendChild(removeBtn);
-
-        li.appendChild(controls);
+        }));
 
         li._els = {
-            title: titleText,
+            number: number,
             name: nameInput,
             enabled: enabledInput,
-            opacity: opacityInput,
+            opacity: opacitySlider,
             blend: blendSelect,
             palette: paletteSelect,
             paletteCustomOption: paletteCustomOption,
             band: bandSelect,
             reactivity: reactivitySelect,
-            sensitivity: sensitivityInput,
-            visualParams: visualParamInputs
+            sensitivity: sensitivitySlider,
+            visualParamSliders: visualParamSliders,
+            visualParamSwitches: visualParamSwitches,
+            info: info
         };
 
         return li;
     }
 
+    function updateModuleToggle(toggle, info, expanded) {
+        var label = (expanded ? "Hide " : "Show ") + info.label + " controls";
+        toggle.title = label;
+        toggle.setAttribute("aria-label", label);
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    }
+
     function updateLayerRow(li, layer, index) {
         var els = li._els;
-        els.title.textContent = index + ": " + layer.visual_type;
+        var position = index + 1;
+        els.number.textContent = position < 10 ? "0" + position : String(position);
+        li.classList.toggle("is-disabled", !layer.enabled);
+        els.enabled.setAttribute("aria-label", els.info.label + " layer visible");
 
         var active = document.activeElement;
-        els.name.placeholder = "Layer " + (index + 1);
+        els.name.placeholder = "Layer " + position;
         if (active !== els.name) els.name.value = layer.name;
         if (active !== els.enabled) els.enabled.checked = layer.enabled;
-        if (active !== els.opacity) els.opacity.value = layer.opacity;
+        syncSlider(els.opacity, layer.opacity, active);
         if (active !== els.blend) els.blend.value = layer.blend_mode;
         var paletteSelection = paletteSelectionFor(layer.palette_override);
         els.paletteCustomOption.hidden = paletteSelection !== PALETTE_CUSTOM;
         if (active !== els.palette) els.palette.value = paletteSelection;
-        els.visualParams.forEach(function (entry) {
-            if (active === entry.input) return;
-            var current = layer.params[entry.paramName];
-            if (entry.input.type === "checkbox") {
-                entry.input.checked = current === true;
-            } else {
-                entry.input.value = current;
-            }
+        els.visualParamSliders.forEach(function (slider) {
+            syncSlider(slider, layer.params[slider.paramName], active);
+        });
+        els.visualParamSwitches.forEach(function (entry) {
+            if (active !== entry.input) entry.input.checked = layer.params[entry.paramName] === true;
         });
         var bandValue = layer.freq_band === null ? "Global" : String(layer.freq_band);
         if (active !== els.band) els.band.value = bandValue;
         if (active !== els.reactivity) els.reactivity.value = layer.reactivity_source;
-        if (active !== els.sensitivity) els.sensitivity.value = layer.sensitivity;
+        syncSlider(els.sensitivity, layer.sensitivity, active);
     }
 
     function renderLayerList(layers) {
@@ -349,6 +495,9 @@
         layers.forEach(function (layer, index) {
             var li = layerRowElements.get(layer.layer_id);
             if (!li || li.dataset.visualType !== layer.visual_type) {
+                if (li) {
+                    expandedModuleSections.delete(layer.layer_id);
+                }
                 var rebuilt = buildLayerRow(layer);
                 if (li) {
                     li.replaceWith(rebuilt);
@@ -366,6 +515,7 @@
             if (!seenIds.has(id)) {
                 li.remove();
                 layerRowElements.delete(id);
+                expandedModuleSections.delete(id);
             }
         });
 

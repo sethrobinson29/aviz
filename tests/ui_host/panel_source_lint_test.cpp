@@ -109,14 +109,25 @@ TEST(PanelSourceLintTest, AppJsHasNoForbiddenPatterns) {
     EXPECT_THAT(panel_source_lint::js_forbidden_patterns(read_all(kPanelDir / "app.js")), IsEmpty());
 }
 
-TEST(PanelSourceLintTest, EveryTokenAppCssUsesIsDefinedByTheTheme) {
+TEST(PanelSourceLintTest, EveryTokenAppCssUsesIsDefinedByTheThemeOrSetByAppJs) {
     const std::string theme = read_all(kPanelDir / "themes" / "dark-y2k.css");
+    const std::string js = read_all(kPanelDir / "app.js");
     const std::vector<std::string> used = panel_source_lint::css_custom_properties_used(read_all(kPanelDir / "app.css"));
 
     EXPECT_FALSE(used.empty());
     for (const std::string& name : used) {
-        EXPECT_NE(theme.find(name + ":"), std::string::npos) << name;
+        const bool defined_by_theme = theme.find(name + ":") != std::string::npos;
+        const bool set_by_app_js = js.find("setProperty(\"" + name + "\"") != std::string::npos;
+        EXPECT_TRUE(defined_by_theme || set_by_app_js) << name;
     }
+}
+
+TEST(PanelSourceLintTest, SliderFillPropertyIsSetOnlyByAppJsNotByTheTheme) {
+    const std::string theme = read_all(kPanelDir / "themes" / "dark-y2k.css");
+    const std::string js = read_all(kPanelDir / "app.js");
+
+    EXPECT_EQ(theme.find("--p:"), std::string::npos);
+    EXPECT_NE(js.find("setProperty(\"--p\""), std::string::npos);
 }
 
 TEST(PanelSourceLintTest, ThemeLoadsBeforeAppCss) {

@@ -53,6 +53,11 @@
     --text-add-button-hover: #e4f2dc;
     --text-drag-handle: #6b7680;
     --text-on-accent: #0a0f13;
+    --text-chip: #9aa6b0;
+    --text-icon-button: #8a97a3;
+    --text-option-disabled: #4a5560;
+    --color-select-arrow: #6b7680;
+    --color-switch-knob-off: #8a97a3;
 
     --status-success: #9dff5c;
     --status-failure: #ff7a70;
@@ -86,6 +91,7 @@
     --size-title-bar: 46px;
     --size-switch-width: 34px;
     --size-switch-height: 18px;
+    --size-switch-knob: 12px;
     --size-slider-thumb: 14px;
     --size-slider-track: 6px;
     --size-remove-button: 22px;

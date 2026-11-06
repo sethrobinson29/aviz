@@ -248,6 +248,23 @@ run directly from `tsan/`.
   Add-layer buttons show labels at 410 CSS px wide and up, and icons only below
   that; `title` and `aria-label` stay in both cases. Preset save and load sit in
   the footer: filename field, then Save Preset and Load Preset on one row.
+- **Layer card**: the header row holds, left to right, a dotted drag handle
+  (the only place a drag starts), the stack number (`01` is the first layer in
+  the compositor's order, at the top of the list and rearmost on screen), a
+  visibility switch (`enabled`), the name field, a type chip (`WAV`, `SPC`,
+  `RAD`, `LIS`, `PRT`, `FLW`, `FRC`, full name on hover), a show/hide toggle
+  for the module controls, Duplicate and Remove. Below it: Reactivity on its
+  own row, then Blend, Band and Palette, then Opacity and Sensitivity. Every
+  slider shows its current value on its caption line, with as many decimals as
+  the slider's step and a `+` sign when its range goes below zero; the value
+  shown is the one the app reports back, so a value the app clamps shows as
+  clamped. A layer's own module controls sit in a two-column grid under those,
+  collapsed by default; Waveform and Spectrum have none and show no toggle.
+  Whether a card is expanded lives only in the panel, is not saved in presets,
+  and resets to collapsed if a layer is rebuilt as a different type. A disabled
+  layer dims its number, name and chip. The slider fill comes from a `--p`
+  property that `app.js` sets, so the panel lint accepts a property used in
+  `app.css` if the theme defines it or `app.js` sets it with `setProperty`.
 - **Control panel window**: a `UIHost` interface (`src/ui_host/ui_host.h`)
   with a WebView2 implementation, opening alongside the raylib visualizer
   window with no shared-surface compositing, on its own dedicated thread.
