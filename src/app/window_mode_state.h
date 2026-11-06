@@ -8,6 +8,7 @@ struct WindowLayoutAction {
     bool hide_panel = false;
     bool enter_fullscreen = false;
     bool exit_fullscreen = false;
+    bool restore_windowed_rect = false;
 };
 
 class WindowModeState {

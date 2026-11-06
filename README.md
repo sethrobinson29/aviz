@@ -171,8 +171,7 @@ run directly from `tsan/`.
   (shortcut, another shell, double-click). Each build configuration has its
   own executable folder and therefore its own `presets/`
   (`build/Debug/presets`, `build/Release/presets`). Paths are handled as
-  UTF-8 throughout, so preset and audio files with non-ASCII names work; a
-  file in `presets/` whose name is not valid Unicode is left out of the list.
+  UTF-8 throughout, so preset and audio files with non-ASCII names work.
   Every layer carries a stable `layer_id`, assigned on creation and
   preserved across save/load, so a reference to a specific layer survives a
   reorder — loading validates the id set (no duplicates, none invalid)
@@ -184,8 +183,9 @@ run directly from `tsan/`.
   boundary fade), so a hand-edited preset with out-of-range numbers loads
   with those values pulled to the nearest limit instead of as written. A
   palette override with no stops, or with stops out of ascending order, is
-  rejected; stop positions outside 0-1 are clamped. Presets are saved, listed and loaded from the
-  control panel (see "Layer management from the panel" below).
+  rejected; stop positions outside 0-1 are clamped. Presets are saved and
+  loaded from the control panel (see "Preset save and load from the panel"
+  below).
 - **Palette override** (milestone 7): a per-layer `palette_override`
   gradient (`Layer.palette_override`) that replaces a visual's own flat
   color with a sampled gradient. A layer with an override skips its tint
@@ -246,8 +246,29 @@ run directly from `tsan/`.
   part that scrolls, with a themed scrollbar), a one-line status line (long
   messages truncate, with the full text as hovertext), and a fixed footer.
   Add-layer buttons show labels at 410 CSS px wide and up, and icons only below
-  that; `title` and `aria-label` stay in both cases. Preset save and load sit in
-  the footer: filename field, then Save Preset and Load Preset on one row.
+  that; `title` and `aria-label` stay in both cases. The header's source row
+  is Import File, Enable Loopback, the source pill and the **Docked** checkbox.
+  The footer is one row: filename field, Save Preset, Load Preset.
+- **Source pill**: shows `No Source`, `File` or `Loopback` and is the
+  source-switch button. With no source it has a dashed outline and is
+  disabled; once a source is chosen it is solid green and clicking it toggles
+  between the imported file and loopback. Enable Loopback is disabled while
+  loopback is active. Switching back from loopback when no file was ever
+  imported fails with a red status-line message.
+- **Preset save and load from the panel**: Save Preset writes the typed
+  filename (`.json` appended if missing) to `presets/`, overwriting silently,
+  and reports in the status line. Load Preset opens the native Windows open
+  dialog, owned by the panel, starting in `presets/` (created if missing) and
+  filtered to `.json`; it can navigate anywhere. The panel never sees or sends
+  a path: the dialog runs on the panel's thread and queues the chosen path as
+  a native-only message the panel's own channel cannot produce, and the
+  render thread reads the file (at most 1 MiB, checked before parsing),
+  validates all of it, and only then replaces the stack. If anything fails,
+  nothing changes and a native popup names the file and says why (could not
+  be read, too large, not a valid preset, bad layer ids); a successful load
+  reports in the status line. The visualizer keeps rendering while the dialog
+  or popup is open, since both run on the panel's thread. There is no preset
+  list or Refresh button any more.
 - **Layer card**: the header row holds, left to right, a dotted drag handle
   (the only place a drag starts), the stack number (`01` is the first layer in
   the compositor's order, at the top of the list and rearmost on screen), a
@@ -278,7 +299,8 @@ run directly from `tsan/`.
   also clear the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment
   variable before starting WebView2, so it cannot switch remote debugging
   back on). The panel page cannot ask the app to open a file by path: an
-  audio file can only be chosen through the native file dialog. WebView2
+  audio file or a preset to load can only be chosen through a native file
+  dialog. WebView2
   callbacks never call `Compositor` (or any window-mode-changing function)
   directly — they push onto a mutex-guarded `PanelDispatchQueue` that the
   render thread drains once per frame and applies via `panel_message_apply`,
@@ -287,7 +309,7 @@ run directly from `tsan/`.
   duplicate/drag-to-reorder, plus every generic per-layer control (opacity,
   blend mode, palette override, `freq_band`, `reactivity_source`,
   `sensitivity`, `enabled`)
-  and preset list/load/save — all reusing the existing tested
+  and preset load/save — all reusing the existing tested
   `layer_preset`/`preset_file_io` schema and validation. The keyboard debug
   tool that predated the panel has been removed: the only keys the
   visualizer window still handles are `F11` (fullscreen), `K` (dock) and
@@ -368,26 +390,33 @@ run directly from `tsan/`.
   count are not exposed. Other visual modules' params can add their own
   case to `visual_param::set` the same way, without a new message type per
   module.
-- **Docked/detached window layout**: at launch (and whenever redocking) the
-  visualizer and panel windows are positioned as one adjacent, centered
-  block (`window_layout_config.h`'s pure `compute_docked_layout`); detaching
-  is a pure state flip that stops enforcing that layout, for the
-  panel-on-one-display / visualizer-fullscreen-on-another workflow.
-  Dragging either window while nominally docked is treated as an explicit
-  detach (caught via `WM_EXITSIZEMOVE`, which only fires for genuine
-  interactive drags, never the app's own programmatic repositioning) rather
-  than letting them silently drift out of sync.
-- **Fullscreen, dock, and audio source are synced three ways**: the panel's
-  checkboxes/button, the existing hotkeys (`F11`/`K`/`L`), and — new — those
-  same hotkeys now also work while the panel window has focus (a JS
-  `keydown` listener re-sends the identical panel message the UI control
-  would send, no new native surface). Fullscreen uses raylib's
+- **Docked/detached window layout**: at launch the visualizer and panel
+  windows are positioned as one adjacent block centered on the visualizer's
+  monitor (`window_layout_config.h`'s pure `compute_docked_layout`, which
+  works from a monitor's origin, so secondary monitors and ones left of or
+  above the primary work). Checking **Docked** snaps both windows back to that
+  block, centered on the monitor the panel is on. Moving either window or
+  resizing the panel unchecks it; this is detected with `WM_ENTERSIZEMOVE`/
+  `WM_EXITSIZEMOVE` and the window rectangle is compared across the two, so
+  clicking a title bar without moving does not detach. Entering or leaving
+  fullscreen never changes the checkbox. Leaving fullscreen snaps to the
+  docked block if it is checked, and otherwise returns the visualizer to the
+  position and size it had before fullscreen.
+- **Hotkeys**: `F11` toggles fullscreen, `K` toggles Docked and `L` toggles
+  the audio source (once a source has been chosen). They work in the
+  visualizer window and in the panel. In the panel they are ignored while
+  typing in a text field (layer name, preset filename), and on key repeat or
+  with Ctrl, Alt or Windows held; sliders, switches, checkboxes and dropdowns
+  no longer block them. The panel has no fullscreen control of its own; the
+  panel's `F11` sends the same message the visualizer's would, and the panel
+  tracks docked, fullscreen and source state from the app's `window_state`
+  pushes rather than from its controls. Fullscreen uses raylib's
   `ToggleBorderlessWindowed()`, not `ToggleFullscreen()`'s exclusive
   display-mode switch, specifically to avoid the signal
   renegotiation/mode-switch artifacts some displays show under real
   exclusive fullscreen. `AudioSourceController` is the single source of
   truth for the current audio source (none/file/loopback), shared by the
-  `L` hotkey and the panel's source-switch button — no second switching
+  `L` hotkey and the panel's source pill — no second switching
   mechanism alongside `ProducerHost::switch_to`.
 - **No default audio source at launch.** `aviz.exe` takes no audio-file
   argument anymore and starts with no active `AudioProducer` at all
@@ -399,5 +428,5 @@ run directly from `tsan/`.
   as every other panel action — the file dialog itself runs on the WebView2
   thread, but only ever enqueues the resulting path for the render thread to
   apply, never calling `ProducerHost`/`AudioSourceController` directly. The
-  panel's source-switch button shows "No Source" and is disabled until a
-  source is first chosen; it then toggles between the two as before.
+  source pill shows "No Source" and is disabled until a source is first
+  chosen; it then toggles between the two as before.

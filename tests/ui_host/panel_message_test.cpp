@@ -346,27 +346,19 @@ TEST(PanelMessageParseTest, SetVisualParamRejectsNonStringParamName) {
             .has_value());
 }
 
-TEST(PanelMessageParseTest, ParsesLoadPreset) {
-    auto message = panel_message::parse(R"({"type":"load_preset","filename":"my-preset.json"})");
-    LoadPresetMessage typed = expect_type<LoadPresetMessage>(message);
-    EXPECT_EQ(typed.filename, "my-preset.json");
-}
-
-TEST(PanelMessageParseTest, LoadPresetRejectsPathTraversal) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"load_preset","filename":"../secret.json"})").has_value());
-}
-
-TEST(PanelMessageParseTest, LoadPresetRejectsPathSeparators) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"load_preset","filename":"sub/dir.json"})").has_value());
-    EXPECT_FALSE(panel_message::parse(R"({"type":"load_preset","filename":"sub\\dir.json"})").has_value());
-}
-
-TEST(PanelMessageParseTest, LoadPresetRejectsNonJsonExtension) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"load_preset","filename":"preset.txt"})").has_value());
-}
-
-TEST(PanelMessageParseTest, LoadPresetRejectsEmptyFilename) {
-    EXPECT_FALSE(panel_message::parse(R"({"type":"load_preset","filename":""})").has_value());
+TEST(PanelMessageParseTest, PresetLoadingIsNotAcceptedFromThePanelMessageChannel) {
+    for (const char* text : {
+             R"({"type":"load_preset","filename":"my-preset.json"})",
+             R"({"type":"load_preset","filename":"../secret.json"})",
+             R"({"type":"load_preset_file","path":"C:\\Users\\someone\\preset.json"})",
+             R"({"type":"load_preset_file","path":"preset.json"})",
+             R"({"type":"load_preset_file"})",
+             R"({"type":"open_preset_dialog"})",
+             R"({"type":"open_preset_dialog","path":"C:\\Windows\\win.ini"})",
+             R"({"type":"open_file_dialog"})",
+         }) {
+        EXPECT_FALSE(panel_message::parse(text).has_value()) << text;
+    }
 }
 
 TEST(PanelMessageParseTest, ParsesSavePreset) {
@@ -479,7 +471,7 @@ TEST(PanelMessageParseTest, VisualParamValueBeyondFloatRangeParsesToAFiniteFloat
 }
 
 TEST(PanelMessageParseTest, RejectsPresetFilenamesThatWouldEscapeThePresetsDirectoryOnWindows) {
-    for (const char* type : {"save_preset", "load_preset"}) {
+    for (const char* type : {"save_preset"}) {
         for (const char* filename : {"C:evil.json", "name:stream.json", "NUL.json", "a*b.json"}) {
             const std::string text =
                 std::string(R"({"type":")") + type + R"(","filename":")" + filename + R"("})";

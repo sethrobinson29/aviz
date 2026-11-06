@@ -86,13 +86,17 @@ int run_app(std::optional<int> generate_layer_count) {
         InitWindow(window_layout::kVisualizerWidth, window_layout::kVisualizerHeight, "aviz");
         SetTargetFPS(kTargetFps);
 
+        const int startup_monitor = GetCurrentMonitor();
+        const Vector2 startup_monitor_origin = GetMonitorPosition(startup_monitor);
         const DockedLayout initial_layout = window_layout::compute_docked_layout(
-            GetMonitorWidth(GetCurrentMonitor()), GetMonitorHeight(GetCurrentMonitor()));
+            WindowRect{static_cast<int>(startup_monitor_origin.x), static_cast<int>(startup_monitor_origin.y),
+                       GetMonitorWidth(startup_monitor), GetMonitorHeight(startup_monitor)});
         SetWindowPosition(initial_layout.visualizer.x, initial_layout.visualizer.y);
 
-        std::unique_ptr<UIHost> ui_host =
-            create_ui_host(resolve_absolute_panel_content_dir(), initial_layout.panel.x, initial_layout.panel.y,
-                            initial_layout.panel.width, initial_layout.panel.height);
+        const std::string presets_dir = preset_file_io::presets_directory_in(GetApplicationDirectory());
+        std::unique_ptr<UIHost> ui_host = create_ui_host(
+            resolve_absolute_panel_content_dir(), presets_dir, initial_layout.panel.x, initial_layout.panel.y,
+            initial_layout.panel.width, initial_layout.panel.height);
 
         std::printf(
             "hotkeys:\n"
@@ -112,7 +116,6 @@ int run_app(std::optional<int> generate_layer_count) {
             populate_startup_layers(compositor, generate_layer_count);
             compositor_math::reassign_layer_tints(compositor.layers());
 
-            const std::string presets_dir = preset_file_io::presets_directory_in(GetApplicationDirectory());
             panel_message_apply::PanelApplyContext apply_ctx{compositor, *ui_host, window_layout_controller,
                                                                audio_source_controller, presets_dir};
 

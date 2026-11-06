@@ -29,13 +29,6 @@ void push_layer_stack(Compositor& compositor, UIHost& ui_host) {
     ui_host.send_to_panel(to_panel_json(msg));
 }
 
-void push_preset_list(UIHost& ui_host, const std::string& presets_dir) {
-    nlohmann::json msg;
-    msg["kind"] = "preset_list";
-    msg["files"] = preset_file_io::list_preset_files(presets_dir);
-    ui_host.send_to_panel(to_panel_json(msg));
-}
-
 void push_status(UIHost& ui_host, bool ok, const std::string& text) {
     nlohmann::json msg;
     msg["kind"] = "status";
@@ -44,13 +37,18 @@ void push_status(UIHost& ui_host, bool ok, const std::string& text) {
     ui_host.send_to_panel(to_panel_json(msg));
 }
 
-void push_full_state(PanelApplyContext& ctx) {
+std::string file_name_of(const std::string& path) {
+    const std::size_t separator = path.find_last_of("\\/");
+    return separator == std::string::npos ? path : path.substr(separator + 1);
+}
+
+void reject_preset_file(PanelApplyContext& ctx, const std::string& name, const std::string& reason) {
+    ctx.ui_host.show_alert("\"" + name + "\" is not a valid preset file, so nothing was loaded.\n\n" + reason);
     push_layer_stack(ctx.compositor, ctx.ui_host);
-    push_preset_list(ctx.ui_host, ctx.presets_dir);
 }
 
 void apply_one(const RequestStateMessage&, PanelApplyContext& ctx) {
-    push_full_state(ctx);
+    push_layer_stack(ctx.compositor, ctx.ui_host);
     push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
 }
 
@@ -176,30 +174,31 @@ void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
     push_layer_stack(ctx.compositor, ctx.ui_host);
 }
 
-void apply_one(const LoadPresetMessage& msg, PanelApplyContext& ctx) {
-    const std::string path = preset_file_io::preset_path(ctx.presets_dir, msg.filename);
-    preset_file_io::ReadResult read_result = preset_file_io::read_file(path);
+void apply_one(const LoadPresetFileMessage& msg, PanelApplyContext& ctx) {
+    const std::string name = file_name_of(msg.path);
+    preset_file_io::ReadResult read_result = preset_file_io::read_file(msg.path);
     if (!read_result.success) {
-        push_status(ctx.ui_host, false, "failed loading preset from " + msg.filename + ": " + read_result.error);
-        push_layer_stack(ctx.compositor, ctx.ui_host);
+        reject_preset_file(ctx, name,
+                           read_result.too_large
+                               ? "It is larger than " + std::to_string(preset_file_io::kMaxPresetFileBytes / 1024) +
+                                     " KB."
+                               : std::string("It could not be read."));
         return;
     }
 
     std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(read_result.contents);
     if (!loaded.has_value()) {
-        push_status(ctx.ui_host, false, "preset " + msg.filename + " is malformed or invalid");
-        push_layer_stack(ctx.compositor, ctx.ui_host);
+        reject_preset_file(ctx, name, "Its contents are not a valid layer preset.");
         return;
     }
 
     if (!ctx.compositor.replace_layers_if_ids_valid(std::move(*loaded))) {
-        push_status(ctx.ui_host, false, "preset " + msg.filename + " was rejected by the compositor");
-        push_layer_stack(ctx.compositor, ctx.ui_host);
+        reject_preset_file(ctx, name, "Its layer ids are missing, repeated or invalid.");
         return;
     }
 
     push_status(ctx.ui_host, true,
-                "loaded " + std::to_string(ctx.compositor.layers().size()) + " layer(s) from " + msg.filename);
+                "loaded " + std::to_string(ctx.compositor.layers().size()) + " layer(s) from " + name);
     push_layer_stack(ctx.compositor, ctx.ui_host);
 }
 
@@ -213,7 +212,7 @@ void apply_one(const SavePresetMessage& msg, PanelApplyContext& ctx) {
     } else {
         push_status(ctx.ui_host, false, "failed saving preset to " + msg.filename + ": " + result.error);
     }
-    push_full_state(ctx);
+    push_layer_stack(ctx.compositor, ctx.ui_host);
 }
 
 void apply_one(const SetDockedMessage& msg, PanelApplyContext& ctx) {

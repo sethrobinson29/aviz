@@ -32,9 +32,8 @@
     <div class="source-row">
       <button id="import-file-button" class="metal-button" type="button">Import File</button>
       <button id="enable-loopback-button" class="metal-button" type="button">Enable Loopback</button>
-      <button id="source-button" class="source-pill" type="button">No Source</button>
+      <button id="source-button" class="source-pill" type="button" disabled>No Source</button>
       <label class="window-option"><input type="checkbox" id="dock-checkbox" /> Docked</label>
-      <label class="window-option"><input type="checkbox" id="fullscreen-checkbox" /> Fullscreen</label>
     </div>
 
     <div class="add-layer">
@@ -81,10 +80,6 @@
       <input id="save-preset-name" type="text" placeholder="filename.json" aria-label="Preset filename" />
       <button id="save-preset-button" class="ghost-button" type="button">Save Preset</button>
       <button id="load-preset-button" class="ghost-button" type="button">Load Preset</button>
-    </div>
-    <div class="footer-row">
-      <select id="preset-select" aria-label="Preset to load"></select>
-      <button id="refresh-presets-button" class="ghost-button" type="button">Refresh</button>
     </div>
   </footer>
 </div>

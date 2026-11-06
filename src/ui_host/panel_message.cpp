@@ -194,9 +194,6 @@ PanelMessage parse_typed(const std::string& type, const nlohmann::json& doc) {
         return SetVisualParamMessage{require_layer_id(doc), require_param_name(doc),
                                      require_visual_param_value(doc)};
     }
-    if (type == "load_preset") {
-        return LoadPresetMessage{require_preset_filename(doc)};
-    }
     if (type == "save_preset") {
         return SavePresetMessage{require_preset_filename(doc)};
     }

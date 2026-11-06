@@ -29,17 +29,23 @@
     ];
 
     var layerListEl = document.getElementById("layer-list");
-    var presetSelectEl = document.getElementById("preset-select");
     var statusEl = document.getElementById("status");
     var savePresetNameEl = document.getElementById("save-preset-name");
     var dockCheckbox = document.getElementById("dock-checkbox");
-    var fullscreenCheckbox = document.getElementById("fullscreen-checkbox");
     var sourceButton = document.getElementById("source-button");
     var importFileButton = document.getElementById("import-file-button");
     var enableLoopbackButton = document.getElementById("enable-loopback-button");
     var iconTemplate = document.getElementById("icon-template");
 
     var SOURCE_BUTTON_LABELS = { none: "No Source", file: "File", loopback: "Loopback" };
+    var SOURCE_BUTTON_TITLES = {
+        none: "Import a file or enable loopback to choose an audio source",
+        file: "Playing a file. Click to switch to loopback",
+        loopback: "Capturing loopback. Click to switch back to the imported file"
+    };
+    var TEXT_ENTRY_INPUT_TYPES = ["text", "search", "email", "url", "password", "number", "tel"];
+
+    var windowState = { docked: true, fullscreen: false, source: "none" };
 
     var layerRowElements = new Map();
 
@@ -522,20 +528,6 @@
         layerListEl.scrollTop = listScrollTop;
     }
 
-    function renderPresetList(files) {
-        var previousValue = presetSelectEl.value;
-        presetSelectEl.textContent = "";
-        files.forEach(function (name) {
-            var opt = document.createElement("option");
-            opt.value = name;
-            opt.textContent = name;
-            presetSelectEl.appendChild(opt);
-        });
-        if (files.indexOf(previousValue) !== -1) {
-            presetSelectEl.value = previousValue;
-        }
-    }
-
     function showStatus(ok, message) {
         statusEl.textContent = message;
         statusEl.title = message;
@@ -554,8 +546,6 @@
         }
         if (data.kind === "layer_stack") {
             renderLayerList(data.state.layers);
-        } else if (data.kind === "preset_list") {
-            renderPresetList(data.files);
         } else if (data.kind === "status") {
             showStatus(data.ok, data.message);
         } else if (data.kind === "window_state") {
@@ -564,19 +554,24 @@
     });
 
     function renderWindowState(data) {
-        dockCheckbox.checked = data.docked;
-        fullscreenCheckbox.checked = data.fullscreen;
-        sourceButton.textContent = SOURCE_BUTTON_LABELS[data.source] || SOURCE_BUTTON_LABELS.none;
-        sourceButton.disabled = data.source === "none";
-        enableLoopbackButton.disabled = data.source === "loopback";
+        var source = SOURCE_BUTTON_LABELS.hasOwnProperty(data.source) ? data.source : "none";
+        windowState = { docked: data.docked === true, fullscreen: data.fullscreen === true, source: source };
+        dockCheckbox.checked = windowState.docked;
+        sourceButton.textContent = SOURCE_BUTTON_LABELS[source];
+        sourceButton.title = SOURCE_BUTTON_TITLES[source];
+        sourceButton.disabled = source === "none";
+        enableLoopbackButton.disabled = source === "loopback";
+        enableLoopbackButton.title = source === "loopback" ? "Loopback capture is already active" : "";
+    }
+
+    function isTextEntry(el) {
+        if (!el) return false;
+        if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+        return el.tagName === "INPUT" && TEXT_ENTRY_INPUT_TYPES.indexOf(el.type) !== -1;
     }
 
     dockCheckbox.addEventListener("change", function () {
         post("set_docked", { docked: dockCheckbox.checked });
-    });
-
-    fullscreenCheckbox.addEventListener("change", function () {
-        post("set_fullscreen", { fullscreen: fullscreenCheckbox.checked });
     });
 
     sourceButton.addEventListener("click", function () {
@@ -594,16 +589,17 @@
     });
 
     document.addEventListener("keydown", function (e) {
-        var tag = document.activeElement ? document.activeElement.tagName : "";
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (isTextEntry(document.activeElement)) return;
+        if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
 
+        var key = e.key.toLowerCase();
         if (e.key === "F11") {
             e.preventDefault();
-            post("set_fullscreen", { fullscreen: !fullscreenCheckbox.checked });
-        } else if (e.key.toLowerCase() === "k") {
-            post("set_docked", { docked: !dockCheckbox.checked });
-        } else if (e.key.toLowerCase() === "l") {
-            if (!sourceButton.disabled) post("switch_source", {});
+            post("set_fullscreen", { fullscreen: !windowState.fullscreen });
+        } else if (key === "k") {
+            post("set_docked", { docked: !windowState.docked });
+        } else if (key === "l") {
+            if (windowState.source !== "none") post("switch_source", {});
         }
     });
 
@@ -614,12 +610,7 @@
     });
 
     document.getElementById("load-preset-button").addEventListener("click", function () {
-        if (!presetSelectEl.value) return;
-        post("load_preset", { filename: presetSelectEl.value });
-    });
-
-    document.getElementById("refresh-presets-button").addEventListener("click", function () {
-        post("request_state", {});
+        post("open_preset_dialog", {});
     });
 
     document.getElementById("save-preset-button").addEventListener("click", function () {

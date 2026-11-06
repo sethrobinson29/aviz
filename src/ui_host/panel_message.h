@@ -79,8 +79,8 @@ struct SetVisualParamMessage {
     VisualParamValue value;
 };
 
-struct LoadPresetMessage {
-    std::string filename;
+struct LoadPresetFileMessage {
+    std::string path;
 };
 
 struct SavePresetMessage {
@@ -107,7 +107,7 @@ using PanelMessage =
     std::variant<RequestStateMessage, AddLayerMessage, RemoveLayerMessage, DuplicateLayerMessage,
                  MoveLayerMessage, SetLayerOpacityMessage, SetLayerBlendModeMessage, SetLayerFreqBandMessage,
                  SetLayerReactivitySourceMessage, SetLayerEnabledMessage, SetLayerSensitivityMessage,
-                 SetPaletteOverrideMessage, SetLayerNameMessage, SetVisualParamMessage, LoadPresetMessage,
+                 SetPaletteOverrideMessage, SetLayerNameMessage, SetVisualParamMessage, LoadPresetFileMessage,
                  SavePresetMessage, SetDockedMessage, SetFullscreenMessage, SwitchSourceMessage,
                  ImportFileMessage, EnableLoopbackMessage>;
 

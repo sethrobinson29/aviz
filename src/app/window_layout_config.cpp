@@ -4,10 +4,10 @@
 
 namespace window_layout {
 
-DockedLayout compute_docked_layout(int monitor_width, int monitor_height) {
+DockedLayout compute_docked_layout(const WindowRect& monitor) {
     const int combined_width = kVisualizerWidth + kPanelWidth;
-    const int anchor_x = std::max(0, (monitor_width - combined_width) / 2);
-    const int anchor_y = std::max(0, (monitor_height - kVisualizerHeight) / 2);
+    const int anchor_x = monitor.x + std::max(0, (monitor.width - combined_width) / 2);
+    const int anchor_y = monitor.y + std::max(0, (monitor.height - kVisualizerHeight) / 2);
 
     DockedLayout layout;
     layout.visualizer = WindowRect{anchor_x, anchor_y, kVisualizerWidth, kVisualizerHeight};

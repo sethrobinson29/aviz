@@ -1,5 +1,6 @@
 #pragma once
 
+#include "app/window_layout_config.h"
 #include "app/window_mode_state.h"
 #include "compositor/compositor.h"
 #include "ui_host/ui_host.h"
@@ -19,10 +20,12 @@ public:
 
 private:
     void apply(const WindowLayoutAction& action);
-    void reposition_visualizer();
+    void place_visualizer(const WindowRect& rect);
     void reposition_docked();
+    WindowRect docking_monitor() const;
 
     WindowModeState state_;
+    WindowRect windowed_rect_{0, 0, window_layout::kVisualizerWidth, window_layout::kVisualizerHeight};
     Compositor& compositor_;
     UIHost& ui_host_;
 };

@@ -11,6 +11,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdio>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -40,6 +41,11 @@ constexpr UINT kMsgShowPanel = WM_APP + 1;
 constexpr UINT kMsgHidePanel = WM_APP + 2;
 constexpr UINT kMsgSendToPanel = WM_APP + 3;
 constexpr UINT kMsgSetBounds = WM_APP + 4;
+constexpr UINT kMsgShowAlert = WM_APP + 5;
+constexpr wchar_t kAlertTitle[] = L"aviz";
+constexpr DWORD kPresetDialogPathCapacity = 32768;
+constexpr char kOpenAudioFileDialogRequest[] = "open_file_dialog";
+constexpr char kOpenPresetFileDialogRequest[] = "open_preset_dialog";
 
 struct BoundsPayload {
     int x;
@@ -93,13 +99,41 @@ void cancel_navigation_unless_trusted(NavigationArgs* args) {
     }
 }
 
-bool is_open_file_dialog_request(const std::string& json_text) {
+std::string native_dialog_request_type(const std::string& json_text) {
     try {
         nlohmann::json doc = nlohmann::json::parse(json_text);
-        return doc.is_object() && doc.value("type", std::string()) == "open_file_dialog";
+        if (!doc.is_object()) {
+            return std::string();
+        }
+        const std::string type = doc.value("type", std::string());
+        if (type == kOpenAudioFileDialogRequest || type == kOpenPresetFileDialogRequest) {
+            return type;
+        }
+        return std::string();
     } catch (const nlohmann::json::exception&) {
-        return false;
+        return std::string();
     }
+}
+
+std::optional<std::string> show_open_preset_file_dialog(HWND owner, const std::string& presets_dir) {
+    std::error_code ignored;
+    std::filesystem::create_directories(std::filesystem::u8path(presets_dir), ignored);
+    const std::wstring initial_dir = utf8_to_wide(presets_dir);
+
+    std::vector<wchar_t> file_buffer(kPresetDialogPathCapacity, L'\0');
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = owner;
+    ofn.lpstrFilter = L"Layer presets (*.json)\0*.json\0";
+    ofn.lpstrFile = file_buffer.data();
+    ofn.nMaxFile = kPresetDialogPathCapacity;
+    ofn.lpstrInitialDir = initial_dir.empty() ? nullptr : initial_dir.c_str();
+    ofn.lpstrDefExt = L"json";
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&ofn)) {
+        return std::nullopt;
+    }
+    return wide_to_utf8(file_buffer.data());
 }
 
 std::optional<std::string> show_open_audio_file_dialog(HWND owner) {
@@ -121,8 +155,10 @@ std::optional<std::string> show_open_audio_file_dialog(HWND owner) {
 
 class WebView2UIHost final : public UIHost {
 public:
-    WebView2UIHost(std::string content_dir, int initial_x, int initial_y, int initial_width, int initial_height)
+    WebView2UIHost(std::string content_dir, std::string presets_dir, int initial_x, int initial_y,
+                   int initial_width, int initial_height)
         : content_dir_(std::move(content_dir)),
+          presets_dir_(std::move(presets_dir)),
           initial_bounds_{initial_x, initial_y, initial_width, initial_height} {
         std::unique_lock<std::mutex> lock(startup_mutex_);
         thread_ = std::thread(&WebView2UIHost::thread_main, this);
@@ -174,6 +210,29 @@ public:
         if (!PostMessageW(hwnd_, kMsgSendToPanel, 0, reinterpret_cast<LPARAM>(payload))) {
             delete payload;
         }
+    }
+
+    void show_alert(const std::string& message) override {
+        if (hwnd_ == nullptr) {
+            return;
+        }
+        auto* payload = new std::wstring(utf8_to_wide(message));
+        if (!PostMessageW(hwnd_, kMsgShowAlert, 0, reinterpret_cast<LPARAM>(payload))) {
+            delete payload;
+        }
+    }
+
+    std::optional<ScreenRect> panel_monitor_bounds() const override {
+        if (hwnd_ == nullptr) {
+            return std::nullopt;
+        }
+        MONITORINFO info{};
+        info.cbSize = sizeof(info);
+        if (!GetMonitorInfoW(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST), &info)) {
+            return std::nullopt;
+        }
+        const RECT& r = info.rcMonitor;
+        return ScreenRect{r.left, r.top, r.right - r.left, r.bottom - r.top};
     }
 
 private:
@@ -353,10 +412,16 @@ private:
                         std::string utf8 = wide_to_utf8(raw);
                         CoTaskMemFree(raw);
 
-                        if (is_open_file_dialog_request(utf8)) {
+                        const std::string dialog_request = native_dialog_request_type(utf8);
+                        if (dialog_request == kOpenAudioFileDialogRequest) {
                             std::optional<std::string> path = show_open_audio_file_dialog(hwnd_);
                             if (path.has_value()) {
                                 queue_.push(PanelMessage{ImportFileMessage{*path}});
+                            }
+                        } else if (dialog_request == kOpenPresetFileDialogRequest) {
+                            std::optional<std::string> path = show_open_preset_file_dialog(hwnd_, presets_dir_);
+                            if (path.has_value()) {
+                                queue_.push(PanelMessage{LoadPresetFileMessage{*path}});
                             }
                         } else {
                             std::optional<PanelMessage> message = panel_message::parse(utf8);
@@ -410,9 +475,22 @@ private:
                              SWP_NOZORDER | SWP_NOACTIVATE);
                 return 0;
             }
-            case WM_EXITSIZEMOVE:
-                queue_.push(PanelMessage{SetDockedMessage{false}});
+            case WM_ENTERSIZEMOVE:
+                GetWindowRect(hwnd, &rect_at_size_move_start_);
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
+            case WM_EXITSIZEMOVE: {
+                RECT now{};
+                GetWindowRect(hwnd, &now);
+                if (!EqualRect(&now, &rect_at_size_move_start_)) {
+                    queue_.push(PanelMessage{SetDockedMessage{false}});
+                }
+                return DefWindowProcW(hwnd, msg, wparam, lparam);
+            }
+            case kMsgShowAlert: {
+                std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));
+                MessageBoxW(hwnd, payload->c_str(), kAlertTitle, MB_OK | MB_ICONWARNING);
+                return 0;
+            }
             case kMsgSendToPanel: {
                 std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));
                 if (webview_) {
@@ -442,6 +520,8 @@ private:
 
     PanelDispatchQueue queue_;
     std::string content_dir_;
+    std::string presets_dir_;
+    RECT rect_at_size_move_start_{};
     BoundsPayload initial_bounds_;
     std::thread thread_;
 
@@ -458,7 +538,8 @@ private:
     ComPtr<ICoreWebView2> webview_;
 };
 
-std::unique_ptr<UIHost> create_ui_host(const std::string& content_dir, int initial_x, int initial_y,
-                                        int initial_width, int initial_height) {
-    return std::make_unique<WebView2UIHost>(content_dir, initial_x, initial_y, initial_width, initial_height);
+std::unique_ptr<UIHost> create_ui_host(const std::string& content_dir, const std::string& presets_dir,
+                                        int initial_x, int initial_y, int initial_width, int initial_height) {
+    return std::make_unique<WebView2UIHost>(content_dir, presets_dir, initial_x, initial_y, initial_width,
+                                            initial_height);
 }

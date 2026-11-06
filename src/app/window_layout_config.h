@@ -18,6 +18,6 @@ constexpr int kVisualizerWidth = 1280;
 constexpr int kVisualizerHeight = 720;
 constexpr int kPanelWidth = 420;
 
-DockedLayout compute_docked_layout(int monitor_width, int monitor_height);
+DockedLayout compute_docked_layout(const WindowRect& monitor);
 
 }

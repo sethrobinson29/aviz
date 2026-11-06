@@ -5,9 +5,9 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 namespace {
 
@@ -70,17 +70,22 @@ bool is_safe_preset_filename(const std::string& filename) {
     return filename.compare(filename.size() - kExtension.size(), kExtension.size(), kExtension) == 0;
 }
 
-ReadResult read_file(const std::string& path) {
+ReadResult read_file(const std::string& path, std::size_t max_bytes) {
     std::ifstream file(std::filesystem::u8path(path), std::ios::binary);
     if (!file.is_open()) {
         return ReadResult{false, {}, "could not open file for reading: " + path};
     }
-    std::ostringstream buffer;
-    buffer << file.rdbuf();
+    std::string contents(max_bytes + 1, char{});
+    file.read(contents.data(), static_cast<std::streamsize>(contents.size()));
     if (file.bad()) {
         return ReadResult{false, {}, "error reading file: " + path};
     }
-    return ReadResult{true, buffer.str(), {}};
+    const std::size_t bytes_read = static_cast<std::size_t>(file.gcount());
+    if (bytes_read > max_bytes) {
+        return ReadResult{false, {}, "file is larger than " + std::to_string(max_bytes) + " bytes: " + path, true};
+    }
+    contents.resize(bytes_read);
+    return ReadResult{true, std::move(contents), {}};
 }
 
 WriteResult write_file(const std::string& path, const std::string& contents) {
@@ -103,30 +108,6 @@ WriteResult write_file(const std::string& path, const std::string& contents) {
         return WriteResult{false, "error writing file: " + path};
     }
     return WriteResult{true, {}};
-}
-
-std::vector<std::string> list_preset_files(const std::string& presets_dir) {
-    std::vector<std::string> names;
-    try {
-        const std::filesystem::path dir = std::filesystem::u8path(presets_dir);
-        if (!std::filesystem::exists(dir)) {
-            return names;
-        }
-        for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(dir)) {
-            if (!entry.is_regular_file()) {
-                continue;
-            }
-            try {
-                names.push_back(entry.path().filename().u8string());
-            } catch (const std::system_error&) {
-                continue;
-            }
-        }
-    } catch (const std::system_error&) {
-        return {};
-    }
-    std::sort(names.begin(), names.end());
-    return names;
 }
 
 }

@@ -11,7 +11,9 @@ public:
     RaylibWindowWatcher(const RaylibWindowWatcher&) = delete;
     RaylibWindowWatcher& operator=(const RaylibWindowWatcher&) = delete;
 
+    struct State;
+
 private:
     void* hwnd_;
-    std::unique_ptr<std::function<void()>> callback_;
+    std::unique_ptr<State> state_;
 };

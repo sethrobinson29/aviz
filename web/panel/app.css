@@ -122,10 +122,28 @@ input[type="range"], input[type="checkbox"] {
 }
 
 .source-pill {
+    margin-left: auto;
     padding: 4px 10px;
     border-radius: var(--radius-round);
+    background: transparent;
+    border: 1px solid var(--border-accent-soft);
+    box-shadow: none;
+    color: var(--color-accent);
     font-size: 10px;
+    font-weight: 600;
     white-space: nowrap;
+}
+
+.source-pill:hover {
+    border-color: var(--color-accent);
+}
+
+.source-pill:disabled, .source-pill:disabled:hover {
+    opacity: 1;
+    border-style: dashed;
+    border-color: var(--border-control);
+    color: var(--text-title);
+    font-weight: 400;
 }
 
 .window-option {
@@ -578,7 +596,7 @@ input[type="range"].track:active::-webkit-slider-thumb {
     gap: 8px;
 }
 
-.footer-row input[type="text"], .footer-row select {
+.footer-row input[type="text"] {
     flex: 1;
     min-width: 0;
     border-radius: var(--radius-select);

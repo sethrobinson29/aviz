@@ -48,6 +48,8 @@ WindowLayoutAction WindowModeState::set_fullscreen(bool fullscreen) {
         action.exit_fullscreen = true;
         if (mode_ == WindowMode::Docked) {
             action.reposition_docked = true;
+        } else {
+            action.restore_windowed_rect = true;
         }
     }
 

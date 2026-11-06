@@ -50,6 +50,12 @@ nlohmann::json sent_of_kind(const FakeUIHost& ui_host, const std::string& kind) 
     return nlohmann::json{};
 }
 
+bool any_sent_of_kind(const FakeUIHost& ui_host, const std::string& kind) {
+    return std::any_of(ui_host.sent_messages.begin(), ui_host.sent_messages.end(), [&kind](const std::string& text) {
+        return nlohmann::json::parse(text).value("kind", "") == kind;
+    });
+}
+
 nlohmann::json color_wire_json(const Color& c) {
     return nlohmann::json{{"r", c.r}, {"g", c.g}, {"b", c.b}, {"a", c.a}};
 }
@@ -83,13 +89,13 @@ class PanelMessageApplyTest : public PanelApplyTestFixture {};
 
 }
 
-TEST_F(PanelMessageApplyTest, RequestStatePushesLayerStackPresetListAndWindowState) {
+TEST_F(PanelMessageApplyTest, RequestStatePushesLayerStackAndWindowStateAndNoPresetList) {
     apply(PanelMessage{RequestStateMessage{}});
 
-    ASSERT_EQ(ui_host_.sent_messages.size(), 3u);
+    ASSERT_EQ(ui_host_.sent_messages.size(), 2u);
     EXPECT_EQ(sent_of_kind(ui_host_, "layer_stack")["kind"], "layer_stack");
-    EXPECT_EQ(sent_of_kind(ui_host_, "preset_list")["kind"], "preset_list");
     EXPECT_EQ(sent_of_kind(ui_host_, "window_state")["kind"], "window_state");
+    EXPECT_FALSE(any_sent_of_kind(ui_host_, "preset_list"));
 }
 
 TEST_F(PanelMessageApplyTest, AddLayerAddsALayerAndPushesLayerStack) {
@@ -521,19 +527,22 @@ class PanelMessageApplyPresetTest : public PanelMessageApplyTest {
 protected:
     void SetUp() override { std::filesystem::remove_all(presets_dir_); }
     void TearDown() override { std::filesystem::remove_all(presets_dir_); }
+
+    PanelMessage load_from_presets_dir(const std::string& filename) const {
+        return PanelMessage{LoadPresetFileMessage{preset_file_io::preset_path(presets_dir_, filename)}};
+    }
+
+    void expect_rejected_with_alert_and_stack_unchanged(std::size_t expected_layers, VisualType expected_first,
+                                                        const std::string& expected_reason) {
+        ASSERT_EQ(ui_host_.alerts.size(), 1u);
+        EXPECT_NE(ui_host_.alerts[0].find("is not a valid preset file"), std::string::npos) << ui_host_.alerts[0];
+        EXPECT_NE(ui_host_.alerts[0].find(expected_reason), std::string::npos) << ui_host_.alerts[0];
+        EXPECT_FALSE(any_sent_of_kind(ui_host_, "status"));
+        EXPECT_EQ(last_sent(ui_host_)["kind"], "layer_stack");
+        ASSERT_EQ(compositor_.layers().size(), expected_layers);
+        EXPECT_EQ(compositor_.layers()[0].visual_type, expected_first);
+    }
 };
-
-TEST_F(PanelMessageApplyPresetTest, RequestStateSurvivesNonAsciiPresetFilenamesOnDisk) {
-    const std::filesystem::path dir(presets_dir_);
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / L"caf\x00E9.json") << "{}";
-    std::ofstream(dir / L"\x65E5\x672C.json") << "{}";
-
-    EXPECT_NO_THROW(apply(PanelMessage{RequestStateMessage{}}));
-
-    EXPECT_EQ(sent_of_kind(ui_host_, "preset_list")["files"],
-              nlohmann::json::array({"caf\xC3\xA9.json", "\xE6\x97\xA5\xE6\x9C\xAC.json"}));
-}
 
 TEST_F(PanelMessageApplyImportFileTest, StatusTextWithInvalidUtf8ReachesThePanelInsteadOfThrowing) {
     EXPECT_NO_THROW(apply(PanelMessage{ImportFileMessage{"missing_caf\xE9.wav"}}));
@@ -555,7 +564,7 @@ TEST_F(PanelMessageApplyPresetTest, PaletteOverridesSetThroughPanelSurviveSaveAn
     for (std::size_t i = 0; i < palettes.size(); ++i) {
         apply(set_palette_message(ids[i], palettes[(i + 1) % palettes.size()]));
     }
-    apply(PanelMessage{LoadPresetMessage{"palette-round-trip.json"}});
+    apply(load_from_presets_dir("palette-round-trip.json"));
 
     EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
     ASSERT_EQ(compositor_.layers().size(), palettes.size());
@@ -576,9 +585,7 @@ TEST_F(PanelMessageApplyPresetTest, SavePresetWritesFileAndSendsSuccessStatus) {
     EXPECT_TRUE(std::filesystem::exists(preset_file_io::preset_path(presets_dir_, "apply-test.json")));
     nlohmann::json status = sent_of_kind(ui_host_, "status");
     EXPECT_EQ(status["ok"], true);
-    nlohmann::json preset_list = sent_of_kind(ui_host_, "preset_list");
-    EXPECT_NE(std::find(preset_list["files"].begin(), preset_list["files"].end(), "apply-test.json"),
-              preset_list["files"].end());
+    EXPECT_FALSE(any_sent_of_kind(ui_host_, "preset_list"));
 }
 
 TEST_F(PanelMessageApplyPresetTest, LoadPresetReplacesLayerStackAndSendsSuccessStatus) {
@@ -596,32 +603,102 @@ TEST_F(PanelMessageApplyPresetTest, LoadPresetReplacesLayerStackAndSendsSuccessS
 
     compositor_.add_layer(VisualType::Waveform);
 
-    apply(PanelMessage{LoadPresetMessage{"apply-load-test.json"}});
+    apply(load_from_presets_dir("apply-load-test.json"));
 
     ASSERT_EQ(compositor_.layers().size(), 2u);
     EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Fractal);
     EXPECT_EQ(compositor_.layers()[1].visual_type, VisualType::Particles);
-    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], true);
+    nlohmann::json status = sent_of_kind(ui_host_, "status");
+    EXPECT_EQ(status["ok"], true);
+    EXPECT_EQ(status["message"], "loaded 2 layer(s) from apply-load-test.json");
+    EXPECT_TRUE(ui_host_.alerts.empty());
 }
 
-TEST_F(PanelMessageApplyPresetTest, LoadPresetOnMissingFileSendsFailureStatusAndLeavesStackUnchanged) {
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileOnMissingFileShowsAlertAndLeavesStackUnchanged) {
     compositor_.add_layer(VisualType::Waveform);
 
-    apply(PanelMessage{LoadPresetMessage{"does-not-exist.json"}});
+    apply(load_from_presets_dir("does-not-exist.json"));
 
-    ASSERT_EQ(compositor_.layers().size(), 1u);
-    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Waveform);
-    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+    expect_rejected_with_alert_and_stack_unchanged(1, VisualType::Waveform, "could not be read");
 }
 
-TEST_F(PanelMessageApplyPresetTest, LoadPresetOnMalformedFileSendsFailureStatusAndLeavesStackUnchanged) {
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileOnMalformedJsonShowsAlertAndLeavesStackUnchanged) {
     preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "malformed.json"), "{ not valid json");
     compositor_.add_layer(VisualType::Waveform);
 
-    apply(PanelMessage{LoadPresetMessage{"malformed.json"}});
+    apply(load_from_presets_dir("malformed.json"));
+
+    expect_rejected_with_alert_and_stack_unchanged(1, VisualType::Waveform, "not a valid layer preset");
+}
+
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileOverTheSizeCapIsRejectedEvenWhenItsJsonIsValid) {
+    compositor_.add_layer(VisualType::Fractal);
+    const std::string path = preset_file_io::preset_path(presets_dir_, "valid-but-padded.json");
+    std::string padded = layer_preset::serialize(compositor_.layers());
+    padded.append(preset_file_io::kMaxPresetFileBytes + 1 - padded.size(), ' ');
+    ASSERT_TRUE(preset_file_io::write_file(path, padded).success);
+    ASSERT_TRUE(layer_preset::deserialize(padded).has_value());
+    compositor_.remove_layer(0);
+    compositor_.add_layer(VisualType::Spectrum);
+    compositor_.add_layer(VisualType::Waveform);
+
+    apply(PanelMessage{LoadPresetFileMessage{path}});
+
+    expect_rejected_with_alert_and_stack_unchanged(2, VisualType::Spectrum, "larger than 1024 KB");
+}
+
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileWithDuplicateLayerIdsShowsAlertAndAppliesNothing) {
+    compositor_.add_layer(VisualType::Radial);
+    compositor_.add_layer(VisualType::Lissajous);
+    nlohmann::json doc = nlohmann::json::parse(layer_preset::serialize(compositor_.layers()));
+    doc["layers"][1]["layer_id"] = doc["layers"][0]["layer_id"];
+    const std::string path = preset_file_io::preset_path(presets_dir_, "duplicate-ids.json");
+    ASSERT_TRUE(preset_file_io::write_file(path, doc.dump()).success);
+    compositor_.remove_layer(1);
+    compositor_.remove_layer(0);
+    compositor_.add_layer(VisualType::Waveform);
+
+    apply(PanelMessage{LoadPresetFileMessage{path}});
+
+    expect_rejected_with_alert_and_stack_unchanged(1, VisualType::Waveform, "is not a valid preset file");
+}
+
+TEST_F(PanelMessageApplyPresetTest, RejectionAlertNamesOnlyTheFileNotItsFullPath) {
+    apply(load_from_presets_dir("secret-folder-name-check.json"));
+
+    ASSERT_EQ(ui_host_.alerts.size(), 1u);
+    EXPECT_NE(ui_host_.alerts[0].find("\"secret-folder-name-check.json\""), std::string::npos);
+    EXPECT_EQ(ui_host_.alerts[0].find(presets_dir_), std::string::npos);
+}
+
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileWorksFromAFolderOutsideThePresetsDirectory) {
+    const std::filesystem::path elsewhere =
+        std::filesystem::temp_directory_path() / "aviz_panel_apply_preset_elsewhere";
+    std::filesystem::remove_all(elsewhere);
+    compositor_.add_layer(VisualType::Fractal);
+    const std::string path = (elsewhere / "outside.json").u8string();
+    ASSERT_TRUE(preset_file_io::write_file(path, layer_preset::serialize(compositor_.layers())).success);
+    compositor_.remove_layer(0);
+
+    apply(PanelMessage{LoadPresetFileMessage{path}});
+    std::filesystem::remove_all(elsewhere);
 
     ASSERT_EQ(compositor_.layers().size(), 1u);
-    EXPECT_EQ(sent_of_kind(ui_host_, "status")["ok"], false);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Fractal);
+    EXPECT_EQ(sent_of_kind(ui_host_, "status")["message"], "loaded 1 layer(s) from outside.json");
+}
+
+TEST_F(PanelMessageApplyPresetTest, LoadPresetFileHandlesANonAsciiUtf8Path) {
+    compositor_.add_layer(VisualType::Particles);
+    const std::string name = "\xE6\x97\xA5\xE6\x9C\xAC caf\xC3\xA9.json";
+    apply(PanelMessage{SavePresetMessage{name}});
+    compositor_.remove_layer(0);
+
+    apply(load_from_presets_dir(name));
+
+    ASSERT_EQ(compositor_.layers().size(), 1u);
+    EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Particles);
+    EXPECT_TRUE(ui_host_.alerts.empty());
 }
 
 TEST_F(PanelMessageApplyTest, ExtremeJsonNumbersEndUpClampedToEachFieldsOwnRangeEndToEnd) {
@@ -814,7 +891,7 @@ TEST_F(PanelMessageApplyImportFileTest, ImportFileJsonFromThePanelChannelNeverRe
     EXPECT_TRUE(ui_host_.sent_messages.empty());
 }
 
-TEST_F(PanelMessageApplyPresetTest, SaveListAndLoadUseThePresetsDirectoryNotTheWorkingDirectory) {
+TEST_F(PanelMessageApplyPresetTest, SaveUsesThePresetsDirectoryNotTheWorkingDirectory) {
     const std::filesystem::path original_working_dir = std::filesystem::current_path();
     const std::filesystem::path unrelated_working_dir =
         std::filesystem::temp_directory_path() / "aviz_panel_apply_unrelated_working_dir";
@@ -827,10 +904,9 @@ TEST_F(PanelMessageApplyPresetTest, SaveListAndLoadUseThePresetsDirectoryNotTheW
     const bool saved_in_presets_dir = std::filesystem::exists(std::filesystem::path(presets_dir_) / "cwd-test.json");
     const bool saved_under_working_dir = std::filesystem::exists(
         unrelated_working_dir / preset_file_io::kPresetsDirectoryName / "cwd-test.json");
-    const nlohmann::json preset_list = sent_of_kind(ui_host_, "preset_list");
     compositor_.remove_layer(0);
     ui_host_.sent_messages.clear();
-    apply(PanelMessage{LoadPresetMessage{"cwd-test.json"}});
+    apply(load_from_presets_dir("cwd-test.json"));
     const nlohmann::json load_status = sent_of_kind(ui_host_, "status");
 
     std::filesystem::current_path(original_working_dir);
@@ -838,8 +914,6 @@ TEST_F(PanelMessageApplyPresetTest, SaveListAndLoadUseThePresetsDirectoryNotTheW
 
     EXPECT_TRUE(saved_in_presets_dir);
     EXPECT_FALSE(saved_under_working_dir);
-    EXPECT_NE(std::find(preset_list["files"].begin(), preset_list["files"].end(), "cwd-test.json"),
-              preset_list["files"].end());
     EXPECT_EQ(load_status["ok"], true);
     ASSERT_EQ(compositor_.layers().size(), 1u);
     EXPECT_EQ(compositor_.layers()[0].visual_type, VisualType::Spectrum);
@@ -910,7 +984,7 @@ TEST_F(PanelMessageApplyPresetTest, LayerNameSurvivesSaveAndLoadThroughThePanelP
     apply(PanelMessage{SavePresetMessage{"named.json"}});
     apply(PanelMessage{SetLayerNameMessage{id, ""}});
 
-    apply(PanelMessage{LoadPresetMessage{"named.json"}});
+    apply(load_from_presets_dir("named.json"));
 
     ASSERT_EQ(compositor_.layers().size(), 1u);
     EXPECT_EQ(compositor_.layers()[0].name, "Kick pulse");

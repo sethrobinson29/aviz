@@ -133,3 +133,47 @@ TEST(WindowModeStateTest, RedockingWhileFullscreenAndDetachedHidesThePanelImmedi
     EXPECT_TRUE(action.hide_panel) << "still fullscreen, and now docked -- panel would be in the way";
     EXPECT_FALSE(action.reposition_docked) << "still fullscreen -- reposition should wait for exit";
 }
+
+TEST(WindowModeStateTest, ExitingFullscreenWhileDetachedRestoresThePreFullscreenRectInsteadOfDocking) {
+    WindowModeState state;
+    state.set_docked(false);
+    state.set_fullscreen(true);
+
+    WindowLayoutAction action = state.set_fullscreen(false);
+
+    EXPECT_TRUE(action.restore_windowed_rect);
+    EXPECT_FALSE(action.reposition_docked);
+}
+
+TEST(WindowModeStateTest, ExitingFullscreenWhileDockedSnapsToDockedLayoutWithoutRestoringTheOldRect) {
+    WindowModeState state;
+    state.set_fullscreen(true);
+
+    WindowLayoutAction action = state.set_fullscreen(false);
+
+    EXPECT_TRUE(action.reposition_docked);
+    EXPECT_FALSE(action.restore_windowed_rect);
+}
+
+TEST(WindowModeStateTest, OnlyExitingFullscreenEverRequestsARestore) {
+    WindowModeState state;
+    EXPECT_FALSE(state.set_docked(false).restore_windowed_rect);
+    EXPECT_FALSE(state.set_fullscreen(true).restore_windowed_rect);
+    EXPECT_FALSE(state.set_docked(true).restore_windowed_rect);
+    EXPECT_FALSE(state.set_docked(false).restore_windowed_rect);
+}
+
+TEST(WindowModeStateTest, FullscreenChangesNeverChangeTheDockedMode) {
+    WindowModeState docked;
+    docked.set_fullscreen(true);
+    EXPECT_EQ(docked.mode(), WindowMode::Docked);
+    docked.set_fullscreen(false);
+    EXPECT_EQ(docked.mode(), WindowMode::Docked);
+
+    WindowModeState detached;
+    detached.set_docked(false);
+    detached.set_fullscreen(true);
+    EXPECT_EQ(detached.mode(), WindowMode::Detached);
+    detached.set_fullscreen(false);
+    EXPECT_EQ(detached.mode(), WindowMode::Detached);
+}

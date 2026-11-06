@@ -32,18 +32,6 @@ protected:
     std::filesystem::path scratch_dir_;
 };
 
-class PresetDirectoryListTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        presets_dir_ = (std::filesystem::temp_directory_path() / "aviz_preset_directory_list_test").string();
-        std::filesystem::remove_all(presets_dir_);
-    }
-
-    void TearDown() override { std::filesystem::remove_all(presets_dir_); }
-
-    std::string presets_dir_;
-};
-
 }
 
 TEST_F(PresetFileIoTest, WriteThenReadRoundTripsExactContents) {
@@ -196,48 +184,53 @@ TEST(PresetsDirectoryTest, RelativeApplicationDirectoryIsMadeAbsolute) {
     EXPECT_TRUE(std::filesystem::path(preset_file_io::presets_directory_in("./")).is_absolute());
 }
 
-TEST_F(PresetDirectoryListTest, NoPresetsDirectoryReturnsEmptyNotAnException) {
-    EXPECT_TRUE(preset_file_io::list_preset_files(presets_dir_).empty());
+TEST_F(PresetFileIoTest, ReadOfAFileExactlyAtTheCapSucceeds) {
+    const std::string path = (scratch_dir_ / "at_cap.json").string();
+    ASSERT_TRUE(preset_file_io::write_file(path, std::string(16, 'x')).success);
+
+    preset_file_io::ReadResult result = preset_file_io::read_file(path, 16);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_FALSE(result.too_large);
+    EXPECT_EQ(result.contents, std::string(16, 'x'));
 }
 
-TEST_F(PresetDirectoryListTest, ListsFilesPresentInThePresetsDirectory) {
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "alpha.json"), "a").success);
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "beta.json"), "b").success);
+TEST_F(PresetFileIoTest, ReadOfAFileOneByteOverTheCapFailsAsTooLargeWithNoContents) {
+    const std::string path = (scratch_dir_ / "over_cap.json").string();
+    ASSERT_TRUE(preset_file_io::write_file(path, std::string(17, 'x')).success);
 
-    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
+    preset_file_io::ReadResult result = preset_file_io::read_file(path, 16);
 
-    EXPECT_EQ(names, (std::vector<std::string>{"alpha.json", "beta.json"}));
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.too_large);
+    EXPECT_TRUE(result.contents.empty());
+    EXPECT_FALSE(result.error.empty());
 }
 
-TEST_F(PresetDirectoryListTest, IgnoresSubdirectoriesAndOnlyListsRegularFiles) {
-    ASSERT_TRUE(preset_file_io::write_file(preset_file_io::preset_path(presets_dir_, "real.json"), "a").success);
-    std::filesystem::create_directories(std::filesystem::path(presets_dir_) / "not_a_preset_dir");
+TEST_F(PresetFileIoTest, DefaultCapAcceptsOneMebibyteAndRejectsOneByteMore) {
+    const std::string at_cap = (scratch_dir_ / "default_at_cap.json").string();
+    const std::string over_cap = (scratch_dir_ / "default_over_cap.json").string();
+    ASSERT_TRUE(preset_file_io::write_file(at_cap, std::string(preset_file_io::kMaxPresetFileBytes, 'y')).success);
+    ASSERT_TRUE(
+        preset_file_io::write_file(over_cap, std::string(preset_file_io::kMaxPresetFileBytes + 1, 'y')).success);
 
-    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
-
-    EXPECT_EQ(names, (std::vector<std::string>{"real.json"}));
+    EXPECT_EQ(preset_file_io::kMaxPresetFileBytes, 1024u * 1024u);
+    EXPECT_TRUE(preset_file_io::read_file(at_cap).success);
+    EXPECT_TRUE(preset_file_io::read_file(over_cap).too_large);
 }
 
-TEST_F(PresetDirectoryListTest, NonAsciiFilenamesAreListedAsUtf8) {
-    const std::filesystem::path dir(presets_dir_);
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / L"caf\x00E9.json") << "{}";
-    std::ofstream(dir / L"\x65E5\x672C.json") << "{}";
+TEST_F(PresetFileIoTest, EmptyFileReadsAsSuccessWithEmptyContents) {
+    const std::string path = (scratch_dir_ / "empty.json").string();
+    ASSERT_TRUE(preset_file_io::write_file(path, "").success);
 
-    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
+    preset_file_io::ReadResult result = preset_file_io::read_file(path);
 
-    EXPECT_EQ(names, (std::vector<std::string>{"caf\xC3\xA9.json", "\xE6\x97\xA5\xE6\x9C\xAC.json"}));
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.contents.empty());
 }
 
-TEST_F(PresetDirectoryListTest, FilenameThatCannotConvertToUtf8IsSkippedNotThrown) {
-    const std::filesystem::path dir(presets_dir_);
-    std::filesystem::create_directories(dir);
-    std::ofstream(dir / "good.json") << "{}";
-    std::ofstream(dir / std::wstring(L"lone_surrogate_\xD800.json")) << "{}";
-
-    std::vector<std::string> names = preset_file_io::list_preset_files(presets_dir_);
-
-    EXPECT_EQ(names, (std::vector<std::string>{"good.json"}));
+TEST_F(PresetFileIoTest, MissingFileIsNotReportedAsTooLarge) {
+    EXPECT_FALSE(preset_file_io::read_file((scratch_dir_ / "nope.json").string()).too_large);
 }
 
 TEST_F(PresetFileIoTest, NonAsciiPresetFilenameRoundTripsToTheRealFilenameOnDisk) {
