@@ -66,6 +66,13 @@
     --gradient-button: linear-gradient(180deg, #2a313b, #1b2026);
     --gradient-add-button: linear-gradient(180deg, #232932, #171b21);
     --gradient-thumb: radial-gradient(circle at 35% 30%, #ffffff, #cfe9c4);
+    --gradient-orb-close: radial-gradient(circle at 35% 30%, #ffe6cf 0%, #ff8a2a 40%, #6b2c04 100%);
+    --gradient-orb-close-hover: radial-gradient(circle at 35% 30%, #ffffff 0%, #ffa95c 40%, #8a3a08 100%);
+    --gradient-orb-minimize: radial-gradient(circle at 35% 30%, #fff6cf 0%, #ffd23a 40%, #6b5004 100%);
+    --gradient-orb-minimize-hover: radial-gradient(circle at 35% 30%, #ffffff 0%, #ffe06e 40%, #8a6a08 100%);
+    --border-orb: rgba(0, 0, 0, 0.55);
+    --shadow-orb: inset 0 -1px 1px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.5);
+    --text-orb-glyph: #0a0f13;
     --gradient-thumb-pressed: radial-gradient(circle at 35% 30%, #9aa0a7, #5d636a);
 
     --shadow-button: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 6px rgba(0, 0, 0, 0.4);
@@ -90,6 +97,11 @@
     --focus-ring-color: #9dff5c;
 
     --size-title-bar: 46px;
+    --size-window-orb: 14px;
+    --size-window-orb-target: 24px;
+    --size-window-orb-glyph: 10px;
+    --size-window-resize-edge: 5px;
+    --size-window-resize-corner: 12px;
     --size-switch-width: 34px;
     --size-switch-height: 18px;
     --size-switch-knob: 12px;

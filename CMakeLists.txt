@@ -147,6 +147,7 @@ add_executable(aviz
   src/ui_host/panel_dispatch_queue.cpp
   src/ui_host/panel_message_apply.cpp
   src/ui_host/panel_navigation_policy.cpp
+  src/ui_host/panel_window_request.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT nlohmann_json::nlohmann_json)
@@ -161,7 +162,7 @@ endif()
 # implemented now.
 if(WIN32)
   target_sources(aviz PRIVATE src/ui_host/ui_host_webview2.cpp src/app/raylib_window_watcher.cpp)
-  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32 Comdlg32)
+  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32 Comdlg32 Dwmapi)
 endif()
 
 add_custom_command(TARGET aviz POST_BUILD

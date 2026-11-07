@@ -603,6 +603,33 @@
         }
     });
 
+    function isPrimaryPress(e) {
+        return e.button === 0 && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey;
+    }
+
+    document.querySelector(".title-bar").addEventListener("mousedown", function (e) {
+        if (!isPrimaryPress(e)) return;
+        if (e.target.closest("button, input, select")) return;
+        e.preventDefault();
+        post("window_drag", { region: "caption" });
+    });
+
+    document.getElementById("window-close-button").addEventListener("click", function () {
+        post("window_command", { command: "close" });
+    });
+
+    document.getElementById("window-minimize-button").addEventListener("click", function () {
+        post("window_command", { command: "minimize" });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll(".window-resize"), function (handle) {
+        handle.addEventListener("mousedown", function (e) {
+            if (!isPrimaryPress(e)) return;
+            e.preventDefault();
+            post("window_drag", { region: handle.dataset.windowRegion });
+        });
+    });
+
     Array.prototype.forEach.call(document.querySelectorAll(".add-button"), function (button) {
         button.addEventListener("click", function () {
             post("add_layer", { visual_type: button.dataset.visualType });

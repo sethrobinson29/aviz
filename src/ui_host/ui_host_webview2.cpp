@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <commdlg.h>
+#include <dwmapi.h>
 #include <wrl.h>
 #include <wrl/client.h>
 
@@ -24,6 +25,7 @@
 #include "ui_host/panel_dispatch_queue.h"
 #include "ui_host/panel_message.h"
 #include "ui_host/panel_navigation_policy.h"
+#include "ui_host/panel_window_request.h"
 
 using Microsoft::WRL::Callback;
 using Microsoft::WRL::ComPtr;
@@ -42,6 +44,9 @@ constexpr UINT kMsgHidePanel = WM_APP + 2;
 constexpr UINT kMsgSendToPanel = WM_APP + 3;
 constexpr UINT kMsgSetBounds = WM_APP + 4;
 constexpr UINT kMsgShowAlert = WM_APP + 5;
+constexpr UINT kMsgBeginWindowDrag = WM_APP + 6;
+constexpr int kMinimumPanelWidthDip = 370;
+constexpr int kDefaultDpi = 96;
 constexpr wchar_t kAlertTitle[] = L"aviz";
 constexpr DWORD kPresetDialogPathCapacity = 32768;
 constexpr char kOpenAudioFileDialogRequest[] = "open_file_dialog";
@@ -112,6 +117,60 @@ std::string native_dialog_request_type(const std::string& json_text) {
         return std::string();
     } catch (const nlohmann::json::exception&) {
         return std::string();
+    }
+}
+
+WPARAM hit_test_code_for(PanelWindowDragRegion region) {
+    switch (region) {
+        case PanelWindowDragRegion::Caption:
+            return HTCAPTION;
+        case PanelWindowDragRegion::Top:
+            return HTTOP;
+        case PanelWindowDragRegion::Bottom:
+            return HTBOTTOM;
+        case PanelWindowDragRegion::Left:
+            return HTLEFT;
+        case PanelWindowDragRegion::Right:
+            return HTRIGHT;
+        case PanelWindowDragRegion::TopLeft:
+            return HTTOPLEFT;
+        case PanelWindowDragRegion::TopRight:
+            return HTTOPRIGHT;
+        case PanelWindowDragRegion::BottomLeft:
+            return HTBOTTOMLEFT;
+        case PanelWindowDragRegion::BottomRight:
+            return HTBOTTOMRIGHT;
+    }
+    return HTCAPTION;
+}
+
+WPARAM system_command_for(PanelWindowCommand command) {
+    switch (command) {
+        case PanelWindowCommand::Close:
+            return SC_CLOSE;
+        case PanelWindowCommand::Minimize:
+            return SC_MINIMIZE;
+    }
+    return SC_MINIMIZE;
+}
+
+bool primary_mouse_button_is_down() {
+    const int primary_button = GetSystemMetrics(SM_SWAPBUTTON) != 0 ? VK_RBUTTON : VK_LBUTTON;
+    return (GetAsyncKeyState(primary_button) & 0x8000) != 0;
+}
+
+int maximized_frame_inset(HWND hwnd) {
+    const UINT dpi = GetDpiForWindow(hwnd);
+    return GetSystemMetricsForDpi(SM_CXFRAME, dpi) + GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+}
+
+void request_rounded_corners(HWND hwnd) {
+    const DWM_WINDOW_CORNER_PREFERENCE preference = DWMWCP_ROUND;
+    const HRESULT hr =
+        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
+    if (FAILED(hr)) {
+        std::fprintf(stderr, "ui_host: rounded window corners unavailable (hr=0x%08lx)\n",
+                     static_cast<unsigned long>(hr));
     }
 }
 
@@ -264,6 +323,9 @@ private:
         }
         startup_cv_.notify_all();
 
+        request_rounded_corners(hwnd);
+        SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                                                     SWP_NOACTIVATE);
         ShowWindow(hwnd, SW_SHOW);
         visible_.store(true);
 
@@ -413,7 +475,15 @@ private:
                         CoTaskMemFree(raw);
 
                         const std::string dialog_request = native_dialog_request_type(utf8);
-                        if (dialog_request == kOpenAudioFileDialogRequest) {
+                        const std::optional<PanelWindowDragRegion> drag_region =
+                            panel_window_request::parse_drag(utf8);
+                        const std::optional<PanelWindowCommand> window_command =
+                            panel_window_request::parse_command(utf8);
+                        if (drag_region.has_value()) {
+                            PostMessageW(hwnd_, kMsgBeginWindowDrag, hit_test_code_for(*drag_region), 0);
+                        } else if (window_command.has_value()) {
+                            PostMessageW(hwnd_, WM_SYSCOMMAND, system_command_for(*window_command), 0);
+                        } else if (dialog_request == kOpenAudioFileDialogRequest) {
                             std::optional<std::string> path = show_open_audio_file_dialog(hwnd_);
                             if (path.has_value()) {
                                 queue_.push(PanelMessage{ImportFileMessage{*path}});
@@ -485,6 +555,33 @@ private:
                     queue_.push(PanelMessage{SetDockedMessage{false}});
                 }
                 return DefWindowProcW(hwnd, msg, wparam, lparam);
+            }
+            case WM_NCCALCSIZE: {
+                if (wparam == FALSE) {
+                    return DefWindowProcW(hwnd, msg, wparam, lparam);
+                }
+                if (IsZoomed(hwnd)) {
+                    auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+                    const int inset = maximized_frame_inset(hwnd);
+                    InflateRect(&params->rgrc[0], -inset, -inset);
+                }
+                return 0;
+            }
+            case WM_GETMINMAXINFO: {
+                auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+                info->ptMinTrackSize.x =
+                    MulDiv(kMinimumPanelWidthDip, static_cast<int>(GetDpiForWindow(hwnd)), kDefaultDpi);
+                return 0;
+            }
+            case kMsgBeginWindowDrag: {
+                if (!primary_mouse_button_is_down()) {
+                    return 0;
+                }
+                POINT cursor{};
+                GetCursorPos(&cursor);
+                ReleaseCapture();
+                SendMessageW(hwnd, WM_NCLBUTTONDOWN, wparam, MAKELPARAM(cursor.x, cursor.y));
+                return 0;
             }
             case kMsgShowAlert: {
                 std::unique_ptr<std::wstring> payload(reinterpret_cast<std::wstring*>(lparam));

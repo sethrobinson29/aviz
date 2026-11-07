@@ -82,6 +82,90 @@ input[type="range"], input[type="checkbox"] {
     border-bottom: 1px solid var(--border-panel);
 }
 
+.window-orbs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    margin-right: -5px;
+}
+
+.window-orb {
+    display: grid;
+    place-items: center;
+    width: var(--size-window-orb-target);
+    height: var(--size-window-orb-target);
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-round);
+    background: none;
+    box-shadow: none;
+}
+
+.window-orb::before {
+    content: "";
+    grid-area: 1 / 1;
+    width: var(--size-window-orb);
+    height: var(--size-window-orb);
+    box-sizing: border-box;
+    border: 1px solid var(--border-orb);
+    border-radius: var(--radius-round);
+    box-shadow: var(--shadow-orb);
+}
+
+.window-orb-close::before { background: var(--gradient-orb-close); }
+.window-orb-minimize::before { background: var(--gradient-orb-minimize); }
+.window-orb-close:hover::before { background: var(--gradient-orb-close-hover); }
+.window-orb-minimize:hover::before { background: var(--gradient-orb-minimize-hover); }
+
+.window-orb-glyph {
+    grid-area: 1 / 1;
+    width: var(--size-window-orb-glyph);
+    height: var(--size-window-orb-glyph);
+    color: var(--text-orb-glyph);
+    opacity: 0;
+}
+
+.window-orbs:hover .window-orb-glyph,
+.window-orb:focus-visible .window-orb-glyph {
+    opacity: 1;
+}
+
+.window-resize {
+    position: fixed;
+    z-index: 10;
+}
+
+.window-resize-top, .window-resize-bottom {
+    left: var(--size-window-resize-corner);
+    right: var(--size-window-resize-corner);
+    height: var(--size-window-resize-edge);
+    cursor: ns-resize;
+}
+
+.window-resize-left, .window-resize-right {
+    top: var(--size-window-resize-corner);
+    bottom: var(--size-window-resize-corner);
+    width: var(--size-window-resize-edge);
+    cursor: ew-resize;
+}
+
+.window-resize-top { top: 0; }
+.window-resize-bottom { bottom: 0; }
+.window-resize-left { left: 0; }
+.window-resize-right { right: 0; }
+
+.window-resize-top-left, .window-resize-top-right,
+.window-resize-bottom-left, .window-resize-bottom-right {
+    width: var(--size-window-resize-corner);
+    height: var(--size-window-resize-corner);
+}
+
+.window-resize-top-left { top: 0; left: 0; cursor: nwse-resize; }
+.window-resize-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.window-resize-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.window-resize-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+
 .title-bar-label {
     font-size: 11px;
     font-weight: 700;

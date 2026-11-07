@@ -150,12 +150,14 @@ add_executable(ui_host_tests
   ui_host/panel_dispatch_round_trip_test.cpp
   ui_host/panel_message_apply_test.cpp
   ui_host/panel_navigation_policy_test.cpp
+  ui_host/panel_window_request_test.cpp
   ui_host/panel_source_lint.cpp
   ui_host/panel_source_lint_test.cpp
   ../src/ui_host/panel_message.cpp
   ../src/ui_host/panel_dispatch_queue.cpp
   ../src/ui_host/panel_message_apply.cpp
   ../src/ui_host/panel_navigation_policy.cpp
+  ../src/ui_host/panel_window_request.cpp
   ../src/app/audio_source_controller.cpp
   ../src/app/window_layout_config.cpp
   ../src/app/window_layout_controller.cpp

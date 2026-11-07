@@ -19,6 +19,7 @@
   <symbol id="icon-fractal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"></path><path d="M7.5 11h9L12 19z"></path></symbol>
   <symbol id="icon-duplicate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></symbol>
   <symbol id="icon-remove" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"></path></symbol>
+  <symbol id="icon-minimize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 12h12"></path></symbol>
   <symbol id="icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></symbol>
 </svg>
 <template id="icon-template"><svg aria-hidden="true"><use href="#icon-remove"></use></svg></template>
@@ -26,6 +27,14 @@
 <div class="panel">
   <header class="title-bar">
     <span class="title-bar-label">Layer Control</span>
+    <div class="window-orbs">
+      <button id="window-minimize-button" class="window-orb window-orb-minimize" type="button" title="Minimize" aria-label="Minimize control panel">
+        <svg class="window-orb-glyph" aria-hidden="true"><use href="#icon-minimize"></use></svg>
+      </button>
+      <button id="window-close-button" class="window-orb window-orb-close" type="button" title="Close (quits aviz)" aria-label="Close and quit aviz">
+        <svg class="window-orb-glyph" aria-hidden="true"><use href="#icon-remove"></use></svg>
+      </button>
+    </div>
   </header>
 
   <section class="panel-header">
@@ -83,6 +92,14 @@
     </div>
   </footer>
 </div>
+<div class="window-resize window-resize-top" data-window-region="top" aria-hidden="true"></div>
+<div class="window-resize window-resize-bottom" data-window-region="bottom" aria-hidden="true"></div>
+<div class="window-resize window-resize-left" data-window-region="left" aria-hidden="true"></div>
+<div class="window-resize window-resize-right" data-window-region="right" aria-hidden="true"></div>
+<div class="window-resize window-resize-top-left" data-window-region="top_left" aria-hidden="true"></div>
+<div class="window-resize window-resize-top-right" data-window-region="top_right" aria-hidden="true"></div>
+<div class="window-resize window-resize-bottom-left" data-window-region="bottom_left" aria-hidden="true"></div>
+<div class="window-resize window-resize-bottom-right" data-window-region="bottom_right" aria-hidden="true"></div>
 <script src="app.js"></script>
 </body>
 </html>

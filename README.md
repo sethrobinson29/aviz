@@ -249,6 +249,23 @@ run directly from `tsan/`.
   that; `title` and `aria-label` stay in both cases. The header's source row
   is Import File, Enable Loopback, the source pill and the **Docked** checkbox.
   The footer is one row: filename field, Save Preset, Load Preset.
+- **Panel window frame**: the control panel is frameless, with its own 46px
+  `LAYER CONTROL` title bar. Drag the title bar to move it (snap to screen
+  edges works); drag any edge or corner to resize it, from a 5px strip inside
+  the edge (12px at corners). It cannot be made narrower than 370 CSS px.
+  Two 14px glossy orbs (24px click targets) sit at the right end of the title
+  bar in Windows order: **minimize** (yellow), then **close** (orange, at the
+  edge), which quits the app as closing the panel always has. Each shows its `×` or `−` glyph when the
+  pointer is over the orbs or when the orb has keyboard focus. The panel asks
+  Windows 11 for rounded window corners (`DWMWA_WINDOW_CORNER_PREFERENCE`);
+  if Windows refuses, the panel logs the HRESULT to stderr and keeps square
+  corners. Moving or resizing the panel by its own title bar or edges still
+  unchecks Docked, and a click on the title bar without moving does not.
+  Alt+F4, Win+Up/Down and the taskbar's window menu still work. The drag and
+  resize requests (`window_drag {region}`) and the orb buttons
+  (`window_command {command: close|minimize}`) are handled on the panel's
+  thread and never reach the render thread's message queue; unknown regions
+  and commands are ignored.
 - **Source pill**: shows `No Source`, `File` or `Loopback` and is the
   source-switch button. With no source it has a dashed outline and is
   disabled; once a source is chosen it is solid green and clicking it toggles
