@@ -327,9 +327,8 @@ run directly from `tsan/`.
   blend mode, palette override, `freq_band`, `reactivity_source`,
   `sensitivity`, `enabled`)
   and preset load/save — all reusing the existing tested
-  `layer_preset`/`preset_file_io` schema and validation. The keyboard debug
-  tool that predated the panel has been removed: the only keys the
-  visualizer window still handles are `F11` (fullscreen), `K` (dock) and
+  `layer_preset`/`preset_file_io` schema and validation. The only keys the
+  visualizer window handles are `F11` (fullscreen), `K` (dock) and
   `L` (audio source). Changing an existing layer's visual type is no longer possible;
   remove the layer and add one of the type you want.
   `preset_file_io::is_safe_preset_filename` validates user-typed filenames

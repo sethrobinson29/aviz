@@ -97,17 +97,17 @@ aviz/
 └── third_party/               # only if a dependency isn't pulled via CMake FetchContent
 ```
 
-**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to each built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on; practically this means a separate `presets/` per build configuration, e.g. `build/Debug/presets`, `build/Release/presets`), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). The path is resolved once at startup from the executable's own location, not the working directory, and passed in explicitly to save and to the preset load dialog's starting folder rather than re-derived in each of those (milestone 8 fix). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The panel's preset save/load (spec §7) is the only path that reads or writes it; the debug tool and its fixed debug preset filename were removed at milestone 8.
+**`presets/` is a runtime-only directory, not part of the repo tree above.** Created next to each built executable (per spec §7's portable, no-install packaging decision — there's no OS-provided app-data location to rely on; practically this means a separate `presets/` per build configuration, e.g. `build/Debug/presets`, `build/Release/presets`), holding user-created layer preset JSON files (`layer_preset.h`/`.cpp`'s schema). The path is resolved once at startup from the executable's own location, not the working directory, and passed in explicitly to save and to the preset load dialog's starting folder rather than re-derived in each of those (milestone 8 fix). Not checked into the repo — git-ignored, since it's generated at runtime and may contain a user's own saved presets. The panel's preset save/load (spec §7) is the only path that reads or writes it.
 
 ## Build options
 
-- **`AVIZ_VERBOSE_RAYLIB_LOG`** (CMake option, default `OFF`) — controls raylib's own trace log verbosity, not application logging. raylib's default `INFO` level prints a line for every texture/FBO load and unload, which is noisy during normal development (especially with the debug control tools reprinting a layer list after every action). Default build suppresses raylib's log to `WARNING` and above via `SetTraceLogLevel`; pass `-DAVIZ_VERBOSE_RAYLIB_LOG=ON` on the configure line to restore full `INFO`-level output when actually debugging a texture/FBO/GPU issue specifically.
+- **`AVIZ_VERBOSE_RAYLIB_LOG`** (CMake option, default `OFF`) — controls raylib's own trace log verbosity, not application logging. raylib's default `INFO` level prints a line for every texture/FBO load and unload, which is noisy during normal development. Default build suppresses raylib's log to `WARNING` and above via `SetTraceLogLevel`; pass `-DAVIZ_VERBOSE_RAYLIB_LOG=ON` on the configure line to restore full `INFO`-level output when actually debugging a texture/FBO/GPU issue specifically.
 
   ```
   cmake -B build -G "Visual Studio 18 2026" -DAVIZ_VERBOSE_RAYLIB_LOG=ON
   ```
 
-  This is not a general application logging framework — there's no leveled TRACE/DEBUG/INFO/WARN/ERROR system for the project's own diagnostics, and none is needed right now. The debug control tools' layer-list printouts are deliberate feature output, not logging, and aren't affected by this flag. Don't build out a broader logging framework speculatively; this flag exists to solve the one specific noise source (raylib's own trace log) that's actually come up.
+  This is not a general application logging framework — there's no leveled TRACE/DEBUG/INFO/WARN/ERROR system for the project's own diagnostics, and none is needed right now. Don't build out a broader logging framework speculatively; this flag exists to solve the one specific noise source (raylib's own trace log) that's actually come up.
 
 ## Dependency policy
 
