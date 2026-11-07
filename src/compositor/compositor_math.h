@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -9,11 +10,15 @@
 
 namespace compositor_math {
 
-float clamp_opacity(float opacity);
+float clamp_opacity(double opacity);
+
+bool has_duplicate_layer_ids(const std::vector<Layer>& layers);
+bool has_invalid_layer_id(const std::vector<Layer>& layers);
+std::uint64_t next_layer_id_after_load(const std::vector<Layer>& layers);
 
 inline constexpr float kSensitivityMin = 0.0f;
 inline constexpr float kSensitivityMax = 4.0f;
-float clamp_sensitivity(float sensitivity);
+float clamp_sensitivity(double sensitivity);
 
 std::optional<std::size_t> next_freq_band(std::optional<std::size_t> current,
                                            std::size_t num_bands);
@@ -26,6 +31,12 @@ ReactivitySource next_reactivity_source(ReactivitySource current,
                                          std::optional<std::size_t> freq_band);
 ReactivitySource prev_reactivity_source(ReactivitySource current,
                                          std::optional<std::size_t> freq_band);
+
+inline constexpr float kLayerPaletteSaturation = 0.75f;
+inline constexpr float kLayerPaletteValue = 0.95f;
+Color layer_palette_color(std::size_t index);
+void reassign_layer_tints(std::vector<Layer>& layers);
+Color layer_composite_color(const Layer& layer);
 
 struct BlendFactors {
     int raylib_mode;

@@ -1,0 +1,276 @@
+#include "ui_host/panel_message_apply.h"
+
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <nlohmann/json.hpp>
+
+#include "compositor/compositor_math.h"
+#include "compositor/layer.h"
+#include "compositor/layer_name.h"
+#include "compositor/layer_preset.h"
+#include "compositor/preset_file_io.h"
+#include "compositor/visual_param.h"
+
+namespace panel_message_apply {
+
+namespace {
+
+std::string to_panel_json(const nlohmann::json& msg) {
+    return msg.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+}
+
+void push_layer_stack(Compositor& compositor, UIHost& ui_host) {
+    nlohmann::json msg;
+    msg["kind"] = "layer_stack";
+    msg["state"] = nlohmann::json::parse(layer_preset::serialize(compositor.layers()));
+    ui_host.send_to_panel(to_panel_json(msg));
+}
+
+void push_status(UIHost& ui_host, bool ok, const std::string& text) {
+    nlohmann::json msg;
+    msg["kind"] = "status";
+    msg["ok"] = ok;
+    msg["message"] = text;
+    ui_host.send_to_panel(to_panel_json(msg));
+}
+
+std::string file_name_of(const std::string& path) {
+    const std::size_t separator = path.find_last_of("\\/");
+    return separator == std::string::npos ? path : path.substr(separator + 1);
+}
+
+void reject_preset_file(PanelApplyContext& ctx, const std::string& name, const std::string& reason) {
+    ctx.ui_host.show_alert("\"" + name + "\" is not a valid preset file, so nothing was loaded.\n\n" + reason);
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const RequestStateMessage&, PanelApplyContext& ctx) {
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const AddLayerMessage& msg, PanelApplyContext& ctx) {
+    if (ctx.compositor.add_layer(msg.visual_type).has_value()) {
+        compositor_math::reassign_layer_tints(ctx.compositor.layers());
+    } else {
+        push_status(ctx.ui_host, false, "layer cap reached (" + std::to_string(Compositor::kMaxLayers) + ")");
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const RemoveLayerMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.remove_layer(*index);
+        compositor_math::reassign_layer_tints(ctx.compositor.layers());
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const DuplicateLayerMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        if (ctx.compositor.duplicate_layer(*index).has_value()) {
+            compositor_math::reassign_layer_tints(ctx.compositor.layers());
+        } else {
+            push_status(ctx.ui_host, false, "layer cap reached (" + std::to_string(Compositor::kMaxLayers) + ")");
+        }
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const MoveLayerMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.move_layer(*index, msg.to_index);
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerOpacityMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].opacity = compositor_math::clamp_opacity(msg.opacity);
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerBlendModeMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].blend_mode = msg.blend_mode;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerFreqBandMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].freq_band = msg.freq_band;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerReactivitySourceMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].reactivity_source = msg.reactivity_source;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerEnabledMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].enabled = msg.enabled;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerSensitivityMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].sensitivity = compositor_math::clamp_sensitivity(msg.sensitivity);
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetPaletteOverrideMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        ctx.compositor.layers()[*index].palette_override =
+            msg.palette_override ? std::optional<Palette>(*msg.palette_override) : std::nullopt;
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetLayerNameMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        std::optional<std::string> name = layer_name::normalized(msg.name);
+        if (name.has_value()) {
+            ctx.compositor.layers()[*index].name = std::move(*name);
+        } else {
+            push_status(ctx.ui_host, false,
+                        "layer name rejected: at most " + std::to_string(layer_name::kMaxCodePoints) +
+                            " characters, no control characters");
+        }
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetVisualParamMessage& msg, PanelApplyContext& ctx) {
+    std::optional<std::size_t> index = ctx.compositor.index_of_layer(msg.layer_id);
+    if (index.has_value()) {
+        if (!visual_param::set(ctx.compositor.layers()[*index], msg.param_name, msg.value)) {
+            push_status(ctx.ui_host, false,
+                        "visual param \"" + msg.param_name +
+                            "\" rejected: unknown name or wrong value type for this layer's visual type");
+        }
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const LoadPresetFileMessage& msg, PanelApplyContext& ctx) {
+    const std::string name = file_name_of(msg.path);
+    preset_file_io::ReadResult read_result = preset_file_io::read_file(msg.path);
+    if (!read_result.success) {
+        reject_preset_file(ctx, name,
+                           read_result.too_large
+                               ? "It is larger than " + std::to_string(preset_file_io::kMaxPresetFileBytes / 1024) +
+                                     " KB."
+                               : std::string("It could not be read."));
+        return;
+    }
+
+    std::optional<std::vector<Layer>> loaded = layer_preset::deserialize(read_result.contents);
+    if (!loaded.has_value()) {
+        reject_preset_file(ctx, name, "Its contents are not a valid layer preset.");
+        return;
+    }
+
+    if (!ctx.compositor.replace_layers_if_ids_valid(std::move(*loaded))) {
+        reject_preset_file(ctx, name, "Its layer ids are missing, repeated or invalid.");
+        return;
+    }
+
+    push_status(ctx.ui_host, true,
+                "loaded " + std::to_string(ctx.compositor.layers().size()) + " layer(s) from " + name);
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SavePresetMessage& msg, PanelApplyContext& ctx) {
+    const std::string path = preset_file_io::preset_path(ctx.presets_dir, msg.filename);
+    const std::string json_text = layer_preset::serialize(ctx.compositor.layers());
+    preset_file_io::WriteResult result = preset_file_io::write_file(path, json_text);
+    if (result.success) {
+        push_status(ctx.ui_host, true,
+                    "saved " + std::to_string(ctx.compositor.layers().size()) + " layer(s) to " + msg.filename);
+    } else {
+        push_status(ctx.ui_host, false, "failed saving preset to " + msg.filename + ": " + result.error);
+    }
+    push_layer_stack(ctx.compositor, ctx.ui_host);
+}
+
+void apply_one(const SetDockedMessage& msg, PanelApplyContext& ctx) {
+    ctx.window_layout.set_docked(msg.docked);
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const SetFullscreenMessage& msg, PanelApplyContext& ctx) {
+    ctx.window_layout.set_fullscreen(msg.fullscreen);
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const SwitchSourceMessage&, PanelApplyContext& ctx) {
+    AudioSourceController::SwitchResult result = ctx.audio_source.toggle();
+    if (!result.success) {
+        push_status(ctx.ui_host, false, "failed switching audio source: " + result.error);
+    }
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const ImportFileMessage& msg, PanelApplyContext& ctx) {
+    AudioSourceController::SwitchResult result = ctx.audio_source.import_file(msg.path);
+    if (result.success) {
+        push_status(ctx.ui_host, true, "playing " + msg.path);
+    } else {
+        push_status(ctx.ui_host, false, "failed importing audio file: " + result.error);
+    }
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+void apply_one(const EnableLoopbackMessage&, PanelApplyContext& ctx) {
+    AudioSourceController::SwitchResult result = ctx.audio_source.enable_loopback();
+    if (!result.success) {
+        push_status(ctx.ui_host, false, "failed enabling loopback: " + result.error);
+    }
+    push_window_state(ctx.ui_host, ctx.window_layout, ctx.audio_source);
+}
+
+}
+
+void apply(const PanelMessage& message, PanelApplyContext& ctx) {
+    std::visit([&ctx](const auto& typed_message) { apply_one(typed_message, ctx); }, message);
+}
+
+void push_window_state(UIHost& ui_host, const WindowLayoutController& window_layout,
+                        const AudioSourceController& audio_source) {
+    nlohmann::json msg;
+    msg["kind"] = "window_state";
+    msg["docked"] = window_layout.mode() == WindowMode::Docked;
+    msg["fullscreen"] = window_layout.is_fullscreen();
+    const char* source = "none";
+    if (audio_source.kind() == AudioSourceKind::File) {
+        source = "file";
+    } else if (audio_source.kind() == AudioSourceKind::Loopback) {
+        source = "loopback";
+    }
+    msg["source"] = source;
+    ui_host.send_to_panel(to_panel_json(msg));
+}
+
+}

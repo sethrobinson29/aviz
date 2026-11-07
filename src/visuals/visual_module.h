@@ -7,8 +7,7 @@
 #include "audio/audio_features.h"
 #include "raylib.h"
 #include "visuals/palette.h"
-
-enum class ReactivitySource { GlobalBeat, BandOnset, BandAmplitude };
+#include "visuals/reactivity_source.h"
 
 struct LayerReactivity {
     std::optional<std::size_t> freq_band;

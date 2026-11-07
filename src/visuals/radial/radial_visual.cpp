@@ -4,7 +4,9 @@
 #include <cmath>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/spectrum/spectrum_visual.h"
+#include "visuals/visual_config.h"
 
 namespace radial_math {
 
@@ -42,14 +44,19 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
     return segments;
 }
 
-float clamp_inner_radius_fraction(float inner, float outer) {
-    const float upper = std::max(outer - kMinRadiusGapFraction, 0.0f);
-    return std::clamp(inner, 0.0f, upper);
+float clamp_thickness(double thickness) {
+    return number_math::clamp_number_to_range<float>(thickness, visual_config::kRadialThicknessPxMin,
+                                                      visual_config::kRadialThicknessPxMax);
 }
 
-float clamp_max_radius_fraction(float outer, float inner) {
+float clamp_inner_radius_fraction(double inner, float outer) {
+    const float upper = std::max(outer - kMinRadiusGapFraction, 0.0f);
+    return number_math::clamp_number_to_range<float>(inner, 0.0f, upper);
+}
+
+float clamp_max_radius_fraction(double outer, float inner) {
     const float lower = std::min(inner + kMinRadiusGapFraction, 1.0f);
-    return std::clamp(outer, lower, 1.0f);
+    return number_math::clamp_number_to_range<float>(outer, lower, 1.0f);
 }
 
 }

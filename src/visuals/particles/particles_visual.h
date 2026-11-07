@@ -29,7 +29,17 @@ bool band_in_range(std::optional<std::size_t> freq_band, std::size_t band_count)
 
 Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius);
 
-float clamp_inner_radius_fraction(float inner);
+float clamp_inner_radius_fraction(double inner);
+
+float clamp_radius(double radius);
+
+float clamp_spawn_rate_per_frame(double rate);
+
+int clamp_lifetime_frames(int frames);
+
+int clamp_lifetime_frames_from_number(double frames);
+
+int clamp_burst_count_from_number(double count);
 
 int accumulate_spawn_count(float& accumulator, float rate_per_frame);
 
@@ -73,6 +83,7 @@ public:
 private:
     ParticlesParams params_;
     RenderTexture2D texture_{};
+    Texture2D sprite_{};
     int width_ = 0;
     int height_ = 0;
     particles_math::Pool pool_{};

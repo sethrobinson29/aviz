@@ -22,11 +22,14 @@ void Compositor::resize(int width, int height) {
     }
 }
 
+std::uint64_t Compositor::allocate_layer_id() { return next_layer_id_++; }
+
 std::optional<std::size_t> Compositor::add_layer(VisualType type) {
     if (layers_.size() >= kMaxLayers) {
         return std::nullopt;
     }
     Layer layer{type, make_visual(type)};
+    layer.layer_id = allocate_layer_id();
     if (width_ > 0 && height_ > 0) {
         layer.visual->resize(width_, height_);
     }
@@ -48,11 +51,42 @@ std::optional<std::size_t> Compositor::duplicate_layer(std::size_t index) {
     copy.reactivity_source = source.reactivity_source;
     copy.sensitivity = source.sensitivity;
     copy.enabled = source.enabled;
+    copy.name = source.name;
+    copy.layer_id = allocate_layer_id();
     if (width_ > 0 && height_ > 0) {
         copy.visual->resize(width_, height_);
     }
     layers_.push_back(std::move(copy));
     return layers_.size() - 1;
+}
+
+bool Compositor::replace_layers_if_ids_valid(std::vector<Layer> layers) {
+    if (layers.size() > kMaxLayers) {
+        return false;
+    }
+    if (compositor_math::has_invalid_layer_id(layers)) {
+        return false;
+    }
+    if (compositor_math::has_duplicate_layer_ids(layers)) {
+        return false;
+    }
+    if (width_ > 0 && height_ > 0) {
+        for (Layer& layer : layers) {
+            layer.visual->resize(width_, height_);
+        }
+    }
+    next_layer_id_ = compositor_math::next_layer_id_after_load(layers);
+    layers_ = std::move(layers);
+    return true;
+}
+
+std::optional<std::size_t> Compositor::index_of_layer(std::uint64_t layer_id) const {
+    for (std::size_t i = 0; i < layers_.size(); ++i) {
+        if (layers_[i].layer_id == layer_id) {
+            return i;
+        }
+    }
+    return std::nullopt;
 }
 
 void Compositor::set_layer_visual_type(std::size_t index, VisualType type) {
@@ -103,13 +137,11 @@ void Compositor::render(const AudioFeatures& features) {
         BeginBlendMode(factors.raylib_mode);
 
         RenderTexture2D& tex = layer.visual->render_texture();
-        const float alpha = compositor_math::clamp_opacity(layer.opacity) * 255.0f;
-        const Color& tint = layer.tint_color;
         DrawTextureRec(tex.texture,
                         Rectangle{0.0f, 0.0f, static_cast<float>(tex.texture.width),
                                   -static_cast<float>(tex.texture.height)},
                         Vector2{0.0f, 0.0f},
-                        Color{tint.r, tint.g, tint.b, static_cast<unsigned char>(alpha)});
+                        compositor_math::layer_composite_color(layer));
 
         EndBlendMode();
     }

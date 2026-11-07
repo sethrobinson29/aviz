@@ -21,6 +21,18 @@ Vector2 field_direction(float x, float y, float turbulence_frequency, float time
 
 Vector2 random_canvas_position(float width, float height, std::mt19937& rng);
 
+float clamp_spawn_rate_per_frame(double rate);
+
+float clamp_turbulence_frequency(double frequency);
+
+float clamp_evolution_per_frame(double evolution);
+
+int clamp_grid_cols(int cols);
+
+int clamp_grid_cols_from_number(double cols);
+
+int grid_rows_for_cols(int cols);
+
 std::size_t grid_cell_index(float x, float y, float cell_width, float cell_height, int cols, int rows);
 
 Vector2 steer_velocity(Vector2 current_velocity, Vector2 target_direction, float speed,
@@ -41,6 +53,9 @@ struct FlowFieldParams {
     float spawn_rate_per_frame = visual_config::kFlowFieldDefaultSpawnRatePerFrame;
     bool ripple_on_onset_enabled = true;
     bool burst_on_onset_enabled = true;
+    float turbulence_frequency = visual_config::kFlowFieldBaseTurbulenceFrequency;
+    float evolution_per_frame = visual_config::kFlowFieldBaseEvolutionPerFrame;
+    int grid_cols = visual_config::kFlowFieldGridCols;
 };
 
 class FlowFieldVisual : public VisualModule {

@@ -151,7 +151,7 @@ TEST(VisualCloneTest, LissajousCloneIsIndependentInstanceOfSameType) {
 }
 
 TEST(VisualCloneTest, LissajousClonePreservesParams) {
-    LissajousVisual original(LissajousParams{PURPLE, 4.5f});
+    LissajousVisual original(LissajousParams{PURPLE, 4.5f, 0.8f});
     auto clone = original.clone();
 
     auto* lissajous_clone = dynamic_cast<LissajousVisual*>(clone.get());
@@ -161,6 +161,7 @@ TEST(VisualCloneTest, LissajousClonePreservesParams) {
     EXPECT_EQ(params.line_color.g, PURPLE.g);
     EXPECT_EQ(params.line_color.b, PURPLE.b);
     EXPECT_FLOAT_EQ(params.line_thickness, 4.5f);
+    EXPECT_FLOAT_EQ(params.compression_exponent, 0.8f);
 }
 
 TEST(VisualCloneTest, FlowFieldCloneIsIndependentInstanceOfSameType) {

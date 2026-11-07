@@ -3,6 +3,7 @@
 #include "miniaudio.h"
 
 #include <cstring>
+#include <filesystem>
 #include <stdexcept>
 
 #include "pipeline_format_converter.h"
@@ -38,7 +39,8 @@ struct FileProducer::Impl {
 
 FileProducer::FileProducer(const std::string& path) : impl_(std::make_unique<Impl>()) {
     ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 0, 0);
-    if (ma_decoder_init_file(path.c_str(), &config, &impl_->decoder) != MA_SUCCESS) {
+    const std::wstring wide_path = std::filesystem::u8path(path).wstring();
+    if (ma_decoder_init_file_w(wide_path.c_str(), &config, &impl_->decoder) != MA_SUCCESS) {
         throw std::runtime_error("FileProducer: failed to open/decode file: " + path);
     }
     impl_->decoder_open = true;

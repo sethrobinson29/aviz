@@ -1,16 +1,17 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 
+#include "compositor/layer_types.h"
 #include "raylib.h"
 #include "visuals/palette.h"
 #include "visuals/visual_module.h"
 
-enum class VisualType { Waveform, Spectrum, Radial, Particles, Lissajous, FlowField, Fractal };
-
-enum class LayerBlendMode { Normal, Additive, Multiply, Screen };
+inline constexpr std::uint64_t kInvalidLayerId = 0;
 
 struct Layer {
     VisualType visual_type;
@@ -23,6 +24,8 @@ struct Layer {
     ReactivitySource reactivity_source = ReactivitySource::GlobalBeat;
     float sensitivity = 1.0f;
     bool enabled = true;
+    std::uint64_t layer_id = kInvalidLayerId;
+    std::string name;
 };
 
 std::unique_ptr<VisualModule> make_visual(VisualType type);

@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace particles_math {
@@ -30,8 +31,32 @@ Vector2 spawn_position(Vector2 center, Vector2 direction, float inner_radius) {
     return Vector2{center.x + direction.x * inner_radius, center.y + direction.y * inner_radius};
 }
 
-float clamp_inner_radius_fraction(float inner) {
-    return std::clamp(inner, 0.0f, 1.0f);
+float clamp_radius(double radius) {
+    return number_math::clamp_number_to_range<float>(radius, visual_config::kParticleRadiusPxMin,
+                                                      visual_config::kParticleRadiusPxMax);
+}
+
+float clamp_inner_radius_fraction(double inner) {
+    return number_math::clamp_number_to_range<float>(inner, 0.0f, 1.0f);
+}
+
+float clamp_spawn_rate_per_frame(double rate) {
+    return number_math::clamp_number_to_range<float>(rate, visual_config::kParticlesSpawnRatePerFrameMin,
+                                                      visual_config::kParticlesSpawnRatePerFrameMax);
+}
+
+int clamp_lifetime_frames(int frames) {
+    return std::clamp(frames, visual_config::kParticlesLifetimeFramesMin,
+                       visual_config::kParticlesLifetimeFramesMax);
+}
+
+int clamp_lifetime_frames_from_number(double frames) {
+    return number_math::clamp_number_to_range<int>(frames, visual_config::kParticlesLifetimeFramesMin,
+                                                    visual_config::kParticlesLifetimeFramesMax);
+}
+
+int clamp_burst_count_from_number(double count) {
+    return number_math::clamp_number_to_range<int>(count, 0, visual_config::kMaxParticles);
 }
 
 int accumulate_spawn_count(float& accumulator, float rate_per_frame) {
@@ -109,14 +134,23 @@ ParticlesVisual::ParticlesVisual(ParticlesParams params) : params_(params) {}
 ParticlesVisual::~ParticlesVisual() {
     if (width_ > 0 && height_ > 0) {
         UnloadRenderTexture(texture_);
+        UnloadTexture(sprite_);
     }
 }
 
 void ParticlesVisual::resize(int width, int height) {
     if (width_ > 0 && height_ > 0) {
         UnloadRenderTexture(texture_);
+        UnloadTexture(sprite_);
     }
     texture_ = LoadRenderTexture(width, height);
+
+    const int sprite_size = visual_config::kParticleSpriteSizePx;
+    Image sprite_image = GenImageColor(sprite_size, sprite_size, Color{255, 255, 255, 0});
+    ImageDrawCircle(&sprite_image, sprite_size / 2, sprite_size / 2, sprite_size / 2 - 1, WHITE);
+    sprite_ = LoadTextureFromImage(sprite_image);
+    UnloadImage(sprite_image);
+    SetTextureFilter(sprite_, TEXTURE_FILTER_BILINEAR);
     width_ = width;
     height_ = height;
 }
@@ -165,6 +199,10 @@ void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivit
     particles_math::step_pool(pool_, static_cast<float>(width_), static_cast<float>(height_),
                                params_.radius);
 
+    const Rectangle sprite_source{0.0f, 0.0f, static_cast<float>(sprite_.width),
+                                  static_cast<float>(sprite_.height)};
+    const float diameter = params_.radius * 2.0f;
+
     BeginTextureMode(texture_);
     ClearBackground(BLANK);
     for (const particles_math::Particle& p : pool_) {
@@ -173,8 +211,10 @@ void ParticlesVisual::render(const AudioFeatures& features, const LayerReactivit
         }
         const Color base =
             particles_math::base_color(params_.particle_color, palette_override, p.age_frames, p.lifetime_frames);
-        DrawCircleV(p.position, params_.radius,
-                    particles_math::faded_color(base, p.age_frames, p.lifetime_frames));
+        DrawTexturePro(sprite_, sprite_source,
+                       Rectangle{p.position.x - params_.radius, p.position.y - params_.radius, diameter, diameter},
+                       Vector2{0.0f, 0.0f}, 0.0f,
+                       particles_math::faded_color(base, p.age_frames, p.lifetime_frames));
     }
     EndTextureMode();
 }

@@ -55,6 +55,49 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pffft)
 
+# --- nlohmann/json --------------------------------------------------------------
+# Layer preset persistence and, later, the WebView2 state bridge (spec §7/§9)
+# both serialize the same JSON shape. Header-only, chosen for idiomatic
+# modern-C++ ergonomics over RapidJSON/simdjson -- preset files are small and
+# read/written rarely, so neither of those libraries' performance edge matters
+# here, and this one reads closest to normal C++ at every call site.
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# --- WebView2 SDK (headers + static loader lib for the control panel window,
+# milestone 8, spec §7) --------------------------------------------------------
+# Headers/lib only -- the WebView2 *runtime* itself is resolved from the
+# system-installed Evergreen runtime for now (not bundled). Fixed Version
+# runtime bundling (CLAUDE.md's no-install packaging decision) is deferred to
+# a dedicated packaging pass, not part of this slice. Fetched directly by URL
+# (the NuGet package is just a zip) rather than via vcpkg or a nuget.exe CLI
+# step, per STRUCTURE.md's "new deps go through FetchContent" policy and the
+# same pin-to-exact-version discipline as the other dependencies above.
+# WebView2LoaderStatic.lib (not WebView2Loader.dll) is used so no extra DLL
+# needs to ship next to the exe, consistent with static CRT linking (/MT).
+# Windows-only; guarded below where it's actually consumed.
+if(WIN32)
+  FetchContent_Declare(
+    webview2sdk
+    URL https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4191.47/microsoft.web.webview2.1.0.4191.47.nupkg
+    URL_HASH SHA256=f492bbf547d0da329553b6727435b677579b1e9f91cc9e4a1ad029366d5f23d0
+    DOWNLOAD_NAME webview2sdk.zip
+  )
+  FetchContent_GetProperties(webview2sdk)
+  if(NOT webview2sdk_POPULATED)
+    FetchContent_Populate(webview2sdk)
+  endif()
+
+  add_library(webview2sdk INTERFACE)
+  target_include_directories(webview2sdk INTERFACE ${webview2sdk_SOURCE_DIR}/build/native/include)
+  target_link_libraries(webview2sdk INTERFACE
+    ${webview2sdk_SOURCE_DIR}/build/native/x64/WebView2LoaderStatic.lib)
+endif()
+
 # --- GoogleTest / GoogleMock ---------------------------------------------------
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
@@ -72,11 +115,20 @@ include(GoogleTest)
 add_executable(aviz
   src/main.cpp
   src/app/app.cpp
+  src/app/audio_source_controller.cpp
   src/app/layer_generator.cpp
+  src/app/visualizer_window_policy.cpp
+  src/app/chrome_raster.cpp
+  src/app/visualizer_overlay.cpp
+  src/app/visualizer_chrome.cpp
+  src/app/window_layout_config.cpp
+  src/app/window_layout_controller.cpp
+  src/app/window_mode_state.cpp
   src/audio/miniaudio_backend.cpp
   src/audio/ring_buffer.cpp
   src/audio/feature_extractor.cpp
   src/audio/feature_worker.cpp
+  src/audio/audio_file_validation.cpp
   src/audio/file_producer.cpp
   src/audio/loopback_producer.cpp
   src/audio/pipeline_format_converter.cpp
@@ -91,11 +143,30 @@ add_executable(aviz
   src/compositor/layer.cpp
   src/compositor/compositor.cpp
   src/compositor/compositor_math.cpp
+  src/compositor/layer_name.cpp
+  src/compositor/layer_preset.cpp
+  src/compositor/preset_file_io.cpp
+  src/compositor/visual_param.cpp
+  src/ui_host/panel_message.cpp
+  src/ui_host/panel_dispatch_queue.cpp
+  src/ui_host/panel_message_apply.cpp
+  src/ui_host/panel_navigation_policy.cpp
+  src/ui_host/panel_window_request.cpp
 )
 target_include_directories(aviz PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT)
+target_link_libraries(aviz PRIVATE miniaudio raylib PFFFT nlohmann_json::nlohmann_json)
 if(AVIZ_VERBOSE_RAYLIB_LOG)
   target_compile_definitions(aviz PRIVATE AVIZ_VERBOSE_RAYLIB_LOG)
+endif()
+
+# UIHost's WebView2 implementation is Windows-only; the interface itself
+# (src/ui_host/ui_host.h) has no platform code and is always compiled in
+# above via panel_message.cpp/panel_dispatch_queue.cpp. See CLAUDE.md on the
+# UIHost interface being designed swappable even though only Windows is
+# implemented now.
+if(WIN32)
+  target_sources(aviz PRIVATE src/ui_host/ui_host_webview2.cpp src/app/raylib_window_watcher.cpp)
+  target_link_libraries(aviz PRIVATE webview2sdk Ole32 Shlwapi Comctl32 Comdlg32 Dwmapi)
 endif()
 
 add_custom_command(TARGET aviz POST_BUILD
@@ -103,6 +174,18 @@ add_custom_command(TARGET aviz POST_BUILD
     ${CMAKE_SOURCE_DIR}/assets/shaders
     $<TARGET_FILE_DIR:aviz>/assets/shaders
   COMMENT "Copying assets/shaders next to aviz executable")
+
+add_custom_command(TARGET aviz POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/assets/fonts
+    $<TARGET_FILE_DIR:aviz>/assets/fonts
+  COMMENT "Copying assets/fonts next to aviz executable")
+
+add_custom_command(TARGET aviz POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/web/panel
+    $<TARGET_FILE_DIR:aviz>/web/panel
+  COMMENT "Copying web/panel next to aviz executable")
 
 # --- tests ---------------------------------------------------------------------
 add_subdirectory(tests)

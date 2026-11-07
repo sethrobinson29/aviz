@@ -8,13 +8,12 @@
 
 namespace {
 void print_usage(const char* program) {
-    std::fprintf(stderr, "usage: %s <audio-file> [-n <count>]\n", program);
+    std::fprintf(stderr, "usage: %s [-n <count>]\n", program);
 }
 }
 
 int main(int argc, char** argv) {
     std::vector<std::string> args(argv + 1, argv + argc);
-    std::optional<std::string> audio_path;
     std::optional<int> generate_count;
 
     for (std::size_t i = 0; i < args.size(); ++i) {
@@ -31,18 +30,11 @@ int main(int argc, char** argv) {
                 return 1;
             }
             generate_count = static_cast<int>(value);
-        } else if (!audio_path.has_value()) {
-            audio_path = args[i];
         } else {
             print_usage(argv[0]);
             return 1;
         }
     }
 
-    if (!audio_path.has_value()) {
-        print_usage(argv[0]);
-        return 1;
-    }
-
-    return run_app(audio_path->c_str(), generate_count);
+    return run_app(generate_count);
 }

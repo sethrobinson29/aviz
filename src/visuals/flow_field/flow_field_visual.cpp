@@ -4,6 +4,7 @@
 #include <cmath>
 
 #include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 
 namespace flow_field_math {
@@ -55,6 +56,36 @@ Vector2 random_canvas_position(float width, float height, std::mt19937& rng) {
     std::uniform_real_distribution<float> x_dist(0.0f, width);
     std::uniform_real_distribution<float> y_dist(0.0f, height);
     return Vector2{x_dist(rng), y_dist(rng)};
+}
+
+float clamp_spawn_rate_per_frame(double rate) {
+    return number_math::clamp_number_to_range<float>(rate, visual_config::kFlowFieldSpawnRatePerFrameMin,
+                                                      visual_config::kFlowFieldSpawnRatePerFrameMax);
+}
+
+float clamp_turbulence_frequency(double frequency) {
+    return number_math::clamp_number_to_range<float>(frequency, visual_config::kFlowFieldTurbulenceFrequencyMin,
+                                                      visual_config::kFlowFieldTurbulenceFrequencyMax);
+}
+
+float clamp_evolution_per_frame(double evolution) {
+    return number_math::clamp_number_to_range<float>(evolution, visual_config::kFlowFieldEvolutionPerFrameMin,
+                                                      visual_config::kFlowFieldEvolutionPerFrameMax);
+}
+
+int clamp_grid_cols(int cols) {
+    return std::clamp(cols, visual_config::kFlowFieldGridColsMin, visual_config::kFlowFieldGridColsMax);
+}
+
+int clamp_grid_cols_from_number(double cols) {
+    return number_math::clamp_number_to_range<int>(cols, visual_config::kFlowFieldGridColsMin,
+                                                    visual_config::kFlowFieldGridColsMax);
+}
+
+int grid_rows_for_cols(int cols) {
+    const int rounded = (cols * visual_config::kFlowFieldGridRows + visual_config::kFlowFieldGridCols / 2) /
+                        visual_config::kFlowFieldGridCols;
+    return std::clamp(rounded, 1, visual_config::kFlowFieldGridRows);
 }
 
 std::size_t grid_cell_index(float x, float y, float cell_width, float cell_height, int cols, int rows) {
@@ -137,13 +168,13 @@ void FlowFieldVisual::render(const AudioFeatures& features, const LayerReactivit
     const bool onset = in_range && features.band_onset[band];
 
     const float turbulence_frequency =
-        visual_config::kFlowFieldBaseTurbulenceFrequency * (1.0f + ratio * reactivity.sensitivity);
+        params_.turbulence_frequency * (1.0f + ratio * reactivity.sensitivity);
     const float evolution_step =
-        visual_config::kFlowFieldBaseEvolutionPerFrame * (1.0f + ratio * reactivity.sensitivity);
+        params_.evolution_per_frame * (1.0f + ratio * reactivity.sensitivity);
     field_time_ += evolution_step;
 
-    const int cols = visual_config::kFlowFieldGridCols;
-    const int rows = visual_config::kFlowFieldGridRows;
+    const int cols = flow_field_math::clamp_grid_cols(params_.grid_cols);
+    const int rows = flow_field_math::grid_rows_for_cols(cols);
     const float cell_width = static_cast<float>(width_) / static_cast<float>(cols);
     const float cell_height = static_cast<float>(height_) / static_cast<float>(rows);
     for (int row = 0; row < rows; ++row) {

@@ -6,19 +6,8 @@
 #include <gtest/gtest.h>
 
 #include "audio/audio_producer.h"
+#include "audio/mock_producer.h"
 #include "audio/ring_buffer.h"
-
-namespace {
-
-class MockProducer : public AudioProducer {
-public:
-    MOCK_METHOD(void, start, (AudioRingBuffer&), (override));
-    MOCK_METHOD(void, stop, (), (override));
-    MOCK_METHOD(unsigned, native_channels, (), (const, override));
-    MOCK_METHOD(unsigned, native_sample_rate, (), (const, override));
-};
-
-}
 
 TEST(ProducerHostTest, ConstructorStartsInitialProducer) {
     AudioRingBuffer ring(64, 2);
@@ -44,6 +33,35 @@ TEST(ProducerHostTest, SwitchToStopsOldProducerBeforeStartingNew) {
     EXPECT_CALL(*next_ptr, start(::testing::Ref(ring))).InSequence(order);
 
     host.switch_to(std::move(next));
+}
+
+TEST(ProducerHostTest, ConstructsWithNoInitialProducerWithoutCrashing) {
+    AudioRingBuffer ring(64, 2);
+
+    ProducerHost host(ring);
+
+    EXPECT_FALSE(host.has_producer());
+    EXPECT_EQ(host.current(), nullptr);
+}
+
+TEST(ProducerHostTest, DestructorWithNoProducerEverActivatedDoesNotCrash) {
+    AudioRingBuffer ring(64, 2);
+
+    { ProducerHost host(ring); }
+}
+
+TEST(ProducerHostTest, SwitchToFromNoProducerStartsTheNewProducerWithoutCrashing) {
+    AudioRingBuffer ring(64, 2);
+    ProducerHost host(ring);
+
+    auto next = std::make_unique<::testing::NiceMock<MockProducer>>();
+    MockProducer* next_ptr = next.get();
+    EXPECT_CALL(*next_ptr, start(::testing::Ref(ring))).Times(1);
+
+    host.switch_to(std::move(next));
+
+    EXPECT_TRUE(host.has_producer());
+    EXPECT_EQ(host.current(), next_ptr);
 }
 
 TEST(ProducerHostTest, DestructorStopsCurrentProducer) {

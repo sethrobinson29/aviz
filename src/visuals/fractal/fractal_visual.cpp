@@ -7,6 +7,7 @@
 
 #include "audio/audio_config.h"
 #include "rlgl.h"
+#include "visuals/number_clamp.h"
 
 namespace {
 
@@ -52,24 +53,78 @@ float one_pole_smooth(float current, float target, float time_constant_ms, float
     return current + (target - current) * coeff;
 }
 
+float apply_sensitivity(float amplitude01, float sensitivity) {
+    return std::clamp(amplitude01 * sensitivity, 0.0f, 1.0f);
+}
+
 float amplitude_to_zoom(float amplitude01, float base_zoom, float zoom_amplitude_scale) {
     const float clamped = std::clamp(amplitude01, 0.0f, 1.0f);
     return base_zoom * (1.0f + clamped * zoom_amplitude_scale);
 }
 
-Vector2 julia_constant(float time_seconds, float amplitude01, float base_radius,
-                        float radius_amplitude_scale, float angular_speed_radians_per_sec,
-                        Vector2 orbit_center, bool clockwise) {
-    const float clamped = std::clamp(amplitude01, 0.0f, 1.0f);
-    const float radius = base_radius + clamped * radius_amplitude_scale;
+float advance_orbit_phase(float phase_radians, float angular_speed_radians_per_sec, bool clockwise,
+                           float dt_seconds) {
     const float direction = clockwise ? 1.0f : -1.0f;
-    const float angle = time_seconds * angular_speed_radians_per_sec * direction;
-    return Vector2{orbit_center.x + radius * std::cos(angle), orbit_center.y + radius * std::sin(angle)};
+    return std::fmod(phase_radians + angular_speed_radians_per_sec * direction * dt_seconds, 2.0f * PI);
 }
 
-float color_cycle_hue(float time_seconds, float cycle_speed_hz) {
-    const float raw = time_seconds * cycle_speed_hz;
+Vector2 julia_constant(float orbit_phase_radians, float amplitude01, float base_radius,
+                        float radius_amplitude_scale, Vector2 orbit_center) {
+    const float clamped = std::clamp(amplitude01, 0.0f, 1.0f);
+    const float radius = base_radius + clamped * radius_amplitude_scale;
+    return Vector2{orbit_center.x + radius * std::cos(orbit_phase_radians),
+                   orbit_center.y + radius * std::sin(orbit_phase_radians)};
+}
+
+float advance_hue_phase(float phase01, float cycle_speed_hz, float dt_seconds) {
+    const float raw = phase01 + cycle_speed_hz * dt_seconds;
     return raw - std::floor(raw);
+}
+
+float clamp_amplitude_smoothing_tau_ms(double tau_ms) {
+    return number_math::clamp_number_to_range<float>(tau_ms, visual_config::kFractalAmplitudeSmoothingTauMsMin,
+                                                      visual_config::kFractalAmplitudeSmoothingTauMsMax);
+}
+
+float clamp_boundary_margin_px(double margin_px) {
+    return number_math::clamp_number_to_range<float>(margin_px, visual_config::kFractalBoundaryMarginPxMin,
+                                                      visual_config::kFractalBoundaryMarginPxMax);
+}
+
+float clamp_base_zoom(double zoom) {
+    return number_math::clamp_number_to_range<float>(zoom, visual_config::kFractalBaseZoomMin,
+                                                      visual_config::kFractalBaseZoomMax);
+}
+
+float clamp_zoom_amplitude_scale(double scale) {
+    return number_math::clamp_number_to_range<float>(scale, visual_config::kFractalZoomAmplitudeScaleMin,
+                                                      visual_config::kFractalZoomAmplitudeScaleMax);
+}
+
+float clamp_julia_base_radius(double radius) {
+    return number_math::clamp_number_to_range<float>(radius, visual_config::kFractalJuliaBaseRadiusMin,
+                                                      visual_config::kFractalJuliaBaseRadiusMax);
+}
+
+float clamp_julia_radius_amplitude_scale(double scale) {
+    return number_math::clamp_number_to_range<float>(scale, visual_config::kFractalJuliaRadiusAmplitudeScaleMin,
+                                                      visual_config::kFractalJuliaRadiusAmplitudeScaleMax);
+}
+
+float clamp_julia_angular_speed(double radians_per_sec) {
+    return number_math::clamp_number_to_range<float>(radians_per_sec,
+                                                      visual_config::kFractalJuliaAngularSpeedRadiansPerSecMin,
+                                                      visual_config::kFractalJuliaAngularSpeedRadiansPerSecMax);
+}
+
+float clamp_julia_orbit_center(double coordinate) {
+    return number_math::clamp_number_to_range<float>(coordinate, visual_config::kFractalJuliaOrbitCenterMin,
+                                                      visual_config::kFractalJuliaOrbitCenterMax);
+}
+
+float clamp_color_cycle_speed_hz(double hz) {
+    return number_math::clamp_number_to_range<float>(hz, visual_config::kFractalColorCycleSpeedHzMin,
+                                                      visual_config::kFractalColorCycleSpeedHzMax);
 }
 
 }
@@ -152,18 +207,21 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
     const float amplitude = fractal_math::selected_band_amplitude(
         features.band_energy, features.band_agc_reference, reactivity.freq_band);
 
+    const float scaled_amplitude = fractal_math::apply_sensitivity(amplitude, reactivity.sensitivity);
+
     const float dt = GetFrameTime();
-    elapsed_seconds_ += dt;
-    smoothed_amplitude_ =
-        fractal_math::one_pole_smooth(smoothed_amplitude_, amplitude, params_.amplitude_smoothing_tau_ms, dt);
+    smoothed_amplitude_ = fractal_math::one_pole_smooth(smoothed_amplitude_, scaled_amplitude,
+                                                         params_.amplitude_smoothing_tau_ms, dt);
+    orbit_phase_radians_ = fractal_math::advance_orbit_phase(
+        orbit_phase_radians_, params_.julia_angular_speed_radians_per_sec, params_.julia_orbit_clockwise, dt);
+    hue_phase_ = fractal_math::advance_hue_phase(hue_phase_, params_.color_cycle_speed_hz, dt);
 
     const float zoom = fractal_math::amplitude_to_zoom(smoothed_amplitude_, params_.base_zoom,
                                                           params_.zoom_amplitude_scale);
     const Vector2 julia_c = fractal_math::julia_constant(
-        elapsed_seconds_, smoothed_amplitude_, params_.julia_base_radius,
-        params_.julia_radius_amplitude_scale, params_.julia_angular_speed_radians_per_sec,
-        Vector2{params_.julia_orbit_center_x, params_.julia_orbit_center_y}, params_.julia_orbit_clockwise);
-    const float hue = fractal_math::color_cycle_hue(elapsed_seconds_, params_.color_cycle_speed_hz);
+        orbit_phase_radians_, smoothed_amplitude_, params_.julia_base_radius,
+        params_.julia_radius_amplitude_scale,
+        Vector2{params_.julia_orbit_center_x, params_.julia_orbit_center_y});
 
     sync_palette_texture(palette_override);
 
@@ -175,7 +233,7 @@ void FractalVisual::render(const AudioFeatures& features, const LayerReactivity&
     SetShaderValue(*shader_, loc_resolution_, resolution, SHADER_UNIFORM_VEC2);
     SetShaderValue(*shader_, loc_zoom_, &zoom, SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_julia_c_, julia_c_uniform, SHADER_UNIFORM_VEC2);
-    SetShaderValue(*shader_, loc_hue_shift_, &hue, SHADER_UNIFORM_FLOAT);
+    SetShaderValue(*shader_, loc_hue_shift_, &hue_phase_, SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_max_iterations_, &max_iterations, SHADER_UNIFORM_INT);
     SetShaderValue(*shader_, loc_boundary_margin_px_, &params_.boundary_margin_px, SHADER_UNIFORM_FLOAT);
     SetShaderValue(*shader_, loc_use_palette_texture_, &use_palette_texture, SHADER_UNIFORM_INT);

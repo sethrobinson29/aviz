@@ -24,9 +24,11 @@ std::vector<RadialSegment> to_radial_bars(const float* band_energy, const float*
 
 inline constexpr float kMinRadiusGapFraction = 0.05f;
 
-float clamp_inner_radius_fraction(float inner, float outer);
+float clamp_inner_radius_fraction(double inner, float outer);
 
-float clamp_max_radius_fraction(float outer, float inner);
+float clamp_max_radius_fraction(double outer, float inner);
+
+float clamp_thickness(double thickness);
 
 }
 

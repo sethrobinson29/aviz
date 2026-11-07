@@ -2,11 +2,16 @@
 
 #include <cmath>
 
-#include "audio/audio_config.h"
+#include "visuals/number_clamp.h"
 #include "visuals/visual_config.h"
 #include "visuals/waveform/waveform_visual.h"
 
 namespace lissajous_math {
+
+float clamp_compression_exponent(double exponent) {
+    return number_math::clamp_number_to_range<float>(exponent, visual_config::kLissajousCompressionExponentMin,
+                                                      visual_config::kLissajousCompressionExponentMax);
+}
 
 float compress_sample(float sample, float exponent) {
     return std::copysign(std::pow(std::fabs(sample), exponent), sample);
@@ -55,7 +60,7 @@ void LissajousVisual::resize(int width, int height) {
 
 void LissajousVisual::render(const AudioFeatures& features, const LayerReactivity& reactivity,
                               const std::optional<Palette>& palette_override) {
-    const std::size_t idle_band = reactivity.freq_band.value_or(audio_config::kGlobalBandIndex);
+    const std::size_t idle_band = waveform_math::safe_band_index(reactivity.freq_band);
     const bool idle = features.band_idle[idle_band];
 
     const waveform_math::ReactivityResult reactivity_result =
@@ -69,7 +74,7 @@ void LissajousVisual::render(const AudioFeatures& features, const LayerReactivit
     const std::vector<Vector2> points = lissajous_math::to_points(
         features.waveform_l.data(), features.waveform_r.data(), features.waveform_l.size(),
         width_, height_, idle, reactivity_result.amplitude_scale,
-        lissajous_math::kAmplitudeCompressionExponent);
+        params_.compression_exponent);
     const float draw_thickness =
         waveform_math::pulse_thickness(params_.line_thickness, onset_pulse_);
 

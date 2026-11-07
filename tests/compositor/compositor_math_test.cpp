@@ -1,9 +1,24 @@
 #include "compositor/compositor_math.h"
 
+#include <cstdint>
+#include <limits>
+#include <memory>
+
 #include <gtest/gtest.h>
 
+#include "compositor/compositor.h"
 #include "raylib.h"
 #include "rlgl.h"
+#include "visuals/palette.h"
+#include "visuals/waveform/waveform_visual.h"
+
+namespace {
+Layer make_test_layer(std::uint64_t id) {
+    Layer layer{VisualType::Waveform, make_visual(VisualType::Waveform)};
+    layer.layer_id = id;
+    return layer;
+}
+}
 
 TEST(ClampOpacityTest, ClampsIntoZeroOneRange) {
     EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-0.5f), 0.0f);
@@ -129,4 +144,179 @@ TEST(PrevReactivitySourceTest, IsInverseOfNextReactivitySourceWithinAValidPair) 
               compositor_math::next_reactivity_source(ReactivitySource::BandOnset, 3));
     EXPECT_EQ(compositor_math::prev_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt),
               compositor_math::next_reactivity_source(ReactivitySource::GlobalBeat, std::nullopt));
+}
+
+TEST(HasDuplicateLayerIdsTest, EmptyIsFalse) {
+    std::vector<Layer> layers;
+    EXPECT_FALSE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasDuplicateLayerIdsTest, AllUniqueIsFalse) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(3));
+    EXPECT_FALSE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasDuplicateLayerIdsTest, RepeatedIdFromAHandEditedPresetIsDetected) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(5));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(5));
+    EXPECT_TRUE(compositor_math::has_duplicate_layer_ids(layers));
+}
+
+TEST(HasInvalidLayerIdTest, ZeroIdIsInvalid) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(kInvalidLayerId));
+    EXPECT_TRUE(compositor_math::has_invalid_layer_id(layers));
+}
+
+TEST(HasInvalidLayerIdTest, NonZeroIdsAreValid) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(42));
+    EXPECT_FALSE(compositor_math::has_invalid_layer_id(layers));
+}
+
+TEST(NextLayerIdAfterLoadTest, EmptyStartsAtOne) {
+    std::vector<Layer> layers;
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers), 1u);
+}
+
+TEST(NextLayerIdAfterLoadTest, ResumesFromOneAboveTheHighestLoadedId) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(3));
+    layers.push_back(make_test_layer(9));
+    layers.push_back(make_test_layer(5));
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers), 10u);
+}
+
+TEST(NextLayerIdAfterLoadTest, SaturatesInsteadOfWrappingPastUint64MaxOnAHandEditedHugeId) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(std::numeric_limits<std::uint64_t>::max()));
+    EXPECT_EQ(compositor_math::next_layer_id_after_load(layers),
+              std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(LayerPaletteColorTest, IsDeterministicForTheSameIndex) {
+    Color a = compositor_math::layer_palette_color(3);
+    Color b = compositor_math::layer_palette_color(3);
+    EXPECT_EQ(a.r, b.r);
+    EXPECT_EQ(a.g, b.g);
+    EXPECT_EQ(a.b, b.b);
+}
+
+TEST(LayerPaletteColorTest, DiffersAcrossDistinctIndices) {
+    Color a = compositor_math::layer_palette_color(0);
+    Color b = compositor_math::layer_palette_color(Compositor::kMaxLayers / 2);
+    EXPECT_FALSE(a.r == b.r && a.g == b.g && a.b == b.b);
+}
+
+TEST(LayerPaletteColorTest, IsNeverWhite) {
+    for (std::size_t i = 0; i < Compositor::kMaxLayers; ++i) {
+        Color c = compositor_math::layer_palette_color(i);
+        EXPECT_FALSE(c.r == 255 && c.g == 255 && c.b == 255) << "index " << i << " produced white";
+    }
+}
+
+TEST(ReassignLayerTintsTest, AssignsADistinctNonWhiteTintPerLayer) {
+    std::vector<Layer> layers;
+    layers.push_back(make_test_layer(1));
+    layers.push_back(make_test_layer(2));
+    layers.push_back(make_test_layer(3));
+    ASSERT_EQ(layers[0].tint_color.r, WHITE.r);
+
+    compositor_math::reassign_layer_tints(layers);
+
+    for (std::size_t i = 0; i < layers.size(); ++i) {
+        Color expected = compositor_math::layer_palette_color(i);
+        EXPECT_EQ(layers[i].tint_color.r, expected.r);
+        EXPECT_EQ(layers[i].tint_color.g, expected.g);
+        EXPECT_EQ(layers[i].tint_color.b, expected.b);
+    }
+    EXPECT_NE(layers[0].tint_color.g, layers[1].tint_color.g);
+}
+
+TEST(ReassignLayerTintsTest, HandlesEmptyVector) {
+    std::vector<Layer> layers;
+    compositor_math::reassign_layer_tints(layers);
+    EXPECT_TRUE(layers.empty());
+}
+
+TEST(ClampOpacityTest, ExtremeAndNonFiniteValuesLandOnADefinedBound) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(nan), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-infinity), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(-1e300), 0.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(infinity), 1.0f);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_opacity(1e300), 1.0f);
+}
+
+TEST(ClampSensitivityTest, ExtremeAndNonFiniteValuesLandOnADefinedBound) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(nan), compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(-infinity), compositor_math::kSensitivityMin);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(infinity), compositor_math::kSensitivityMax);
+    EXPECT_FLOAT_EQ(compositor_math::clamp_sensitivity(1e300), compositor_math::kSensitivityMax);
+}
+
+TEST(LayerCompositeColorTest, LayerWithoutPaletteOverrideCompositesWithItsTint) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.opacity = 1.0f;
+
+    Color color = compositor_math::layer_composite_color(layer);
+
+    EXPECT_EQ(color.r, 10);
+    EXPECT_EQ(color.g, 20);
+    EXPECT_EQ(color.b, 30);
+    EXPECT_EQ(color.a, 255);
+}
+
+TEST(LayerCompositeColorTest, LayerWithPaletteOverrideSkipsTintMultiply) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+
+    Color color = compositor_math::layer_composite_color(layer);
+
+    EXPECT_EQ(color.r, 255);
+    EXPECT_EQ(color.g, 255);
+    EXPECT_EQ(color.b, 255);
+}
+
+TEST(LayerCompositeColorTest, PaletteOverrideStillHonorsOpacity) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    layer.opacity = 0.5f;
+
+    EXPECT_EQ(compositor_math::layer_composite_color(layer).a, 127);
+}
+
+TEST(LayerCompositeColorTest, ClearingPaletteOverrideRevertsToStoredTintWithoutBookkeeping) {
+    Layer layer{VisualType::Waveform, std::make_unique<WaveformVisual>()};
+    layer.tint_color = Color{10, 20, 30, 255};
+    layer.palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    ASSERT_EQ(compositor_math::layer_composite_color(layer).r, 255);
+
+    layer.palette_override = std::nullopt;
+
+    EXPECT_EQ(compositor_math::layer_composite_color(layer).r, 10);
+}
+
+TEST(ReassignLayerTintsTest, StillAssignsTintToLayersWithPaletteOverride) {
+    std::vector<Layer> layers;
+    layers.push_back(Layer{VisualType::Waveform, std::make_unique<WaveformVisual>()});
+    layers[0].palette_override = Palette{{{0.0f, Color{1, 2, 3, 255}}}};
+    layers[0].tint_color = Color{0, 0, 0, 255};
+
+    compositor_math::reassign_layer_tints(layers);
+
+    EXPECT_EQ(layers[0].tint_color.r, compositor_math::layer_palette_color(0).r);
+    EXPECT_EQ(layers[0].tint_color.g, compositor_math::layer_palette_color(0).g);
+    EXPECT_EQ(layers[0].tint_color.b, compositor_math::layer_palette_color(0).b);
 }

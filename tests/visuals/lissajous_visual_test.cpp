@@ -1,8 +1,11 @@
 #include "visuals/lissajous/lissajous_visual.h"
 
 #include <cmath>
+#include <limits>
 
 #include <gtest/gtest.h>
+
+#include "visuals/visual_config.h"
 
 TEST(CompressSampleTest, PreservesEndpointsAtMagnitudeOne) {
     EXPECT_FLOAT_EQ(lissajous_math::compress_sample(1.0f, 0.5f), 1.0f);
@@ -102,4 +105,51 @@ TEST(LissajousToPointsTest, IdleIgnoresSamplesEvenIfProvided) {
     ASSERT_EQ(pts.size(), 2u);
     EXPECT_FLOAT_EQ(pts[0].x, 100.0f);
     EXPECT_FLOAT_EQ(pts[0].y, 50.0f);
+}
+
+TEST(LissajousClampCompressionExponentTest, InRangeValuePassesThrough) {
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(0.7), 0.7f);
+}
+
+TEST(LissajousClampCompressionExponentTest, DefaultExponentIsInsideTheClampRange) {
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(lissajous_math::kAmplitudeCompressionExponent),
+                    lissajous_math::kAmplitudeCompressionExponent);
+}
+
+TEST(LissajousClampCompressionExponentTest, OutOfRangeValuesClampToBounds) {
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(0.0), visual_config::kLissajousCompressionExponentMin);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(-3.0), visual_config::kLissajousCompressionExponentMin);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(7.0), visual_config::kLissajousCompressionExponentMax);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(1e300), visual_config::kLissajousCompressionExponentMax);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(-1e300),
+                    visual_config::kLissajousCompressionExponentMin);
+}
+
+TEST(LissajousClampCompressionExponentTest, NonFiniteValuesClampToBoundsInsteadOfPropagating) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(nan), visual_config::kLissajousCompressionExponentMin);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(infinity),
+                    visual_config::kLissajousCompressionExponentMax);
+    EXPECT_FLOAT_EQ(lissajous_math::clamp_compression_exponent(-infinity),
+                    visual_config::kLissajousCompressionExponentMin);
+}
+
+TEST(LissajousClampCompressionExponentTest, MinimumExponentKeepsSilenceAtCenter) {
+    EXPECT_FLOAT_EQ(lissajous_math::compress_sample(0.0f, visual_config::kLissajousCompressionExponentMin), 0.0f);
+}
+
+TEST(LissajousToPointsTest, LowerExponentPushesQuietSampleFurtherFromCenter) {
+    float left[] = {0.1f};
+    float right[] = {0.0f};
+    auto linear = lissajous_math::to_points(left, right, 1, 200, 200, false, 1.0f,
+                                            visual_config::kLissajousCompressionExponentMax);
+    auto standard = lissajous_math::to_points(left, right, 1, 200, 200, false, 1.0f,
+                                              lissajous_math::kAmplitudeCompressionExponent);
+    auto heavy = lissajous_math::to_points(left, right, 1, 200, 200, false, 1.0f,
+                                           visual_config::kLissajousCompressionExponentMin);
+    EXPECT_FLOAT_EQ(linear[0].x, 110.0f);
+    EXPECT_GT(standard[0].x, linear[0].x);
+    EXPECT_GT(heavy[0].x, standard[0].x);
+    EXPECT_LT(heavy[0].x, 200.0f);
 }

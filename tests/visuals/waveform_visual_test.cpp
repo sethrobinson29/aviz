@@ -4,6 +4,7 @@
 
 #include "audio/audio_config.h"
 #include "visuals/visual_config.h"
+#include <limits>
 
 TEST(WaveformToPointsTest, IdleReturnsFlatMidLine) {
     auto pts = waveform_math::to_points(nullptr, 0, 200, 100, true);
@@ -200,4 +201,55 @@ TEST(ResolveReactivityTest, PulseTargetIsUnusedDefaultWhenOnsetInactive) {
 
     EXPECT_FALSE(result.onset_active);
     EXPECT_FLOAT_EQ(result.onset_pulse_target, 0.0f);
+}
+
+TEST(ResolveReactivityTest, OutOfRangeFreqBandStaysInertInsteadOfOutOfBoundsRead) {
+    AudioFeatures features;
+    features.band_energy[0] = 999.0f;
+    features.band_agc_reference[0] = 1.0f;
+
+    LayerReactivity reactivity{999999, ReactivitySource::BandAmplitude, 2.0f};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FLOAT_EQ(result.amplitude_scale, 1.0f);
+    EXPECT_FALSE(result.onset_active);
+}
+
+TEST(ResolveReactivityTest, OutOfRangeFreqBandWithOnsetSourceStaysInert) {
+    AudioFeatures features;
+
+    LayerReactivity reactivity{audio_config::kNumBands, ReactivitySource::BandOnset, 2.0f};
+    auto result = waveform_math::resolve_reactivity(features, reactivity);
+
+    EXPECT_FALSE(result.onset_active);
+    EXPECT_FLOAT_EQ(result.onset_pulse_target, 0.0f);
+}
+
+TEST(SafeBandIndexTest, NulloptReturnsGlobalBandIndex) {
+    EXPECT_EQ(waveform_math::safe_band_index(std::nullopt), audio_config::kGlobalBandIndex);
+}
+
+TEST(SafeBandIndexTest, InRangeReturnsSameIndex) {
+    EXPECT_EQ(waveform_math::safe_band_index(3), 3u);
+}
+
+TEST(SafeBandIndexTest, OutOfRangeFreqBandFallsBackToGlobalInsteadOfOutOfBoundsRead) {
+    EXPECT_EQ(waveform_math::safe_band_index(999999), audio_config::kGlobalBandIndex);
+    EXPECT_EQ(waveform_math::safe_band_index(audio_config::kNumBands), audio_config::kGlobalBandIndex);
+}
+
+TEST(WaveformClampTest, LineThicknessClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kLineThicknessPxMin;
+    const float max = visual_config::kLineThicknessPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(waveform_math::clamp_line_thickness(high), max) << high;
+    }
 }

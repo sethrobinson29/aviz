@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "visuals/visual_config.h"
+#include <limits>
 
 TEST(SpectrumToBarsTest, ZeroBandCountReturnsEmpty) {
     auto bars = spectrum_math::to_bars(nullptr, nullptr, 0, 100, 100, 0.2f, 1.0f);
@@ -235,4 +236,36 @@ TEST(PulseColorTest, ClampsOutOfRangePulse) {
     Color at_min = spectrum_math::pulse_color(base, 0.0f);
     EXPECT_EQ(over.r, at_max.r);
     EXPECT_EQ(under.r, at_min.r);
+}
+
+TEST(SpectrumClampTest, GapRatioClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kSpectrumGapRatioMin;
+    const float max = visual_config::kSpectrumGapRatioMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(spectrum_math::clamp_gap_ratio(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(spectrum_math::clamp_gap_ratio(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(spectrum_math::clamp_gap_ratio(high), max) << high;
+    }
+}
+
+TEST(SpectrumClampTest, MaxHeightFractionClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kSpectrumMaxHeightFractionMin;
+    const float max = visual_config::kSpectrumMaxHeightFractionMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(spectrum_math::clamp_max_height_fraction(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(spectrum_math::clamp_max_height_fraction(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(spectrum_math::clamp_max_height_fraction(high), max) << high;
+    }
 }

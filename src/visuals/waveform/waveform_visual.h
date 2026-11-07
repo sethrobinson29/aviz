@@ -17,6 +17,8 @@ float band_amplitude_scale(float energy, float reference);
 
 float pulse_thickness(float base_thickness, float pulse);
 
+float clamp_line_thickness(double thickness);
+
 float next_onset_pulse(float current_pulse, bool band_changed, bool onset_active,
                         float pulse_target, float decay_per_frame);
 
@@ -27,6 +29,8 @@ struct ReactivityResult {
 };
 
 ReactivityResult resolve_reactivity(const AudioFeatures& features, const LayerReactivity& reactivity);
+
+std::size_t safe_band_index(std::optional<std::size_t> freq_band);
 
 }
 

@@ -3,9 +3,12 @@
 #include <cmath>
 #include <random>
 
+#include <limits>
+
 #include <gtest/gtest.h>
 
 #include "audio/audio_config.h"
+#include "visuals/visual_config.h"
 
 namespace {
 constexpr float kEpsilon = 1e-3f;
@@ -84,6 +87,20 @@ TEST(ClampInnerRadiusFractionTest, ClampsToUnitRange) {
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(0.5f), 0.5f);
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-0.2f), 0.0f);
     EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1.5f), 1.0f);
+}
+
+TEST(ClampSpawnRatePerFrameTest, ClampsToConfiguredRange) {
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(5.0f), 5.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(-1.0f),
+                    visual_config::kParticlesSpawnRatePerFrameMin);
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(1000.0f),
+                    visual_config::kParticlesSpawnRatePerFrameMax);
+}
+
+TEST(ClampLifetimeFramesTest, ClampsToConfiguredRange) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(200), 200);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(0), visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames(10000), visual_config::kParticlesLifetimeFramesMax);
 }
 
 TEST(ParticlesAccumulateSpawnCountTest, CarriesFractionalRemainderAcrossFrames) {
@@ -299,4 +316,71 @@ TEST(ParticlesBaseColorTest, ZeroLifetimeNormalizesToZero) {
     Palette palette{{{0.0f, Color{0, 0, 0, 255}}, {1.0f, Color{200, 0, 0, 255}}}};
     Color c = particles_math::base_color(WHITE, palette, 0, 0);
     EXPECT_EQ(c.r, 0);
+}
+
+TEST(ParticlesClampLifetimeFromNumberTest, ExtremeAndNonFiniteValuesClampWithoutReachingTheIntCast) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(1e30),
+              visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(-1e30),
+              visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(std::numeric_limits<double>::infinity()),
+              visual_config::kParticlesLifetimeFramesMax);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(-std::numeric_limits<double>::infinity()),
+              visual_config::kParticlesLifetimeFramesMin);
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(std::numeric_limits<double>::quiet_NaN()),
+              visual_config::kParticlesLifetimeFramesMin);
+}
+
+TEST(ParticlesClampLifetimeFromNumberTest, InRangeValueTruncatesToInt) {
+    EXPECT_EQ(particles_math::clamp_lifetime_frames_from_number(150.9), 150);
+}
+
+TEST(ParticlesClampBurstCountFromNumberTest, ClampsToZeroThroughPoolCapacity) {
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(24.0), 24);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(-5.0), 0);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(1e30), visual_config::kMaxParticles);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(-1e30), 0);
+    EXPECT_EQ(particles_math::clamp_burst_count_from_number(std::numeric_limits<double>::quiet_NaN()), 0);
+}
+
+TEST(ParticlesClampInnerRadiusFractionTest, NonFiniteAndExtremeValuesClampInsteadOfPropagating) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(nan), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-infinity), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(-1e300), 0.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(infinity), 1.0f);
+    EXPECT_FLOAT_EQ(particles_math::clamp_inner_radius_fraction(1e300), 1.0f);
+}
+
+TEST(ParticlesClampTest, RadiusClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kParticleRadiusPxMin;
+    const float max = visual_config::kParticleRadiusPxMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(particles_math::clamp_radius(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_radius(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_radius(high), max) << high;
+    }
+}
+
+TEST(ParticlesClampTest, SpawnRateClampsToRangeIncludingExtremeAndNonFiniteValues) {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const double infinity = std::numeric_limits<double>::infinity();
+    const float min = visual_config::kParticlesSpawnRatePerFrameMin;
+    const float max = visual_config::kParticlesSpawnRatePerFrameMax;
+    const float inside = min + (max - min) * 0.25f;
+
+    EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(static_cast<double>(inside)), inside);
+    for (double low : {static_cast<double>(min) - 1.0, -1e300, -infinity, nan}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(low), min) << low;
+    }
+    for (double high : {static_cast<double>(max) + 1.0, 1e300, infinity}) {
+        EXPECT_FLOAT_EQ(particles_math::clamp_spawn_rate_per_frame(high), max) << high;
+    }
 }
