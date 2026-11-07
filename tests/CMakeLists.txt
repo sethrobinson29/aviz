@@ -105,7 +105,9 @@ add_executable(app_tests
   app/window_layout_config_test.cpp
   app/window_mode_state_test.cpp
   app/audio_source_controller_test.cpp
+  app/visualizer_window_policy_test.cpp
   ../src/app/layer_generator.cpp
+  ../src/app/visualizer_window_policy.cpp
   ../src/app/window_layout_config.cpp
   ../src/app/window_mode_state.cpp
   ../src/app/audio_source_controller.cpp

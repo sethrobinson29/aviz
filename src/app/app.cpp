@@ -83,7 +83,9 @@ int run_app(std::optional<int> generate_layer_count) {
 #else
         SetTraceLogLevel(LOG_WARNING);
 #endif
+        SetConfigFlags(FLAG_WINDOW_UNDECORATED);
         InitWindow(window_layout::kVisualizerWidth, window_layout::kVisualizerHeight, "aviz");
+        SetExitKey(KEY_NULL);
         SetTargetFPS(kTargetFps);
 
         const int startup_monitor = GetCurrentMonitor();
@@ -108,11 +110,14 @@ int run_app(std::optional<int> generate_layer_count) {
             Compositor compositor;
             compositor.resize(initial_layout.visualizer.width, initial_layout.visualizer.height);
             WindowLayoutController window_layout_controller(compositor, *ui_host);
-            RaylibWindowWatcher raylib_window_watcher(GetWindowHandle(), [&]() {
-                window_layout_controller.set_docked(false);
-                panel_message_apply::push_window_state(*ui_host, window_layout_controller,
-                                                        audio_source_controller);
-            });
+            RaylibWindowWatcher raylib_window_watcher(
+                GetWindowHandle(),
+                [&]() {
+                    window_layout_controller.set_docked(false);
+                    panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                            audio_source_controller);
+                },
+                [&]() { return window_layout_controller.is_fullscreen(); });
             populate_startup_layers(compositor, generate_layer_count);
             compositor_math::reassign_layer_tints(compositor.layers());
 

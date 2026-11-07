@@ -32,6 +32,7 @@ void WindowLayoutController::apply(const WindowLayoutAction& action) {
     }
     if (action.exit_fullscreen) {
         ToggleBorderlessWindowed();
+        SetWindowState(FLAG_WINDOW_UNDECORATED);
     }
     if (action.restore_windowed_rect) {
         place_visualizer(windowed_rect_);

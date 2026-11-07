@@ -419,6 +419,18 @@ run directly from `tsan/`.
   fullscreen never changes the checkbox. Leaving fullscreen snaps to the
   docked block if it is checked, and otherwise returns the visualizer to the
   position and size it had before fullscreen.
+- **Visualizer window frame**: the visualizer window has no OS frame or title
+  bar (`FLAG_WINDOW_UNDECORATED`) and is a fixed 1280x720 when windowed. Drag
+  anywhere in it to move it; this returns `HTCAPTION` from `WM_NCHITTEST` in
+  `RaylibWindowWatcher`'s subclass, and double-clicking does nothing. In
+  fullscreen it cannot be dragged. Leaving fullscreen reapplies the
+  undecorated state after raylib's borderless toggle (which turns the OS
+  frame back on), so the frame does not return. Windowed, it asks Windows 11
+  for rounded corners; in fullscreen, square corners
+  (`DWMWA_WINDOW_CORNER_PREFERENCE`, logged to stderr if refused). `Esc` does
+  nothing (`SetExitKey(KEY_NULL)`). There is no close button on the
+  visualizer: Alt+F4, the taskbar's window menu, or the panel's close orb
+  quit the app.
 - **Hotkeys**: `F11` toggles fullscreen, `K` toggles Docked and `L` toggles
   the audio source (once a source has been chosen). They work in the
   visualizer window and in the panel. In the panel they are ignored while

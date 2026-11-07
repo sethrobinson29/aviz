@@ -51,11 +51,16 @@ aviz/
 │   │                        # (C++ side of the C++/JS boundary — see spec §7),
 │   │                        # panel_navigation_policy.h/.cpp (new-window/frame-navigation/
 │   │                        # resource-request trust checks — see TESTING.md's Security
-│   │                        # / adversarial input section)
+│   │                        # / adversarial input section), panel_window_request.h/.cpp
+│   │                        # (parses the panel's window_drag/window_command requests,
+│   │                        # handled on the panel thread — see spec §7's Window frames)
 │   ├── app/               # top-level orchestration: window/init, main loop, wiring
 │   │                        # (producer_host.h, audio_source_controller, window_layout_config.h),
-│   │                        # plus the visualizer window's chrome (theme data struct, overlay
-│   │                        # drawing, raylib-free button/layout logic)
+│   │                        # plus the visualizer window's chrome: raylib_window_watcher
+│   │                        # (Win32 subclass for drag hit-testing, corners, move detection),
+│   │                        # visualizer_window_policy (raylib-free hit-test/corner rules),
+│   │                        # and later the theme data struct, overlay drawing and
+│   │                        # raylib-free button/layout logic
 │   └── main.cpp
 ├── web/
 │   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI)

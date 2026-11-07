@@ -5,7 +5,8 @@
 
 class RaylibWindowWatcher {
 public:
-    RaylibWindowWatcher(void* native_window_handle, std::function<void()> on_user_drag_or_resize);
+    RaylibWindowWatcher(void* native_window_handle, std::function<void()> on_user_drag_or_resize,
+                        std::function<bool()> is_fullscreen);
     ~RaylibWindowWatcher();
 
     RaylibWindowWatcher(const RaylibWindowWatcher&) = delete;
