@@ -14,6 +14,8 @@
 #include "app/audio_source_controller.h"
 #include "app/layer_generator.h"
 #include "app/raylib_window_watcher.h"
+#include "app/visualizer_chrome.h"
+#include "app/visualizer_chrome_theme.h"
 #include "app/window_layout_config.h"
 #include "app/window_layout_controller.h"
 #include "audio/audio_config.h"
@@ -110,6 +112,8 @@ int run_app(std::optional<int> generate_layer_count) {
             Compositor compositor;
             compositor.resize(initial_layout.visualizer.width, initial_layout.visualizer.height);
             WindowLayoutController window_layout_controller(compositor, *ui_host);
+            const VisualizerChromeTheme& chrome_theme = visualizer_chrome_theme::kDarkY2k;
+            VisualizerChrome chrome(chrome_theme);
             RaylibWindowWatcher raylib_window_watcher(
                 GetWindowHandle(),
                 [&]() {
@@ -117,7 +121,8 @@ int run_app(std::optional<int> generate_layer_count) {
                     panel_message_apply::push_window_state(*ui_host, window_layout_controller,
                                                             audio_source_controller);
                 },
-                [&]() { return window_layout_controller.is_fullscreen(); });
+                [&]() { return window_layout_controller.is_fullscreen(); },
+                [&](int client_x, int client_y) { return chrome.is_over_button(client_x, client_y); });
             populate_startup_layers(compositor, generate_layer_count);
             compositor_math::reassign_layer_tints(compositor.layers());
 
@@ -146,6 +151,12 @@ int run_app(std::optional<int> generate_layer_count) {
                                                             audio_source_controller);
                 }
 
+                if (chrome.update(window_layout_controller.is_fullscreen())) {
+                    window_layout_controller.toggle_fullscreen();
+                    panel_message_apply::push_window_state(*ui_host, window_layout_controller,
+                                                            audio_source_controller);
+                }
+
                 for (const PanelMessage& message : ui_host->drain_pending_messages()) {
                     panel_message_apply::apply(message, apply_ctx);
                 }
@@ -153,13 +164,14 @@ int run_app(std::optional<int> generate_layer_count) {
                 compositor.render(snapshot.current());
 
                 BeginDrawing();
-                ClearBackground(BLACK);
+                draw_visualizer_background(chrome_theme);
                 RenderTexture2D& tex = compositor.output();
                 DrawTextureRec(
                     tex.texture,
                     Rectangle{0.0f, 0.0f, static_cast<float>(tex.texture.width),
                               -static_cast<float>(tex.texture.height)},
                     Vector2{0.0f, 0.0f}, WHITE);
+                chrome.draw();
                 EndDrawing();
             }
         }

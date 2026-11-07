@@ -2,8 +2,8 @@
 
 namespace visualizer_window_policy {
 
-VisualizerHitRegion hit_region(bool fullscreen) {
-    return fullscreen ? VisualizerHitRegion::Client : VisualizerHitRegion::Caption;
+VisualizerHitRegion hit_region(bool fullscreen, bool over_overlay_button) {
+    return fullscreen || over_overlay_button ? VisualizerHitRegion::Client : VisualizerHitRegion::Caption;
 }
 
 VisualizerCornerStyle corner_style(bool fullscreen) {

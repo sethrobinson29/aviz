@@ -1,6 +1,7 @@
 #include "app/raylib_window_watcher.h"
 
 #include <windows.h>
+#include <windowsx.h>
 
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -13,6 +14,7 @@
 struct RaylibWindowWatcher::State {
     std::function<void()> on_user_drag_or_resize;
     std::function<bool()> is_fullscreen;
+    std::function<bool(int, int)> is_over_overlay_button;
     RECT rect_at_size_move_start{};
     std::optional<VisualizerCornerStyle> applied_corner_style;
 };
@@ -46,7 +48,11 @@ LRESULT CALLBACK WatcherSubclassProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM 
             if (hit != HTCLIENT) {
                 return hit;
             }
-            return visualizer_window_policy::hit_region(state->is_fullscreen()) == VisualizerHitRegion::Caption
+            POINT cursor{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            ScreenToClient(hwnd, &cursor);
+            const bool over_button = state->is_over_overlay_button(cursor.x, cursor.y);
+            return visualizer_window_policy::hit_region(state->is_fullscreen(), over_button) ==
+                           VisualizerHitRegion::Caption
                        ? HTCAPTION
                        : HTCLIENT;
         }
@@ -81,10 +87,12 @@ LRESULT CALLBACK WatcherSubclassProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM 
 }
 
 RaylibWindowWatcher::RaylibWindowWatcher(void* native_window_handle, std::function<void()> on_user_drag_or_resize,
-                                         std::function<bool()> is_fullscreen)
+                                         std::function<bool()> is_fullscreen,
+                                         std::function<bool(int, int)> is_over_overlay_button)
     : hwnd_(native_window_handle), state_(std::make_unique<State>()) {
     state_->on_user_drag_or_resize = std::move(on_user_drag_or_resize);
     state_->is_fullscreen = std::move(is_fullscreen);
+    state_->is_over_overlay_button = std::move(is_over_overlay_button);
     HWND hwnd = static_cast<HWND>(hwnd_);
     apply_corner_style(hwnd, *state_);
     SetWindowSubclass(hwnd, WatcherSubclassProc, kSubclassId, reinterpret_cast<DWORD_PTR>(state_.get()));

@@ -59,8 +59,11 @@ aviz/
 │   │                        # plus the visualizer window's chrome: raylib_window_watcher
 │   │                        # (Win32 subclass for drag hit-testing, corners, move detection),
 │   │                        # visualizer_window_policy (raylib-free hit-test/corner rules),
-│   │                        # and later the theme data struct, overlay drawing and
-│   │                        # raylib-free button/layout logic
+│   │                        # visualizer_chrome_theme.h (VisualizerChromeTheme, the theme
+│   │                        # data struct), chrome_raster (raylib-free button image
+│   │                        # generation), visualizer_overlay (raylib-free button layout and
+│   │                        # press logic), visualizer_chrome (font/texture lifetime, overlay
+│   │                        # drawing, draw_visualizer_background)
 │   └── main.cpp
 ├── web/
 │   └── panel/              # control panel HTML/CSS/JS (WebView2-hosted UI)

@@ -2,12 +2,17 @@
 
 #include <gtest/gtest.h>
 
-TEST(VisualizerWindowPolicyTest, WindowedVisualizerDragsFromAnywhereInItsClientArea) {
-    EXPECT_EQ(visualizer_window_policy::hit_region(false), VisualizerHitRegion::Caption);
+TEST(VisualizerWindowPolicyTest, WindowedVisualizerDragsFromAnywhereOutsideTheOverlayButton) {
+    EXPECT_EQ(visualizer_window_policy::hit_region(false, false), VisualizerHitRegion::Caption);
+}
+
+TEST(VisualizerWindowPolicyTest, OverlayButtonReceivesClicksInsteadOfStartingADrag) {
+    EXPECT_EQ(visualizer_window_policy::hit_region(false, true), VisualizerHitRegion::Client);
 }
 
 TEST(VisualizerWindowPolicyTest, FullscreenVisualizerCannotBeDragged) {
-    EXPECT_EQ(visualizer_window_policy::hit_region(true), VisualizerHitRegion::Client);
+    EXPECT_EQ(visualizer_window_policy::hit_region(true, false), VisualizerHitRegion::Client);
+    EXPECT_EQ(visualizer_window_policy::hit_region(true, true), VisualizerHitRegion::Client);
 }
 
 TEST(VisualizerWindowPolicyTest, WindowedVisualizerRequestsRoundedCorners) {

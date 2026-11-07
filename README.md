@@ -421,8 +421,9 @@ run directly from `tsan/`.
   position and size it had before fullscreen.
 - **Visualizer window frame**: the visualizer window has no OS frame or title
   bar (`FLAG_WINDOW_UNDECORATED`) and is a fixed 1280x720 when windowed. Drag
-  anywhere in it to move it; this returns `HTCAPTION` from `WM_NCHITTEST` in
-  `RaylibWindowWatcher`'s subclass, and double-clicking does nothing. In
+  anywhere except the overlay button to move it; this returns `HTCAPTION` from
+  `WM_NCHITTEST` in `RaylibWindowWatcher`'s subclass (`HTCLIENT` over the
+  button), and double-clicking does nothing. In
   fullscreen it cannot be dragged. Leaving fullscreen reapplies the
   undecorated state after raylib's borderless toggle (which turns the OS
   frame back on), so the frame does not return. Windowed, it asks Windows 11
@@ -431,6 +432,31 @@ run directly from `tsan/`.
   nothing (`SetExitKey(KEY_NULL)`). There is no close button on the
   visualizer: Alt+F4, the taskbar's window menu, or the panel's close orb
   quit the app.
+- **Visualizer chrome**: drawn inside `BeginDrawing` after the compositor
+  output, so it is not a layer. Windowed, a 26px fullscreen toggle sits 16px
+  from the top-right corner (6px radius, 4% white fill, 8% white hairline
+  border, a `#5c6b61` expand icon; brighter fill, border and icon on hover).
+  Fullscreen, an `Exit Fullscreen` pill sits 28px from the bottom-right
+  corner (metallic `#2a313b`→`#1b2026` gradient, `#3a424d` border turning
+  `#454e59` on hover, a 1px 18%-white inset top highlight, brighter than the
+  panel buttons' 8%, a collapse icon and a 12px
+  Inter SemiBold label). Clicking either fires on release only if the press
+  began on the button, and takes the same path as `F11`. Hover clears when
+  the pointer leaves the window. Both buttons are anti-aliased images
+  generated once from the theme (rounded shape, border, gradient, highlight
+  and icon strokes, via signed distances in raylib-free `chrome_raster`), and
+  regenerated when the window's DPI scale changes; sizes and margins scale by
+  `GetWindowScaleDPI()`. The design's drop shadow under the pill is not
+  drawn. The only source of chrome colors and sizes is
+  `VisualizerChromeTheme` (`src/app/visualizer_chrome_theme.h`,
+  `visualizer_chrome_theme::kDarkY2k`); values shared with the panel's
+  `dark-y2k.css` tokens are the named `kPanelButton*` constants, so a theme
+  change has to update both. The background is one
+  `draw_visualizer_background(theme)` call (flat black). The label font
+  `assets/fonts/Inter-SemiBold-ascii.ttf` is loaded after `InitWindow` at
+  12px times the DPI scale and unloaded before `CloseWindow`; if it fails to
+  load, stderr says so and raylib's default font is used. Overlay layout and
+  press logic live in raylib-free `visualizer_overlay`, with unit tests.
 - **Hotkeys**: `F11` toggles fullscreen, `K` toggles Docked and `L` toggles
   the audio source (once a source has been chosen). They work in the
   visualizer window and in the panel. In the panel they are ignored while

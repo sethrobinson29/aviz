@@ -118,6 +118,9 @@ add_executable(aviz
   src/app/audio_source_controller.cpp
   src/app/layer_generator.cpp
   src/app/visualizer_window_policy.cpp
+  src/app/chrome_raster.cpp
+  src/app/visualizer_overlay.cpp
+  src/app/visualizer_chrome.cpp
   src/app/window_layout_config.cpp
   src/app/window_layout_controller.cpp
   src/app/window_mode_state.cpp
