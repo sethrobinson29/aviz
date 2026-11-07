@@ -16,8 +16,10 @@ namespace window_layout {
 
 constexpr int kVisualizerWidth = 1280;
 constexpr int kVisualizerHeight = 720;
-constexpr int kPanelWidth = 420;
+constexpr int kPanelWidthDip = 420;
 
-DockedLayout compute_docked_layout(const WindowRect& monitor);
+int panel_width_for_scale(float panel_dpi_scale);
+
+DockedLayout compute_docked_layout(const WindowRect& monitor, float panel_dpi_scale);
 
 }

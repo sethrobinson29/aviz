@@ -22,10 +22,12 @@ public:
     void send_to_panel(const std::string& json_text) override { sent_messages.push_back(json_text); }
     void show_alert(const std::string& message) override { alerts.push_back(message); }
     std::optional<ScreenRect> panel_monitor_bounds() const override { return monitor_bounds; }
+    std::optional<float> panel_dpi_scale() const override { return dpi_scale; }
 
     std::vector<std::string> sent_messages;
     std::vector<std::string> alerts;
     std::optional<ScreenRect> monitor_bounds;
+    std::optional<float> dpi_scale;
     std::optional<WindowRect> last_bounds;
     bool should_close_ = false;
 

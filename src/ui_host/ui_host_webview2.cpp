@@ -294,6 +294,17 @@ public:
         return ScreenRect{r.left, r.top, r.right - r.left, r.bottom - r.top};
     }
 
+    std::optional<float> panel_dpi_scale() const override {
+        if (hwnd_ == nullptr) {
+            return std::nullopt;
+        }
+        const UINT dpi = GetDpiForWindow(hwnd_);
+        if (dpi == 0) {
+            return std::nullopt;
+        }
+        return static_cast<float>(dpi) / static_cast<float>(kDefaultDpi);
+    }
+
 private:
     void thread_main() {
         if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) {
@@ -565,6 +576,12 @@ private:
                     const int inset = maximized_frame_inset(hwnd);
                     InflateRect(&params->rgrc[0], -inset, -inset);
                 }
+                return 0;
+            }
+            case WM_DPICHANGED: {
+                const RECT* suggested = reinterpret_cast<const RECT*>(lparam);
+                SetWindowPos(hwnd, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
+                             suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
                 return 0;
             }
             case WM_GETMINMAXINFO: {

@@ -27,6 +27,7 @@ public:
     virtual void send_to_panel(const std::string& json_text) = 0;
     virtual void show_alert(const std::string& message) = 0;
     virtual std::optional<ScreenRect> panel_monitor_bounds() const = 0;
+    virtual std::optional<float> panel_dpi_scale() const = 0;
 };
 
 std::unique_ptr<UIHost> create_ui_host(const std::string& content_dir, const std::string& presets_dir,

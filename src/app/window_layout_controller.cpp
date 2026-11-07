@@ -66,7 +66,8 @@ WindowRect WindowLayoutController::docking_monitor() const {
 }
 
 void WindowLayoutController::reposition_docked() {
-    const DockedLayout layout = window_layout::compute_docked_layout(docking_monitor());
+    const float panel_scale = ui_host_.panel_dpi_scale().value_or(GetWindowScaleDPI().x);
+    const DockedLayout layout = window_layout::compute_docked_layout(docking_monitor(), panel_scale);
     place_visualizer(layout.visualizer);
     ui_host_.set_bounds(layout.panel.x, layout.panel.y, layout.panel.width, layout.panel.height);
 }

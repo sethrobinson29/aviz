@@ -419,6 +419,17 @@ run directly from `tsan/`.
   fullscreen never changes the checkbox. Leaving fullscreen snaps to the
   docked block if it is checked, and otherwise returns the visualizer to the
   position and size it had before fullscreen.
+- **Display scaling (DPI)**: the process is per-monitor DPI aware (GLFW sets
+  this at startup). The panel is 420 CSS px wide in the docked layout at any
+  scale (`kPanelWidthDip` times the panel monitor's scale: 420 physical px at
+  100%, 525 at 125%, 630 at 150%); at startup the visualizer's monitor scale
+  is used, since the panel does not exist yet. Moving the panel to a monitor
+  with a different scale resizes it to Windows' suggested rectangle
+  (`WM_DPICHANGED`), so its CSS size stays the same, and the 370 CSS px
+  minimum width follows the current monitor. The visualizer stays a fixed
+  1280x720 physical pixels at every scale, and the panel's docked height
+  matches it, so at 150% the panel is 480 CSS px tall. The visualizer's
+  overlay buttons and their font scale with the visualizer monitor's scale.
 - **Visualizer window frame**: the visualizer window has no OS frame or title
   bar (`FLAG_WINDOW_UNDECORATED`) and is a fixed 1280x720 when windowed. Drag
   anywhere except the overlay button to move it; this returns `HTCAPTION` from

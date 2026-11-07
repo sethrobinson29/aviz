@@ -94,7 +94,8 @@ int run_app(std::optional<int> generate_layer_count) {
         const Vector2 startup_monitor_origin = GetMonitorPosition(startup_monitor);
         const DockedLayout initial_layout = window_layout::compute_docked_layout(
             WindowRect{static_cast<int>(startup_monitor_origin.x), static_cast<int>(startup_monitor_origin.y),
-                       GetMonitorWidth(startup_monitor), GetMonitorHeight(startup_monitor)});
+                       GetMonitorWidth(startup_monitor), GetMonitorHeight(startup_monitor)},
+            GetWindowScaleDPI().x);
         SetWindowPosition(initial_layout.visualizer.x, initial_layout.visualizer.y);
 
         const std::string presets_dir = preset_file_io::presets_directory_in(GetApplicationDirectory());
