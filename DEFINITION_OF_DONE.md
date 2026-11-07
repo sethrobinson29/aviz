@@ -23,7 +23,7 @@ Done when it:
 
 ## Control panel / UI work
 
-A control panel feature (a new panel control, theme selection wiring, layer preset save/load, state bridge message, etc.) is done when it:
+A control panel feature (a new panel control, window chrome, layer preset save/load, state bridge message, etc.) is done when it:
 
 - Is wired to real layer/theme state through the defined state bridge (design spec §7) — no UI element that looks functional but isn't actually connected.
 - Ships with the required security defaults already in place for anything it touches (restricted navigation, CSP, DevTools off in release, scoped file access) — these aren't a separate follow-up task, per `CLAUDE.md` invariant #8.
